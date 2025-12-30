@@ -25,21 +25,27 @@ app.get('/health', (c) => {
 
 app.get('/api/db-check', async (c) => {
   try {
-    // Insert a test row
-    await c.env.DB.prepare(
-      'INSERT INTO test_connection (message) VALUES (?)'
-    ).bind('Connection verified').run();
-
-    // Select all rows
-    const rows = await c.env.DB.prepare(
-      'SELECT * FROM test_connection ORDER BY created_at DESC'
+    // Query the meal_slots table (has default data from migration)
+    const mealSlots = await c.env.DB.prepare(
+      'SELECT * FROM meal_slots ORDER BY sort_order'
     ).all();
+
+    // Get table counts to verify schema
+    const tableCountsResult = await c.env.DB.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM recipes) as recipes,
+        (SELECT COUNT(*) FROM categories) as categories,
+        (SELECT COUNT(*) FROM tags) as tags,
+        (SELECT COUNT(*) FROM ingredients) as ingredients,
+        (SELECT COUNT(*) FROM meal_slots) as meal_slots
+    `).first();
 
     return c.json({
       status: 'ok',
       database: 'connected',
-      message: 'Read and write successful',
-      rows: rows.results,
+      message: 'Schema verified',
+      mealSlots: mealSlots.results,
+      tableCounts: tableCountsResult,
     });
   } catch (error) {
     return c.json({
