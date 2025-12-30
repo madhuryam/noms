@@ -1,6 +1,18 @@
 name = "noms-api"
 main = "src/index.ts"
-compatibility_date = "2024-12-18"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
 
 [dev]
 port = 8787
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "noms-db"
+database_id = "placeholder-id"  # Replace with actual ID after running: npx wrangler d1 create noms-db
+
+# R2 Bucket for recipe images
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "noms-images"  # Replace after running: npx wrangler r2 bucket create noms-images
