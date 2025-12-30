@@ -1,0 +1,21 @@
+{
+  "name": "noms",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.5.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently --names \"api,web\" -c \"blue,green\" \"npm run dev -w @noms/api\" \"npm run dev -w @noms/web\"",
+    "dev:api": "npm run dev -w @noms/api",
+    "dev:web": "npm run dev -w @noms/web",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "turbo": "^2.3.3"
+  }
+}
