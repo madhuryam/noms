@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { HealthResponse } from '@noms/shared';
+import { recipes, categories, tags, search } from './routes';
 
 type Bindings = {
   DB: D1Database;
@@ -9,12 +10,14 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+// CORS middleware
 app.use('/*', cors({
   origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type'],
 }));
 
+// Health check endpoint
 app.get('/health', (c) => {
   const response: HealthResponse = {
     status: 'ok',
@@ -23,14 +26,13 @@ app.get('/health', (c) => {
   return c.json(response);
 });
 
+// Database check endpoint
 app.get('/api/db-check', async (c) => {
   try {
-    // Query the meal_slots table (has default data from migration)
     const mealSlots = await c.env.DB.prepare(
       'SELECT * FROM meal_slots ORDER BY sort_order'
     ).all();
 
-    // Get table counts to verify schema
     const tableCountsResult = await c.env.DB.prepare(`
       SELECT
         (SELECT COUNT(*) FROM recipes) as recipes,
@@ -56,15 +58,14 @@ app.get('/api/db-check', async (c) => {
   }
 });
 
+// R2 check endpoint
 app.get('/api/r2-check', async (c) => {
   try {
     const testContent = `R2 connection verified at ${new Date().toISOString()}`;
     const key = 'test/connection-check.txt';
 
-    // Put a test file
     await c.env.IMAGES_BUCKET.put(key, testContent);
 
-    // Get the file back
     const object = await c.env.IMAGES_BUCKET.get(key);
     if (!object) {
       throw new Error('Failed to retrieve uploaded file');
@@ -86,5 +87,16 @@ app.get('/api/r2-check', async (c) => {
     }, 500);
   }
 });
+
+// Mount route groups
+app.route('/api/recipes', recipes);
+app.route('/api/categories', categories);
+app.route('/api/tags', tags);
+app.route('/api/search', search);
+
+// Recipe tag routes are defined in tags.ts but need /api prefix
+// They're mounted at /api/tags but the routes include /recipes/:id/tags paths
+// So we need to re-mount for the recipe-tag endpoints
+app.route('/api', tags);
 
 export default app;
