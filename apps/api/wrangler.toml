@@ -10,9 +10,10 @@ port = 8787
 [[d1_databases]]
 binding = "DB"
 database_name = "noms-db"
-database_id = "placeholder-id"  # Replace with actual ID after running: npx wrangler d1 create noms-db
+database_id = "6a6ae1f3-8d4c-4260-af1f-f0a95788a99c"
+migrations_dir = "migrations"
 
-# R2 Bucket for recipe images
+# R2 Bucket for recipe images (enable R2 in Cloudflare Dashboard first)
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
-bucket_name = "noms-images"  # Replace after running: npx wrangler r2 bucket create noms-images
+bucket_name = "noms-images"
