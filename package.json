@@ -12,7 +12,9 @@
     "dev:api": "npm run dev -w @noms/api",
     "dev:web": "npm run dev -w @noms/web",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "test": "npm run test -w @noms/api",
+    "test:api": "npm run test -w @noms/api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
