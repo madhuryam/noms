@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { checkHealth, checkDatabase, checkStorage } from './lib/api';
+import { checkHealth, checkDatabase, checkStorage } from '../../lib/api';
 
 function StatusIndicator({ status }: { status: 'loading' | 'ok' | 'error' }) {
   if (status === 'loading') {
@@ -11,7 +11,7 @@ function StatusIndicator({ status }: { status: 'loading' | 'ok' | 'error' }) {
   return <span className="inline-block w-3 h-3 rounded-full bg-red-500 dark:bg-onedark-red" />;
 }
 
-function ConnectionStatus() {
+export function ConnectionStatus() {
   const health = useQuery({
     queryKey: ['health'],
     queryFn: checkHealth,
@@ -77,14 +77,3 @@ function ConnectionStatus() {
     </div>
   );
 }
-
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-100 dark:bg-onedark-bg flex flex-col items-center justify-center p-4 transition-colors">
-      <h1 className="text-4xl font-bold text-gray-800 dark:text-onedark-blue mb-8">Noms</h1>
-      <ConnectionStatus />
-    </div>
-  );
-}
-
-export default App;
