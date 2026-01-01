@@ -8,6 +8,7 @@ import {
   HomePage,
   RecipeListPage,
   RecipeDetailPage,
+  NewRecipePage,
   CategoriesPage,
   TagsPage,
   MealPlansPage,
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<AppShell />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/recipes" element={<RecipeListPage />} />
+            <Route path="/recipes/new" element={<NewRecipePage />} />
             <Route path="/recipes/:id" element={<RecipeDetailPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/tags" element={<TagsPage />} />

@@ -4,9 +4,9 @@ interface Recipe {
   id: number;
   title: string;
   description?: string | null;
-  image_url?: string | null;
-  prep_time?: number | null;
-  cook_time?: number | null;
+  image_path?: string | null;
+  prep_time_minutes?: number | null;
+  cook_time_minutes?: number | null;
   servings?: number | null;
   categories?: string[];
   tags?: string[];
@@ -50,9 +50,9 @@ export function RecipeGrid({ recipes, loading = false }: RecipeGridProps) {
           id={recipe.id}
           title={recipe.title}
           description={recipe.description}
-          imageUrl={recipe.image_url}
-          prepTime={recipe.prep_time}
-          cookTime={recipe.cook_time}
+          imageUrl={recipe.image_path}
+          prepTime={recipe.prep_time_minutes}
+          cookTime={recipe.cook_time_minutes}
           servings={recipe.servings}
           categories={recipe.categories}
           tags={recipe.tags}

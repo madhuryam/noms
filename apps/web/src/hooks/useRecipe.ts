@@ -5,41 +5,31 @@ interface Recipe {
   id: number;
   title: string;
   description: string | null;
-  instructions: string | null;
-  image_url: string | null;
-  prep_time: number | null;
-  cook_time: number | null;
+  markdown_content: string | null;
+  ingredients_raw: string | null;
+  instructions_raw: string | null;
+  image_path: string | null;
+  prep_time_minutes: number | null;
+  cook_time_minutes: number | null;
   servings: number | null;
-  difficulty: string | null;
-  source_url: string | null;
-  source_name: string | null;
+  servings_unit: string | null;
+  source_path: string | null;
   notes: string | null;
-  is_favorite: boolean;
-  rating: number | null;
   created_at: string;
   updated_at: string;
-  categories?: { id: number; name: string }[];
-  tags?: { id: number; name: string }[];
-  ingredients?: {
-    id: number;
-    name: string;
-    quantity: number | null;
-    unit: string | null;
-    notes: string | null;
-    order_index: number;
-  }[];
+  categories?: { id: number; name: string; slug: string; path: string; is_primary: boolean }[];
+  tags?: { id: number; name: string; display_name: string; color: string }[];
 }
 
 interface CreateRecipeInput {
   title: string;
   description?: string;
-  instructions?: string;
-  prep_time?: number;
-  cook_time?: number;
+  ingredients_raw?: string;
+  instructions_raw?: string;
   servings?: number;
-  difficulty?: string;
-  source_url?: string;
-  source_name?: string;
+  servings_unit?: string;
+  prep_time_minutes?: number;
+  cook_time_minutes?: number;
   notes?: string;
 }
 

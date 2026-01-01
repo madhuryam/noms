@@ -1,0 +1,291 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCreateRecipe } from '../../hooks';
+
+interface FormData {
+  title: string;
+  description: string;
+  ingredients_raw: string;
+  instructions_raw: string;
+  servings: number;
+  prep_time_minutes: string;
+  cook_time_minutes: string;
+}
+
+interface FormErrors {
+  title?: string;
+  ingredients_raw?: string;
+  instructions_raw?: string;
+}
+
+export function RecipeForm() {
+  const navigate = useNavigate();
+  const createRecipe = useCreateRecipe();
+
+  const [formData, setFormData] = useState<FormData>({
+    title: '',
+    description: '',
+    ingredients_raw: '',
+    instructions_raw: '',
+    servings: 4,
+    prep_time_minutes: '',
+    cook_time_minutes: '',
+  });
+
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!formData.title.trim()) {
+      newErrors.title = 'Title is required';
+    }
+
+    if (!formData.ingredients_raw.trim()) {
+      newErrors.ingredients_raw = 'Ingredients are required';
+    }
+
+    if (!formData.instructions_raw.trim()) {
+      newErrors.instructions_raw = 'Instructions are required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      const recipe = await createRecipe.mutateAsync({
+        title: formData.title.trim(),
+        description: formData.description.trim() || undefined,
+        ingredients_raw: formData.ingredients_raw.trim(),
+        instructions_raw: formData.instructions_raw.trim(),
+        servings: formData.servings,
+        prep_time_minutes: formData.prep_time_minutes ? Number(formData.prep_time_minutes) : undefined,
+        cook_time_minutes: formData.cook_time_minutes ? Number(formData.cook_time_minutes) : undefined,
+      });
+
+      navigate(`/recipes/${recipe.id}`);
+    } catch (error) {
+      // Error is handled by mutation state
+    }
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error when user starts typing
+    if (errors[name as keyof FormErrors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    if (name === 'servings') {
+      setFormData((prev) => ({ ...prev, [name]: Math.max(1, Number(value) || 1) }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Title */}
+      <div>
+        <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          Recipe Title <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          value={formData.title}
+          onChange={handleChange}
+          placeholder="e.g., Grandma's Chicken Soup"
+          className={`w-full px-4 py-2 rounded-lg border ${
+            errors.title
+              ? 'border-red-500 dark:border-onedark-red'
+              : 'border-gray-200 dark:border-onedark-bg-highlight'
+          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg`}
+        />
+        {errors.title && (
+          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">{errors.title}</p>
+        )}
+      </div>
+
+      {/* Description */}
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          Description
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          rows={2}
+          placeholder="A brief description of the recipe..."
+          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none"
+        />
+      </div>
+
+      {/* Ingredients */}
+      <div>
+        <label htmlFor="ingredients_raw" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          Ingredients <span className="text-red-500">*</span>
+        </label>
+        <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mb-2">
+          One ingredient per line (e.g., "2 cups flour" or "1 lb chicken breast")
+        </p>
+        <textarea
+          id="ingredients_raw"
+          name="ingredients_raw"
+          value={formData.ingredients_raw}
+          onChange={handleChange}
+          rows={6}
+          placeholder="2 cups all-purpose flour&#10;1 tsp salt&#10;1 cup milk&#10;2 eggs"
+          className={`w-full px-4 py-2 rounded-lg border ${
+            errors.ingredients_raw
+              ? 'border-red-500 dark:border-onedark-red'
+              : 'border-gray-200 dark:border-onedark-bg-highlight'
+          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg font-mono text-sm`}
+        />
+        {errors.ingredients_raw && (
+          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">{errors.ingredients_raw}</p>
+        )}
+      </div>
+
+      {/* Instructions */}
+      <div>
+        <label htmlFor="instructions_raw" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          Instructions <span className="text-red-500">*</span>
+        </label>
+        <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mb-2">
+          Write each step on a new line, or use numbered steps
+        </p>
+        <textarea
+          id="instructions_raw"
+          name="instructions_raw"
+          value={formData.instructions_raw}
+          onChange={handleChange}
+          rows={8}
+          placeholder="1. Preheat oven to 350°F&#10;2. Mix dry ingredients in a large bowl&#10;3. Add wet ingredients and stir until combined&#10;4. Pour into greased pan and bake for 25 minutes"
+          className={`w-full px-4 py-2 rounded-lg border ${
+            errors.instructions_raw
+              ? 'border-red-500 dark:border-onedark-red'
+              : 'border-gray-200 dark:border-onedark-bg-highlight'
+          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg`}
+        />
+        {errors.instructions_raw && (
+          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">{errors.instructions_raw}</p>
+        )}
+      </div>
+
+      {/* Time and Servings Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Servings */}
+        <div>
+          <label htmlFor="servings" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+            Servings
+          </label>
+          <input
+            type="number"
+            id="servings"
+            name="servings"
+            value={formData.servings}
+            onChange={handleNumberChange}
+            min="1"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+          />
+        </div>
+
+        {/* Prep Time */}
+        <div>
+          <label htmlFor="prep_time_minutes" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+            Prep Time (minutes)
+          </label>
+          <input
+            type="number"
+            id="prep_time_minutes"
+            name="prep_time_minutes"
+            value={formData.prep_time_minutes}
+            onChange={handleNumberChange}
+            min="0"
+            placeholder="15"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+          />
+        </div>
+
+        {/* Cook Time */}
+        <div>
+          <label htmlFor="cook_time_minutes" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+            Cook Time (minutes)
+          </label>
+          <input
+            type="number"
+            id="cook_time_minutes"
+            name="cook_time_minutes"
+            value={formData.cook_time_minutes}
+            onChange={handleNumberChange}
+            min="0"
+            placeholder="30"
+            className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+          />
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {createRecipe.isError && (
+        <div className="p-4 bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-lg">
+          <p className="text-sm text-red-600 dark:text-onedark-red">
+            {createRecipe.error instanceof Error
+              ? createRecipe.error.message
+              : 'Failed to create recipe. Please try again.'}
+          </p>
+        </div>
+      )}
+
+      {/* Submit Button */}
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-onedark-bg-highlight">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 text-gray-700 dark:text-onedark-fg border border-gray-200 dark:border-onedark-bg-highlight rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={createRecipe.isPending}
+          className="flex items-center gap-2 px-6 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {createRecipe.isPending ? (
+            <>
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Creating...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Recipe
+            </>
+          )}
+        </button>
+      </div>
+    </form>
+  );
+}

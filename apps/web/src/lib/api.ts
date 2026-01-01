@@ -10,11 +10,22 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   });
 
   if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(errorText || `API error: ${response.status} ${response.statusText}`);
   }
 
   return response.json();
 }
+
+export const api = {
+  get: <T>(endpoint: string) => fetchApi<T>(endpoint),
+  post: <T>(endpoint: string, data: unknown) =>
+    fetchApi<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
+  put: <T>(endpoint: string, data: unknown) =>
+    fetchApi<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: <T>(endpoint: string) =>
+    fetchApi<T>(endpoint, { method: 'DELETE' }),
+};
 
 export interface HealthCheckResponse {
   status: 'ok' | 'error';

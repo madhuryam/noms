@@ -5,50 +5,37 @@ interface Recipe {
   id: number;
   title: string;
   description: string | null;
-  image_url: string | null;
-  prep_time: number | null;
-  cook_time: number | null;
+  image_path: string | null;
+  prep_time_minutes: number | null;
+  cook_time_minutes: number | null;
   servings: number | null;
-  difficulty: string | null;
-  source_url: string | null;
-  source_name: string | null;
-  is_favorite: boolean;
-  rating: number | null;
   created_at: string;
-  updated_at: string;
 }
 
 interface RecipesResponse {
-  data: Recipe[];
+  recipes: Recipe[];
   pagination: {
-    page: number;
     limit: number;
+    offset: number;
     total: number;
-    total_pages: number;
   };
 }
 
 interface UseRecipesOptions {
-  page?: number;
   limit?: number;
-  category?: number;
-  tag?: number;
-  search?: string;
+  offset?: number;
   enabled?: boolean;
 }
 
 export function useRecipes(options: UseRecipesOptions = {}) {
-  const { page = 1, limit = 20, category, tag, search, enabled = true } = options;
+  const { limit = 20, offset = 0, enabled = true } = options;
 
   return useQuery({
-    queryKey: ['recipes', { page, limit, category, tag, search }],
+    queryKey: ['recipes', { limit, offset }],
     queryFn: async (): Promise<RecipesResponse> => {
       const params = new URLSearchParams();
-      params.set('page', String(page));
       params.set('limit', String(limit));
-      if (category) params.set('category', String(category));
-      if (tag) params.set('tag', String(tag));
-      if (search) params.set('search', search);
+      params.set('offset', String(offset));
 
       const response = await api.get<RecipesResponse>(`/api/recipes?${params}`);
       return response;
