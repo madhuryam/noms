@@ -110,9 +110,10 @@ test.describe('Search API', () => {
 
     const data = await response.json();
     // Should find recipes with "chocolate"
-    const hasChocolate = data.results.some((r: { title: string; description: string }) =>
-      r.title.toLowerCase().includes('chocolate') ||
-      r.description?.toLowerCase().includes('chocolate')
+    const hasChocolate = data.results.some(
+      (r: { title: string; description: string }) =>
+        r.title.toLowerCase().includes('chocolate') ||
+        r.description?.toLowerCase().includes('chocolate')
     );
     expect(hasChocolate).toBeTruthy();
   });

@@ -1,5 +1,7 @@
-const STORAGE_PREFIX = 'recipe-progress-';
-const EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+import { RECIPE_PROGRESS_STORAGE_PREFIX, RECIPE_PROGRESS_EXPIRATION_MS } from './constants';
+
+const STORAGE_PREFIX = RECIPE_PROGRESS_STORAGE_PREFIX;
+const EXPIRATION_MS = RECIPE_PROGRESS_EXPIRATION_MS;
 
 interface StoredProgress {
   ingredients: number[];
@@ -15,7 +17,10 @@ function isExpired(timestamp: number): boolean {
   return Date.now() - timestamp > EXPIRATION_MS;
 }
 
-export function loadProgress(recipeId: number): { ingredients: Set<number>; instructions: Set<number> } {
+export function loadProgress(recipeId: number): {
+  ingredients: Set<number>;
+  instructions: Set<number>;
+} {
   try {
     const stored = localStorage.getItem(getStorageKey(recipeId));
     if (!stored) {
@@ -96,7 +101,7 @@ export function cleanupExpiredProgress(): void {
       }
     }
 
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
   } catch {
     // Silently fail
   }

@@ -6,7 +6,10 @@ export function NewRecipePage() {
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm">
-        <Link to="/recipes" className="text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg">
+        <Link
+          to="/recipes"
+          className="text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg"
+        >
           Recipes
         </Link>
         <span className="text-gray-400 dark:text-onedark-fg-muted">/</span>

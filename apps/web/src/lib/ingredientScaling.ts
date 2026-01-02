@@ -122,10 +122,11 @@ function parseAmount(amountStr: string): number | null {
 // Check if an ingredient should not be scaled
 function shouldNotScale(ingredientName: string): boolean {
   const normalized = ingredientName.toLowerCase().trim();
-  return NO_SCALE_INGREDIENTS.some(noScale =>
-    normalized === noScale ||
-    normalized.startsWith(noScale + ',') ||
-    normalized.endsWith(' ' + noScale)
+  return NO_SCALE_INGREDIENTS.some(
+    (noScale) =>
+      normalized === noScale ||
+      normalized.startsWith(noScale + ',') ||
+      normalized.endsWith(' ' + noScale)
   );
 }
 
@@ -139,7 +140,8 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   // Regex to match amount at the start
   // Matches: "2", "1/2", "1 1/2", "½", "1½", "2.5"
-  const amountPattern = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*/;
+  const amountPattern =
+    /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*/;
 
   const amountMatch = original.match(amountPattern);
 
@@ -150,7 +152,7 @@ export function parseIngredient(line: string): ParsedIngredient {
       amount: null,
       unit: null,
       ingredient: original,
-      shouldScale: false
+      shouldScale: false,
     };
   }
 
@@ -159,7 +161,8 @@ export function parseIngredient(line: string): ParsedIngredient {
   const rest = original.slice(amountMatch[0].length).trim();
 
   // Common units (including abbreviations)
-  const unitPattern = /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kilograms?|kg\.?|milliliters?|ml\.?|liters?|l\.?|quarts?|qt\.?|pints?|pt\.?|gallons?|gal\.?|pinch(?:es)?|dash(?:es)?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|packages?|pkgs?\.?|sticks?|large|medium|small|whole)\s+/i;
+  const unitPattern =
+    /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kilograms?|kg\.?|milliliters?|ml\.?|liters?|l\.?|quarts?|qt\.?|pints?|pt\.?|gallons?|gal\.?|pinch(?:es)?|dash(?:es)?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|packages?|pkgs?\.?|sticks?|large|medium|small|whole)\s+/i;
 
   const unitMatch = rest.match(unitPattern);
 
@@ -262,7 +265,7 @@ export function scaleIngredients(ingredientsRaw: string, scaleFactor: number): S
 
   return ingredientsRaw
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(line => scaleIngredient(line, scaleFactor));
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => scaleIngredient(line, scaleFactor));
 }

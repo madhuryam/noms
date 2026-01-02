@@ -15,11 +15,11 @@ function parseInstructions(raw: string): string[] {
     }
     return raw
       .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .map(line => {
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => {
         // Remove leading numbers like "1.", "1)", "1:", "Step 1:", etc.
-        return line.replace(/^(?:step\s*)?\d+[\.\)\:]\s*/i, '');
+        return line.replace(/^(?:step\s*)?\d+[.):]\s*/i, '');
       });
   } catch {
     console.error('Failed to parse instructions');
@@ -35,15 +35,18 @@ export function InstructionSteps({
 }: InstructionStepsProps) {
   const instructions = parseInstructions(instructionsRaw);
 
-  const toggleItem = useCallback((index: number) => {
-    const next = new Set(checkedItems);
-    if (next.has(index)) {
-      next.delete(index);
-    } else {
-      next.add(index);
-    }
-    onProgressChange?.(next);
-  }, [checkedItems, onProgressChange]);
+  const toggleItem = useCallback(
+    (index: number) => {
+      const next = new Set(checkedItems);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      onProgressChange?.(next);
+    },
+    [checkedItems, onProgressChange]
+  );
 
   const clearAll = useCallback(() => {
     onProgressChange?.(new Set());
@@ -55,7 +58,9 @@ export function InstructionSteps({
   if (instructions.length === 0) {
     return (
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">Instructions</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">
+          Instructions
+        </h2>
         <p className="text-gray-500 dark:text-onedark-fg-muted italic">No instructions provided</p>
       </div>
     );
@@ -103,8 +108,18 @@ export function InstructionSteps({
                     }`}
                   >
                     {isChecked ? (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2.5}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     ) : (
                       index + 1
@@ -147,10 +162,13 @@ export function useInstructionProgress(recipeId: number) {
     setCheckedItems(instructions);
   }, [recipeId]);
 
-  const updateProgress = useCallback((newChecked: Set<number>, ingredients: Set<number>) => {
-    setCheckedItems(newChecked);
-    saveProgress(recipeId, ingredients, newChecked);
-  }, [recipeId]);
+  const updateProgress = useCallback(
+    (newChecked: Set<number>, ingredients: Set<number>) => {
+      setCheckedItems(newChecked);
+      saveProgress(recipeId, ingredients, newChecked);
+    },
+    [recipeId]
+  );
 
   return { checkedItems, updateProgress };
 }

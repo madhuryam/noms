@@ -23,8 +23,8 @@ search.get('/', async (c) => {
       .trim()
       .replace(/['"]/g, '') // Remove quotes
       .split(/\s+/)
-      .filter(term => term.length > 0)
-      .map(term => `"${term}"*`) // Prefix matching with quotes
+      .filter((term) => term.length > 0)
+      .map((term) => `"${term}"*`) // Prefix matching with quotes
       .join(' ');
 
     if (searchQuery.length === 0) {
@@ -36,7 +36,8 @@ search.get('/', async (c) => {
     }
 
     // Search with BM25 ranking and snippets
-    const results = await c.env.DB.prepare(`
+    const results = await c.env.DB.prepare(
+      `
       SELECT
         r.id,
         r.title,
@@ -56,14 +57,21 @@ search.get('/', async (c) => {
       WHERE recipes_fts MATCH ?
       ORDER BY rank
       LIMIT ? OFFSET ?
-    `).bind(searchQuery, limit, offset).all();
+    `
+    )
+      .bind(searchQuery, limit, offset)
+      .all();
 
     // Get total count
-    const countResult = await c.env.DB.prepare(`
+    const countResult = await c.env.DB.prepare(
+      `
       SELECT COUNT(*) as total
       FROM recipes_fts
       WHERE recipes_fts MATCH ?
-    `).bind(searchQuery).first<{ total: number }>();
+    `
+    )
+      .bind(searchQuery)
+      .first<{ total: number }>();
 
     return c.json({
       results: results.results,

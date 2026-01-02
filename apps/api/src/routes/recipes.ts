@@ -13,17 +13,21 @@ recipes.get('/', async (c) => {
   const offset = Number(c.req.query('offset')) || 0;
 
   try {
-    const results = await c.env.DB.prepare(`
+    const results = await c.env.DB.prepare(
+      `
       SELECT id, title, description, image_path, prep_time_minutes,
              cook_time_minutes, servings, created_at
       FROM recipes
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `).bind(limit, offset).all();
+    `
+    )
+      .bind(limit, offset)
+      .all();
 
-    const countResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as total FROM recipes'
-    ).first<{ total: number }>();
+    const countResult = await c.env.DB.prepare('SELECT COUNT(*) as total FROM recipes').first<{
+      total: number;
+    }>();
 
     return c.json({
       recipes: results.results,
@@ -34,9 +38,12 @@ recipes.get('/', async (c) => {
       },
     });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to fetch recipes',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch recipes',
+      },
+      500
+    );
   }
 });
 
@@ -45,29 +52,41 @@ recipes.get('/:id', async (c) => {
   const id = Number(c.req.param('id'));
 
   try {
-    const recipe = await c.env.DB.prepare(`
+    const recipe = await c.env.DB.prepare(
+      `
       SELECT * FROM recipes WHERE id = ?
-    `).bind(id).first();
+    `
+    )
+      .bind(id)
+      .first();
 
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
     }
 
     // Get tags for this recipe
-    const tags = await c.env.DB.prepare(`
+    const tags = await c.env.DB.prepare(
+      `
       SELECT t.id, t.name, t.display_name, t.color
       FROM tags t
       JOIN recipe_tags rt ON t.id = rt.tag_id
       WHERE rt.recipe_id = ?
-    `).bind(id).all();
+    `
+    )
+      .bind(id)
+      .all();
 
     // Get categories for this recipe
-    const categories = await c.env.DB.prepare(`
+    const categories = await c.env.DB.prepare(
+      `
       SELECT c.id, c.name, c.slug, c.path, rc.is_primary
       FROM categories c
       JOIN recipe_categories rc ON c.id = rc.category_id
       WHERE rc.recipe_id = ?
-    `).bind(id).all();
+    `
+    )
+      .bind(id)
+      .all();
 
     return c.json({
       ...recipe,
@@ -75,9 +94,12 @@ recipes.get('/:id', async (c) => {
       categories: categories.results,
     });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to fetch recipe',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch recipe',
+      },
+      500
+    );
   }
 });
 
@@ -102,33 +124,40 @@ recipes.post('/', async (c) => {
       return c.json({ error: 'Title is required' }, 400);
     }
 
-    const result = await c.env.DB.prepare(`
+    const result = await c.env.DB.prepare(
+      `
       INSERT INTO recipes (
         title, markdown_content, description, ingredients_raw, instructions_raw,
         servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      title,
-      markdown_content ?? null,
-      description ?? null,
-      ingredients_raw ?? null,
-      instructions_raw ?? null,
-      servings ?? null,
-      servings_unit ?? 'servings',
-      prep_time_minutes ?? null,
-      cook_time_minutes ?? null,
-      notes ?? null
-    ).run();
+    `
+    )
+      .bind(
+        title,
+        markdown_content ?? null,
+        description ?? null,
+        ingredients_raw ?? null,
+        instructions_raw ?? null,
+        servings ?? null,
+        servings_unit ?? 'servings',
+        prep_time_minutes ?? null,
+        cook_time_minutes ?? null,
+        notes ?? null
+      )
+      .run();
 
-    const newRecipe = await c.env.DB.prepare(
-      'SELECT * FROM recipes WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+    const newRecipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?')
+      .bind(result.meta.last_row_id)
+      .first();
 
     return c.json(newRecipe, 201);
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to create recipe',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to create recipe',
+      },
+      500
+    );
   }
 });
 
@@ -140,9 +169,7 @@ recipes.put('/:id', async (c) => {
     const body = await c.req.json();
 
     // Check if recipe exists
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM recipes WHERE id = ?'
-    ).bind(id).first();
+    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?').bind(id).first();
 
     if (!existing) {
       return c.json({ error: 'Recipe not found' }, 404);
@@ -150,9 +177,18 @@ recipes.put('/:id', async (c) => {
 
     // Build dynamic update query based on provided fields
     const allowedFields = [
-      'title', 'markdown_content', 'description', 'ingredients_raw',
-      'instructions_raw', 'servings', 'servings_unit', 'prep_time_minutes',
-      'cook_time_minutes', 'notes', 'image_path', 'source_path'
+      'title',
+      'markdown_content',
+      'description',
+      'ingredients_raw',
+      'instructions_raw',
+      'servings',
+      'servings_unit',
+      'prep_time_minutes',
+      'cook_time_minutes',
+      'notes',
+      'image_path',
+      'source_path',
     ];
 
     const updates: string[] = [];
@@ -170,22 +206,27 @@ recipes.put('/:id', async (c) => {
     }
 
     // Always update updated_at
-    updates.push('updated_at = datetime(\'now\')');
+    updates.push("updated_at = datetime('now')");
     values.push(id);
 
-    await c.env.DB.prepare(`
+    await c.env.DB.prepare(
+      `
       UPDATE recipes SET ${updates.join(', ')} WHERE id = ?
-    `).bind(...values).run();
+    `
+    )
+      .bind(...values)
+      .run();
 
-    const updated = await c.env.DB.prepare(
-      'SELECT * FROM recipes WHERE id = ?'
-    ).bind(id).first();
+    const updated = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?').bind(id).first();
 
     return c.json(updated);
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to update recipe',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to update recipe',
+      },
+      500
+    );
   }
 });
 
@@ -194,9 +235,7 @@ recipes.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'));
 
   try {
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM recipes WHERE id = ?'
-    ).bind(id).first();
+    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?').bind(id).first();
 
     if (!existing) {
       return c.json({ error: 'Recipe not found' }, 404);
@@ -206,9 +245,12 @@ recipes.delete('/:id', async (c) => {
 
     return c.json({ success: true, id });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to delete recipe',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to delete recipe',
+      },
+      500
+    );
   }
 });
 

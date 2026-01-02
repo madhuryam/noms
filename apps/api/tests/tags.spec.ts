@@ -153,7 +153,9 @@ test.describe('Tags API', () => {
     expect(recipeData.tags.find((t: { id: number }) => t.id === tag.id)).toBeUndefined();
   });
 
-  test('DELETE /api/recipes/:id/tags/:tagId returns 404 for non-existent link', async ({ request }) => {
+  test('DELETE /api/recipes/:id/tags/:tagId returns 404 for non-existent link', async ({
+    request,
+  }) => {
     const response = await request.delete('/api/recipes/99999/tags/99999');
     expect(response.status()).toBe(404);
   });

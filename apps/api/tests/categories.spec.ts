@@ -33,7 +33,9 @@ test.describe('Categories API', () => {
     expect(data.error).toContain('Name is required');
   });
 
-  test('POST /api/categories creates child category with correct path and depth', async ({ request }) => {
+  test('POST /api/categories creates child category with correct path and depth', async ({
+    request,
+  }) => {
     // Create parent
     const parentResponse = await request.post('/api/categories', {
       data: { name: 'Parent Category' },
@@ -112,7 +114,9 @@ test.describe('Categories API', () => {
     expect(data.category.id).toBe(category.id);
   });
 
-  test('GET /api/categories/:id/recipes returns 404 for non-existent category', async ({ request }) => {
+  test('GET /api/categories/:id/recipes returns 404 for non-existent category', async ({
+    request,
+  }) => {
     const response = await request.get('/api/categories/99999/recipes');
     expect(response.status()).toBe(404);
   });

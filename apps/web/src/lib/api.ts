@@ -94,8 +94,7 @@ export const api = {
     fetchApi<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
   put: <T>(endpoint: string, data: unknown) =>
     fetchApi<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: <T>(endpoint: string) =>
-    fetchApi<T>(endpoint, { method: 'DELETE' }),
+  delete: <T>(endpoint: string) => fetchApi<T>(endpoint, { method: 'DELETE' }),
 };
 
 export interface HealthCheckResponse {

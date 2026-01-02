@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Recipes API', () => {
-  let createdRecipeId: number;
-
   test('GET /api/recipes returns empty list initially', async ({ request }) => {
     const response = await request.get('/api/recipes');
     expect(response.ok()).toBeTruthy();
@@ -32,8 +30,6 @@ test.describe('Recipes API', () => {
     expect(data.description).toBe(newRecipe.description);
     expect(data.servings).toBe(newRecipe.servings);
     expect(data.id).toBeDefined();
-
-    createdRecipeId = data.id;
   });
 
   test('POST /api/recipes requires title', async ({ request }) => {

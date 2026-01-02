@@ -27,15 +27,18 @@ export function IngredientList({
     }
   }, [ingredientsRaw, scaleFactor]);
 
-  const toggleItem = useCallback((index: number) => {
-    const next = new Set(checkedItems);
-    if (next.has(index)) {
-      next.delete(index);
-    } else {
-      next.add(index);
-    }
-    onProgressChange?.(next);
-  }, [checkedItems, onProgressChange]);
+  const toggleItem = useCallback(
+    (index: number) => {
+      const next = new Set(checkedItems);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      onProgressChange?.(next);
+    },
+    [checkedItems, onProgressChange]
+  );
 
   const clearAll = useCallback(() => {
     onProgressChange?.(new Set());
@@ -47,7 +50,9 @@ export function IngredientList({
   if (ingredients.length === 0) {
     return (
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">Ingredients</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">
+          Ingredients
+        </h2>
         <p className="text-gray-500 dark:text-onedark-fg-muted italic">No ingredients listed</p>
       </div>
     );
@@ -77,9 +82,7 @@ export function IngredientList({
 
       {/* Scale indicator */}
       {scaleFactor !== 1 && (
-        <p className="text-sm text-blue-600 dark:text-onedark-blue">
-          Scaled to {scaleFactor}x
-        </p>
+        <p className="text-sm text-blue-600 dark:text-onedark-blue">Scaled to {scaleFactor}x</p>
       )}
 
       {/* Ingredient List */}
@@ -93,7 +96,9 @@ export function IngredientList({
                   type="button"
                   onClick={() => toggleItem(index)}
                   aria-pressed={isChecked}
-                  aria-label={isChecked ? `Uncheck ${ingredient.original}` : `Check ${ingredient.original}`}
+                  aria-label={
+                    isChecked ? `Uncheck ${ingredient.original}` : `Check ${ingredient.original}`
+                  }
                   className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                     isChecked
                       ? 'bg-green-500 dark:bg-onedark-green text-white'
@@ -101,8 +106,18 @@ export function IngredientList({
                   }`}
                 >
                   {isChecked ? (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.5}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   ) : (
                     <span className="w-2 h-2 rounded-full bg-current" />
@@ -144,10 +159,13 @@ export function useIngredientProgress(recipeId: number) {
     setCheckedItems(ingredients);
   }, [recipeId]);
 
-  const updateProgress = useCallback((newChecked: Set<number>, instructions: Set<number>) => {
-    setCheckedItems(newChecked);
-    saveProgress(recipeId, newChecked, instructions);
-  }, [recipeId]);
+  const updateProgress = useCallback(
+    (newChecked: Set<number>, instructions: Set<number>) => {
+      setCheckedItems(newChecked);
+      saveProgress(recipeId, newChecked, instructions);
+    },
+    [recipeId]
+  );
 
   return { checkedItems, updateProgress };
 }

@@ -13,7 +13,12 @@ interface Category {
   path: string;
   depth: number;
   sort_order: number;
+  recipeCount?: number;
   children?: Category[];
+}
+
+interface CategoryWithCount extends Category {
+  recipe_count: number;
 }
 
 const categories = new Hono<{ Bindings: Bindings }>();
@@ -21,28 +26,39 @@ const categories = new Hono<{ Bindings: Bindings }>();
 // GET /api/categories - Return flat list of all categories
 categories.get('/', async (c) => {
   try {
-    const results = await c.env.DB.prepare(`
+    const results = await c.env.DB.prepare(
+      `
       SELECT id, name, slug, parent_id, path, depth, sort_order
       FROM categories
       ORDER BY path, sort_order, name
-    `).all();
+    `
+    ).all();
 
     return c.json({ categories: results.results });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to fetch categories',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch categories',
+      },
+      500
+    );
   }
 });
 
-// GET /api/categories/tree - Return hierarchical tree structure
+// GET /api/categories/tree - Return hierarchical tree structure with recipe counts
 categories.get('/tree', async (c) => {
   try {
-    const results = await c.env.DB.prepare(`
-      SELECT id, name, slug, parent_id, path, depth, sort_order
-      FROM categories
-      ORDER BY path, sort_order, name
-    `).all<Category>();
+    // Get categories with direct recipe counts
+    const results = await c.env.DB.prepare(
+      `
+      SELECT c.id, c.name, c.slug, c.parent_id, c.path, c.depth, c.sort_order,
+             COUNT(rc.recipe_id) as recipe_count
+      FROM categories c
+      LEFT JOIN recipe_categories rc ON c.id = rc.category_id
+      GROUP BY c.id
+      ORDER BY c.path, c.sort_order, c.name
+    `
+    ).all<CategoryWithCount>();
 
     // Build tree structure
     const categoryMap = new Map<number, Category>();
@@ -50,7 +66,11 @@ categories.get('/tree', async (c) => {
 
     // First pass: create map of all categories
     for (const cat of results.results) {
-      categoryMap.set(cat.id, { ...cat, children: [] });
+      categoryMap.set(cat.id, {
+        ...cat,
+        recipeCount: cat.recipe_count,
+        children: [],
+      });
     }
 
     // Second pass: build tree
@@ -69,9 +89,97 @@ categories.get('/tree', async (c) => {
 
     return c.json({ tree: roots });
   } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch category tree',
+      },
+      500
+    );
+  }
+});
+
+// GET /api/categories/:id - Get single category with ancestors
+categories.get('/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  // Skip if this looks like a named route
+  if (isNaN(id)) {
+    return c.notFound();
+  }
+
+  try {
+    const category = await c.env.DB.prepare(
+      `
+      SELECT c.id, c.name, c.slug, c.parent_id, c.path, c.depth, c.sort_order,
+             COUNT(rc.recipe_id) as recipe_count
+      FROM categories c
+      LEFT JOIN recipe_categories rc ON c.id = rc.category_id
+      WHERE c.id = ?
+      GROUP BY c.id
+    `
+    )
+      .bind(id)
+      .first<CategoryWithCount>();
+
+    if (!category) {
+      return c.json({ error: 'Category not found' }, 404);
+    }
+
+    // Get ancestors by parsing the path
+    let ancestors: Category[] = [];
+    if (category.path) {
+      const ancestorIds = category.path.split('/').filter(Boolean).map(Number);
+      if (ancestorIds.length > 0) {
+        const placeholders = ancestorIds.map(() => '?').join(',');
+        const ancestorResults = await c.env.DB.prepare(
+          `
+          SELECT id, name, slug, parent_id, path, depth, sort_order
+          FROM categories
+          WHERE id IN (${placeholders})
+          ORDER BY depth
+        `
+        )
+          .bind(...ancestorIds)
+          .all<Category>();
+        ancestors = ancestorResults.results;
+      }
+    }
+
+    // Get direct children
+    const childrenResults = await c.env.DB.prepare(
+      `
+      SELECT c.id, c.name, c.slug, c.parent_id, c.path, c.depth, c.sort_order,
+             COUNT(rc.recipe_id) as recipe_count
+      FROM categories c
+      LEFT JOIN recipe_categories rc ON c.id = rc.category_id
+      WHERE c.parent_id = ?
+      GROUP BY c.id
+      ORDER BY c.sort_order, c.name
+    `
+    )
+      .bind(id)
+      .all<CategoryWithCount>();
+
+    const children = childrenResults.results.map((child) => ({
+      ...child,
+      recipeCount: child.recipe_count,
+    }));
+
     return c.json({
-      error: error instanceof Error ? error.message : 'Failed to fetch category tree',
-    }, 500);
+      category: {
+        ...category,
+        recipeCount: category.recipe_count,
+      },
+      ancestors,
+      children,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch category',
+      },
+      500
+    );
   }
 });
 
@@ -83,16 +191,17 @@ categories.get('/:id/recipes', async (c) => {
 
   try {
     // First check if category exists
-    const category = await c.env.DB.prepare(
-      'SELECT * FROM categories WHERE id = ?'
-    ).bind(id).first<Category>();
+    const category = await c.env.DB.prepare('SELECT * FROM categories WHERE id = ?')
+      .bind(id)
+      .first<Category>();
 
     if (!category) {
       return c.json({ error: 'Category not found' }, 404);
     }
 
     // Use recursive CTE to get all descendant category IDs
-    const recipes = await c.env.DB.prepare(`
+    const recipes = await c.env.DB.prepare(
+      `
       WITH RECURSIVE category_tree AS (
         SELECT id FROM categories WHERE id = ?
         UNION ALL
@@ -106,10 +215,14 @@ categories.get('/:id/recipes', async (c) => {
       INNER JOIN category_tree ct ON rc.category_id = ct.id
       ORDER BY r.created_at DESC
       LIMIT ? OFFSET ?
-    `).bind(id, limit, offset).all();
+    `
+    )
+      .bind(id, limit, offset)
+      .all();
 
     // Get total count
-    const countResult = await c.env.DB.prepare(`
+    const countResult = await c.env.DB.prepare(
+      `
       WITH RECURSIVE category_tree AS (
         SELECT id FROM categories WHERE id = ?
         UNION ALL
@@ -120,7 +233,10 @@ categories.get('/:id/recipes', async (c) => {
       FROM recipes r
       INNER JOIN recipe_categories rc ON r.id = rc.recipe_id
       INNER JOIN category_tree ct ON rc.category_id = ct.id
-    `).bind(id).first<{ total: number }>();
+    `
+    )
+      .bind(id)
+      .first<{ total: number }>();
 
     return c.json({
       category,
@@ -132,9 +248,12 @@ categories.get('/:id/recipes', async (c) => {
       },
     });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to fetch category recipes',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch category recipes',
+      },
+      500
+    );
   }
 });
 
@@ -155,9 +274,9 @@ categories.post('/', async (c) => {
       .replace(/^-|-$/g, '');
 
     // Check for duplicate slug
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM categories WHERE slug = ?'
-    ).bind(slug).first();
+    const existing = await c.env.DB.prepare('SELECT id FROM categories WHERE slug = ?')
+      .bind(slug)
+      .first();
 
     if (existing) {
       return c.json({ error: 'Category with this slug already exists' }, 409);
@@ -168,9 +287,9 @@ categories.post('/', async (c) => {
     let depth = 0;
 
     if (parent_id) {
-      const parent = await c.env.DB.prepare(
-        'SELECT id, path, depth FROM categories WHERE id = ?'
-      ).bind(parent_id).first<{ id: number; path: string; depth: number }>();
+      const parent = await c.env.DB.prepare('SELECT id, path, depth FROM categories WHERE id = ?')
+        .bind(parent_id)
+        .first<{ id: number; path: string; depth: number }>();
 
       if (!parent) {
         return c.json({ error: 'Parent category not found' }, 400);
@@ -180,20 +299,27 @@ categories.post('/', async (c) => {
       depth = parent.depth + 1;
     }
 
-    const result = await c.env.DB.prepare(`
+    const result = await c.env.DB.prepare(
+      `
       INSERT INTO categories (name, slug, parent_id, path, depth)
       VALUES (?, ?, ?, ?, ?)
-    `).bind(name, slug, parent_id ?? null, path, depth).run();
+    `
+    )
+      .bind(name, slug, parent_id ?? null, path, depth)
+      .run();
 
-    const newCategory = await c.env.DB.prepare(
-      'SELECT * FROM categories WHERE id = ?'
-    ).bind(result.meta.last_row_id).first();
+    const newCategory = await c.env.DB.prepare('SELECT * FROM categories WHERE id = ?')
+      .bind(result.meta.last_row_id)
+      .first();
 
     return c.json(newCategory, 201);
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to create category',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to create category',
+      },
+      500
+    );
   }
 });
 
@@ -202,9 +328,9 @@ categories.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'));
 
   try {
-    const existing = await c.env.DB.prepare(
-      'SELECT id FROM categories WHERE id = ?'
-    ).bind(id).first();
+    const existing = await c.env.DB.prepare('SELECT id FROM categories WHERE id = ?')
+      .bind(id)
+      .first();
 
     if (!existing) {
       return c.json({ error: 'Category not found' }, 404);
@@ -214,9 +340,12 @@ categories.delete('/:id', async (c) => {
 
     return c.json({ success: true, id });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : 'Failed to delete category',
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to delete category',
+      },
+      500
+    );
   }
 });
 

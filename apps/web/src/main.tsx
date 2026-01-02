@@ -30,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/recipes/:id/edit" element={<EditRecipePage />} />
             <Route path="/recipes/:id" element={<RecipeDetailPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/categories/:id" element={<CategoriesPage />} />
             <Route path="/tags" element={<TagsPage />} />
             <Route path="/meal-plans" element={<MealPlansPage />} />
             <Route path="/pantry" element={<PantryPage />} />
@@ -38,5 +39,5 @@ createRoot(document.getElementById('root')!).render(
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 );

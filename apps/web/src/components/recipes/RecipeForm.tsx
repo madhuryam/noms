@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateRecipe, useUpdateRecipe } from '../../hooks';
+import { DEFAULT_SERVINGS } from '../../lib/constants';
 
 interface FormData {
   title: string;
@@ -44,7 +45,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     description: '',
     ingredients_raw: '',
     instructions_raw: '',
-    servings: 4,
+    servings: DEFAULT_SERVINGS,
     prep_time_minutes: '',
     cook_time_minutes: '',
     notes: '',
@@ -58,7 +59,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         description: initialData.description ?? '',
         ingredients_raw: initialData.ingredients_raw ?? '',
         instructions_raw: initialData.instructions_raw ?? '',
-        servings: initialData.servings ?? 4,
+        servings: initialData.servings ?? DEFAULT_SERVINGS,
         prep_time_minutes: initialData.prep_time_minutes?.toString() ?? '',
         cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
         notes: initialData.notes ?? '',
@@ -102,8 +103,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       ingredients_raw: formData.ingredients_raw.trim(),
       instructions_raw: formData.instructions_raw.trim(),
       servings: formData.servings,
-      prep_time_minutes: formData.prep_time_minutes ? Number(formData.prep_time_minutes) : undefined,
-      cook_time_minutes: formData.cook_time_minutes ? Number(formData.cook_time_minutes) : undefined,
+      prep_time_minutes: formData.prep_time_minutes
+        ? Number(formData.prep_time_minutes)
+        : undefined,
+      cook_time_minutes: formData.cook_time_minutes
+        ? Number(formData.cook_time_minutes)
+        : undefined,
       notes: formData.notes.trim() || undefined,
     };
 
@@ -115,9 +120,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     }
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     // Clear error when user starts typing
@@ -129,7 +132,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (name === 'servings') {
-      setFormData((prev) => ({ ...prev, [name]: Math.max(1, Number(value) || 1) }));
+      setFormData((prev) => ({
+        ...prev,
+        [name]: Math.max(1, Number(value) || 1),
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -139,7 +145,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Title */}
       <div>
-        <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+        <label
+          htmlFor="title"
+          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+        >
           Recipe Title <span className="text-red-500">*</span>
         </label>
         <input
@@ -162,7 +171,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
       {/* Description */}
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+        <label
+          htmlFor="description"
+          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+        >
           Description
         </label>
         <textarea
@@ -178,7 +190,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
       {/* Ingredients */}
       <div>
-        <label htmlFor="ingredients_raw" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+        <label
+          htmlFor="ingredients_raw"
+          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+        >
           Ingredients <span className="text-red-500">*</span>
         </label>
         <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mb-2">
@@ -198,13 +213,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg font-mono text-sm`}
         />
         {errors.ingredients_raw && (
-          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">{errors.ingredients_raw}</p>
+          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">
+            {errors.ingredients_raw}
+          </p>
         )}
       </div>
 
       {/* Instructions */}
       <div>
-        <label htmlFor="instructions_raw" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+        <label
+          htmlFor="instructions_raw"
+          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+        >
           Instructions <span className="text-red-500">*</span>
         </label>
         <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mb-2">
@@ -224,7 +244,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg`}
         />
         {errors.instructions_raw && (
-          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">{errors.instructions_raw}</p>
+          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">
+            {errors.instructions_raw}
+          </p>
         )}
       </div>
 
@@ -232,7 +254,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Servings */}
         <div>
-          <label htmlFor="servings" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          <label
+            htmlFor="servings"
+            className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+          >
             Servings
           </label>
           <input
@@ -248,7 +273,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
         {/* Prep Time */}
         <div>
-          <label htmlFor="prep_time_minutes" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          <label
+            htmlFor="prep_time_minutes"
+            className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+          >
             Prep Time (minutes)
           </label>
           <input
@@ -265,7 +293,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
         {/* Cook Time */}
         <div>
-          <label htmlFor="cook_time_minutes" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          <label
+            htmlFor="cook_time_minutes"
+            className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+          >
             Cook Time (minutes)
           </label>
           <input
@@ -283,7 +314,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
       {/* Notes */}
       <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+        <label
+          htmlFor="notes"
+          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+        >
           Notes
         </label>
         <textarea
@@ -325,8 +359,19 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           {mutation.isPending ? (
             <>
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               {mode === 'edit' ? 'Saving...' : 'Creating...'}
             </>
@@ -334,9 +379,19 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mode === 'edit' ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 )}
               </svg>
               {mode === 'edit' ? 'Save Changes' : 'Create Recipe'}

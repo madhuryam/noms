@@ -11,11 +11,14 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>();
 
 // CORS middleware
-app.use('/*', cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type'],
-}));
+app.use(
+  '/*',
+  cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type'],
+  })
+);
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -29,18 +32,18 @@ app.get('/health', (c) => {
 // Database check endpoint
 app.get('/api/db-check', async (c) => {
   try {
-    const mealSlots = await c.env.DB.prepare(
-      'SELECT * FROM meal_slots ORDER BY sort_order'
-    ).all();
+    const mealSlots = await c.env.DB.prepare('SELECT * FROM meal_slots ORDER BY sort_order').all();
 
-    const tableCountsResult = await c.env.DB.prepare(`
+    const tableCountsResult = await c.env.DB.prepare(
+      `
       SELECT
         (SELECT COUNT(*) FROM recipes) as recipes,
         (SELECT COUNT(*) FROM categories) as categories,
         (SELECT COUNT(*) FROM tags) as tags,
         (SELECT COUNT(*) FROM ingredients) as ingredients,
         (SELECT COUNT(*) FROM meal_slots) as meal_slots
-    `).first();
+    `
+    ).first();
 
     return c.json({
       status: 'ok',
@@ -50,11 +53,14 @@ app.get('/api/db-check', async (c) => {
       tableCounts: tableCountsResult,
     });
   } catch (error) {
-    return c.json({
-      status: 'error',
-      database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }, 500);
+    return c.json(
+      {
+        status: 'error',
+        database: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
   }
 });
 
@@ -80,11 +86,14 @@ app.get('/api/r2-check', async (c) => {
       content,
     });
   } catch (error) {
-    return c.json({
-      status: 'error',
-      r2: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }, 500);
+    return c.json(
+      {
+        status: 'error',
+        r2: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
   }
 });
 
