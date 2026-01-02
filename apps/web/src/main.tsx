@@ -14,6 +14,7 @@ import {
   TagsPage,
   MealPlansPage,
   PantryPage,
+  ImportPage,
   NotFoundPage,
 } from './pages';
 import './index.css';
@@ -34,6 +35,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/tags" element={<TagsPage />} />
             <Route path="/meal-plans" element={<MealPlansPage />} />
             <Route path="/pantry" element={<PantryPage />} />
+            <Route path="/import" element={<ImportPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

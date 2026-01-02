@@ -3,3 +3,4 @@ export { useRecipe, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from './
 export { useCategoryTree, useCategory } from './useCategories';
 export type { Category } from './useCategories';
 export { useCategoryRecipes } from './useCategoryRecipes';
+export { useVaultImport } from './useVaultImport';

@@ -7,4 +7,5 @@ export { CategoriesPage } from './CategoriesPage';
 export { TagsPage } from './TagsPage';
 export { MealPlansPage } from './MealPlansPage';
 export { PantryPage } from './PantryPage';
+export { ImportPage } from './ImportPage';
 export { NotFoundPage } from './NotFoundPage';
