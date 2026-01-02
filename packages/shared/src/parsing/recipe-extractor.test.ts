@@ -3,8 +3,9 @@ import { extractRecipe, validateRecipe } from './recipe-extractor';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Path to test vault
-const VAULT_PATH =
+// Path to test vault - set via environment variable TEST_VAULT_PATH
+const VAULT_PATH = process.env.TEST_VAULT_PATH || '';
+
 describe('extractRecipe', () => {
   describe('basic extraction', () => {
     it('extracts title from first H1', () => {
