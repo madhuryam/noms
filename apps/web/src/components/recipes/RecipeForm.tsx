@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateRecipe } from '../../hooks';
+import { useCreateRecipe, useUpdateRecipe } from '../../hooks';
 
 interface FormData {
   title: string;
@@ -10,6 +10,7 @@ interface FormData {
   servings: number;
   prep_time_minutes: string;
   cook_time_minutes: string;
+  notes: string;
 }
 
 interface FormErrors {
@@ -18,9 +19,25 @@ interface FormErrors {
   instructions_raw?: string;
 }
 
-export function RecipeForm() {
+interface RecipeFormProps {
+  mode?: 'create' | 'edit';
+  recipeId?: number;
+  initialData?: {
+    title: string;
+    description: string | null;
+    ingredients_raw: string | null;
+    instructions_raw: string | null;
+    servings: number | null;
+    prep_time_minutes: number | null;
+    cook_time_minutes: number | null;
+    notes: string | null;
+  };
+}
+
+export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFormProps) {
   const navigate = useNavigate();
   const createRecipe = useCreateRecipe();
+  const updateRecipe = useUpdateRecipe(recipeId ?? 0);
 
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -30,7 +47,24 @@ export function RecipeForm() {
     servings: 4,
     prep_time_minutes: '',
     cook_time_minutes: '',
+    notes: '',
   });
+
+  // Populate form when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        title: initialData.title,
+        description: initialData.description ?? '',
+        ingredients_raw: initialData.ingredients_raw ?? '',
+        instructions_raw: initialData.instructions_raw ?? '',
+        servings: initialData.servings ?? 4,
+        prep_time_minutes: initialData.prep_time_minutes?.toString() ?? '',
+        cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
+        notes: initialData.notes ?? '',
+      });
+    }
+  }, [initialData]);
 
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -53,6 +87,8 @@ export function RecipeForm() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const mutation = mode === 'edit' ? updateRecipe : createRecipe;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -60,19 +96,21 @@ export function RecipeForm() {
       return;
     }
 
-    try {
-      const recipe = await createRecipe.mutateAsync({
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        ingredients_raw: formData.ingredients_raw.trim(),
-        instructions_raw: formData.instructions_raw.trim(),
-        servings: formData.servings,
-        prep_time_minutes: formData.prep_time_minutes ? Number(formData.prep_time_minutes) : undefined,
-        cook_time_minutes: formData.cook_time_minutes ? Number(formData.cook_time_minutes) : undefined,
-      });
+    const payload = {
+      title: formData.title.trim(),
+      description: formData.description.trim() || undefined,
+      ingredients_raw: formData.ingredients_raw.trim(),
+      instructions_raw: formData.instructions_raw.trim(),
+      servings: formData.servings,
+      prep_time_minutes: formData.prep_time_minutes ? Number(formData.prep_time_minutes) : undefined,
+      cook_time_minutes: formData.cook_time_minutes ? Number(formData.cook_time_minutes) : undefined,
+      notes: formData.notes.trim() || undefined,
+    };
 
+    try {
+      const recipe = await mutation.mutateAsync(payload);
       navigate(`/recipes/${recipe.id}`);
-    } catch (error) {
+    } catch {
       // Error is handled by mutation state
     }
   };
@@ -243,13 +281,29 @@ export function RecipeForm() {
         </div>
       </div>
 
+      {/* Notes */}
+      <div>
+        <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          Notes
+        </label>
+        <textarea
+          id="notes"
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          rows={3}
+          placeholder="Any additional notes, tips, or variations..."
+          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none"
+        />
+      </div>
+
       {/* Error Message */}
-      {createRecipe.isError && (
+      {mutation.isError && (
         <div className="p-4 bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-lg">
           <p className="text-sm text-red-600 dark:text-onedark-red">
-            {createRecipe.error instanceof Error
-              ? createRecipe.error.message
-              : 'Failed to create recipe. Please try again.'}
+            {mutation.error instanceof Error
+              ? mutation.error.message
+              : `Failed to ${mode === 'edit' ? 'update' : 'create'} recipe. Please try again.`}
           </p>
         </div>
       )}
@@ -265,23 +319,27 @@ export function RecipeForm() {
         </button>
         <button
           type="submit"
-          disabled={createRecipe.isPending}
+          disabled={mutation.isPending}
           className="flex items-center gap-2 px-6 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {createRecipe.isPending ? (
+          {mutation.isPending ? (
             <>
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              Creating...
+              {mode === 'edit' ? 'Saving...' : 'Creating...'}
             </>
           ) : (
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                {mode === 'edit' ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                )}
               </svg>
-              Create Recipe
+              {mode === 'edit' ? 'Save Changes' : 'Create Recipe'}
             </>
           )}
         </button>

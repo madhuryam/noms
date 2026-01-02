@@ -1,20 +1,91 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const DEFAULT_TIMEOUT = 10000; // 10 seconds
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public statusText?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `API error: ${response.status} ${response.statusText}`);
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage: string;
+
+      try {
+        const errorBody = await response.text();
+        // Try to parse as JSON to get a structured error message
+        try {
+          const errorJson = JSON.parse(errorBody);
+          errorMessage = errorJson.error || errorJson.message || errorBody;
+        } catch {
+          errorMessage = errorBody;
+        }
+      } catch {
+        errorMessage = response.statusText;
+      }
+
+      throw new ApiError(
+        errorMessage || `Request failed: ${response.status}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    // Handle empty responses (e.g., 204 No Content)
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return {} as T;
+    }
+
+    const text = await response.text();
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new ApiError('Invalid JSON response from server');
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new ApiError('Request timed out');
+      }
+      if (error.message === 'Failed to fetch') {
+        throw new ApiError('Unable to connect to server. Please check your connection.');
+      }
+      throw new ApiError(error.message);
+    }
+
+    throw new ApiError('An unexpected error occurred');
   }
-
-  return response.json();
 }
 
 export const api = {
