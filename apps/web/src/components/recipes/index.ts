@@ -1,5 +1,6 @@
 export { RecipeCard } from './RecipeCard';
 export { RecipeGrid } from './RecipeGrid';
+export { DraggableRecipeGrid } from './DraggableRecipeGrid';
 export { RecipeForm } from './RecipeForm';
 export { RecipeHeader } from './RecipeHeader';
 export { RecipeMetadata } from './RecipeMetadata';

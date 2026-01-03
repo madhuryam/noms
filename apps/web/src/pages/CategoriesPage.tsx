@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useCategoryTree, useCategory, useCategoryRecipes } from '../hooks';
 import { CategoryBreadcrumb } from '../components/categories';
-import { RecipeGrid } from '../components/recipes';
+import { DraggableRecipeGrid } from '../components/recipes';
 import type { Category } from '../hooks';
 
 function LoadingSkeleton() {
@@ -238,7 +238,7 @@ function CategoryDetailView({ categoryId }: { categoryId: number }) {
       {(hasRecipes || recipesLoading) && (
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">Recipes</h2>
-          <RecipeGrid recipes={recipes} loading={recipesLoading} />
+          <DraggableRecipeGrid recipes={recipes} loading={recipesLoading} />
         </div>
       )}
 

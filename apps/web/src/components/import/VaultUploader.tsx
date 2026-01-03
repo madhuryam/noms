@@ -123,14 +123,24 @@ export function VaultUploader({ onParseComplete }: VaultUploaderProps) {
           const parsed = extractRecipe(file.content, file.name);
           const validation = validateRecipe(parsed);
 
+          // Check if recipe is missing both ingredients and instructions
+          const hasNoIngredients = parsed.ingredients.length === 0;
+          const hasNoInstructions = !parsed.instructions || parsed.instructions.trim().length === 0;
+          const needsFormatting = hasNoIngredients && hasNoInstructions;
+
+          // For unparseable recipes, put the raw content into instructions
+          const finalInstructions = needsFormatting ? file.content : parsed.instructions;
+
           recipes.push({
             ...parsed,
+            instructions: finalInstructions,
             filePath: file.path,
             category: getCategoryFromPath(file.path),
             selected: true,
             parseErrors: validation.errors,
             parseWarnings: validation.warnings,
             rawContent: file.content,
+            needsFormatting,
           });
         } catch (err) {
           errors.push(`Failed to parse ${file.path}: ${err}`);
@@ -294,15 +304,28 @@ export function VaultUploader({ onParseComplete }: VaultUploaderProps) {
   );
 }
 
-// Helper to recursively read directory entries
-async function readDirectory(directory: FileSystemDirectoryEntry): Promise<File[]> {
-  const files: File[] = [];
-  const reader = directory.createReader();
+// Helper to read all entries from a directory reader (handles batching)
+async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+  const allEntries: FileSystemEntry[] = [];
 
-  const readEntries = (): Promise<FileSystemEntry[]> =>
+  const readBatch = (): Promise<FileSystemEntry[]> =>
     new Promise((resolve, reject) => {
       reader.readEntries(resolve, reject);
     });
+
+  // readEntries returns entries in batches, keep reading until empty
+  let batch = await readBatch();
+  while (batch.length > 0) {
+    allEntries.push(...batch);
+    batch = await readBatch();
+  }
+
+  return allEntries;
+}
+
+// Helper to recursively read directory entries
+async function readDirectory(directory: FileSystemDirectoryEntry): Promise<File[]> {
+  const files: File[] = [];
 
   const getFile = (entry: FileSystemFileEntry): Promise<File> =>
     new Promise((resolve, reject) => {
@@ -323,21 +346,19 @@ async function readDirectory(directory: FileSystemDirectoryEntry): Promise<File[
     } else if (entry.isDirectory) {
       const dirEntry = entry as FileSystemDirectoryEntry;
       const dirReader = dirEntry.createReader();
-      const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
-        dirReader.readEntries(resolve, reject);
-      });
+      // Read ALL entries from subdirectory (not just first batch)
+      const entries = await readAllEntries(dirReader);
       for (const subEntry of entries) {
         await processEntry(subEntry, path + '/' + entry.name);
       }
     }
   };
 
-  let entries = await readEntries();
-  while (entries.length > 0) {
-    for (const entry of entries) {
-      await processEntry(entry, directory.name);
-    }
-    entries = await readEntries();
+  const reader = directory.createReader();
+  const entries = await readAllEntries(reader);
+
+  for (const entry of entries) {
+    await processEntry(entry, directory.name);
   }
 
   return files;

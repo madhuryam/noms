@@ -68,6 +68,7 @@ export function CategoryNav({
           selectedId={selectedId}
           showRecipeCount={true}
           compact={true}
+          expandedByDefault={true}
         />
       )}
     </div>

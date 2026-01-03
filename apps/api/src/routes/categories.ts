@@ -323,6 +323,149 @@ categories.post('/', async (c) => {
   }
 });
 
+// PUT /api/categories/:id - Update category (name, parent, sort_order)
+categories.put('/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    const body = await c.req.json<{
+      name?: string;
+      parentId?: number | null;
+      sortOrder?: number;
+    }>();
+
+    const { name, parentId, sortOrder } = body;
+
+    // Check if category exists
+    const existing = await c.env.DB.prepare(
+      'SELECT id, name, slug, parent_id, path, depth FROM categories WHERE id = ?'
+    )
+      .bind(id)
+      .first<Category>();
+
+    if (!existing) {
+      return c.json({ error: 'Category not found' }, 404);
+    }
+
+    // Prevent moving a category to be its own descendant
+    if (parentId !== undefined && parentId !== null) {
+      // Check if new parent is a descendant of this category
+      const potentialParent = await c.env.DB.prepare(
+        'SELECT id, path FROM categories WHERE id = ?'
+      )
+        .bind(parentId)
+        .first<{ id: number; path: string }>();
+
+      if (!potentialParent) {
+        return c.json({ error: 'Parent category not found' }, 400);
+      }
+
+      // Check if the potential parent's path contains this category's id
+      const parentPathParts = potentialParent.path ? potentialParent.path.split('/') : [];
+      if (parentPathParts.includes(String(id)) || potentialParent.id === id) {
+        return c.json({ error: 'Cannot move category to be a descendant of itself' }, 400);
+      }
+    }
+
+    const updates: string[] = [];
+    const values: unknown[] = [];
+
+    // Update name and regenerate slug if name changed
+    if (name !== undefined && name !== existing.name) {
+      const newSlug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      updates.push('name = ?', 'slug = ?');
+      values.push(name, newSlug);
+    }
+
+    // Update sort_order
+    if (sortOrder !== undefined) {
+      updates.push('sort_order = ?');
+      values.push(sortOrder);
+    }
+
+    // Update parent (move category)
+    const parentChanged = parentId !== undefined && parentId !== existing.parent_id;
+    let newPath = existing.path;
+    let newDepth = existing.depth;
+
+    if (parentChanged) {
+      if (parentId === null) {
+        // Moving to root
+        newPath = '';
+        newDepth = 0;
+      } else {
+        // Moving to new parent
+        const newParent = await c.env.DB.prepare(
+          'SELECT id, path, depth FROM categories WHERE id = ?'
+        )
+          .bind(parentId)
+          .first<{ id: number; path: string; depth: number }>();
+
+        if (!newParent) {
+          return c.json({ error: 'Parent category not found' }, 400);
+        }
+
+        newPath = newParent.path ? `${newParent.path}/${newParent.id}` : String(newParent.id);
+        newDepth = newParent.depth + 1;
+      }
+
+      updates.push('parent_id = ?', 'path = ?', 'depth = ?');
+      values.push(parentId, newPath, newDepth);
+    }
+
+    if (updates.length === 0) {
+      return c.json({ error: 'No valid fields to update' }, 400);
+    }
+
+    values.push(id);
+    await c.env.DB.prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
+
+    // If parent changed, update all descendants' paths and depths
+    if (parentChanged) {
+      const oldPathPrefix = existing.path ? `${existing.path}/${id}` : String(id);
+      const newPathPrefix = newPath ? `${newPath}/${id}` : String(id);
+      const depthDiff = newDepth - existing.depth;
+
+      // Get all descendants
+      const descendants = await c.env.DB.prepare(
+        `SELECT id, path, depth FROM categories WHERE path LIKE ? OR path LIKE ?`
+      )
+        .bind(`${oldPathPrefix}`, `${oldPathPrefix}/%`)
+        .all<{ id: number; path: string; depth: number }>();
+
+      // Update each descendant's path and depth
+      for (const desc of descendants.results) {
+        const updatedPath = desc.path.replace(oldPathPrefix, newPathPrefix);
+        const updatedDepth = desc.depth + depthDiff;
+
+        await c.env.DB.prepare('UPDATE categories SET path = ?, depth = ? WHERE id = ?')
+          .bind(updatedPath, updatedDepth, desc.id)
+          .run();
+      }
+    }
+
+    // Get updated category
+    const updated = await c.env.DB.prepare('SELECT * FROM categories WHERE id = ?')
+      .bind(id)
+      .first();
+
+    return c.json({ success: true, category: updated });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to update category',
+      },
+      500
+    );
+  }
+});
+
 // DELETE /api/categories/:id - Delete category
 categories.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'));

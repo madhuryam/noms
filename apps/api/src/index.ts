@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { HealthResponse } from '@noms/shared';
-import { recipes, categories, tags, search } from './routes';
+import { recipes, categories, tags, search, importRoutes } from './routes';
 
 type Bindings = {
   DB: D1Database;
@@ -102,6 +102,7 @@ app.route('/api/recipes', recipes);
 app.route('/api/categories', categories);
 app.route('/api/tags', tags);
 app.route('/api/search', search);
+app.route('/api/import', importRoutes);
 
 // Recipe tag routes are defined in tags.ts but need /api prefix
 // They're mounted at /api/tags but the routes include /recipes/:id/tags paths

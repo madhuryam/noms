@@ -230,6 +230,68 @@ recipes.put('/:id', async (c) => {
   }
 });
 
+// PUT /api/recipes/:id/categories - Update recipe's category assignments
+recipes.put('/:id/categories', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    const body = await c.req.json<{
+      categoryIds: number[];
+      primaryCategoryId?: number;
+    }>();
+
+    const { categoryIds, primaryCategoryId } = body;
+
+    if (!Array.isArray(categoryIds)) {
+      return c.json({ error: 'categoryIds must be an array' }, 400);
+    }
+
+    // Check if recipe exists
+    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?').bind(id).first();
+
+    if (!existing) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
+    // Delete existing category associations
+    await c.env.DB.prepare('DELETE FROM recipe_categories WHERE recipe_id = ?').bind(id).run();
+
+    // Insert new category associations
+    const primaryId = primaryCategoryId ?? categoryIds[0];
+    for (const categoryId of categoryIds) {
+      await c.env.DB.prepare(
+        `INSERT INTO recipe_categories (recipe_id, category_id, is_primary)
+         VALUES (?, ?, ?)`
+      )
+        .bind(id, categoryId, categoryId === primaryId ? 1 : 0)
+        .run();
+    }
+
+    // Get updated categories
+    const categories = await c.env.DB.prepare(
+      `SELECT c.id, c.name, c.slug, c.path, rc.is_primary
+       FROM categories c
+       JOIN recipe_categories rc ON c.id = rc.category_id
+       WHERE rc.recipe_id = ?`
+    )
+      .bind(id)
+      .all();
+
+    return c.json({
+      success: true,
+      recipeId: id,
+      categories: categories.results,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to update recipe categories',
+      },
+      500
+    );
+  }
+});
+
 // DELETE /api/recipes/:id - Delete recipe
 recipes.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'));
@@ -248,6 +310,29 @@ recipes.delete('/:id', async (c) => {
     return c.json(
       {
         error: error instanceof Error ? error.message : 'Failed to delete recipe',
+      },
+      500
+    );
+  }
+});
+
+// DELETE /api/recipes - Delete ALL recipes (for testing only)
+recipes.delete('/', async (c) => {
+  try {
+    // Delete in correct order to respect foreign keys
+    await c.env.DB.prepare('DELETE FROM recipe_ingredients').run();
+    await c.env.DB.prepare('DELETE FROM recipe_tags').run();
+    await c.env.DB.prepare('DELETE FROM recipe_categories').run();
+    await c.env.DB.prepare('DELETE FROM recipes').run();
+    // Also clean up orphaned tags and categories
+    await c.env.DB.prepare('DELETE FROM tags').run();
+    await c.env.DB.prepare('DELETE FROM categories').run();
+
+    return c.json({ success: true, message: 'All recipes deleted' });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to delete all recipes',
       },
       500
     );

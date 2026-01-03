@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
 export interface Category {
@@ -43,5 +43,30 @@ export function useCategory(id: number | undefined) {
       return response;
     },
     enabled: !!id,
+  });
+}
+
+interface MoveCategoryInput {
+  parentId: number | null;
+  sortOrder?: number;
+}
+
+interface MoveCategoryResponse {
+  success: boolean;
+  category: Category;
+}
+
+// Move a category to a new parent (or make it top-level)
+export function useMoveCategory(id: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: MoveCategoryInput): Promise<MoveCategoryResponse> => {
+      return api.put<MoveCategoryResponse>(`/api/categories/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['category'] });
+    },
   });
 }

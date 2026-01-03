@@ -11,6 +11,15 @@ export interface ParsedIngredient {
   isGroupHeader: boolean;
 }
 
+/**
+ * Remove markdown checkbox syntax from a line
+ * Handles: [ ], [x], [X], -[ ], - [ ], -[x], - [x], etc.
+ */
+function stripCheckbox(line: string): string {
+  // Match checkbox patterns: [ ], [x], [X] with optional leading - or * and spaces
+  return line.replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '$1').trim();
+}
+
 // Common preparation terms that might appear after ingredient name
 const PREPARATION_PATTERNS = [
   /,\s*(minced|chopped|diced|sliced|crushed|grated|shredded|julienned|cubed)/i,
@@ -63,8 +72,9 @@ export function parseIngredientLine(line: string): ParsedIngredient {
     };
   }
 
-  // Remove common list markers (-, *, bullet points)
-  const cleanedLine = trimmedLine.replace(/^[-*•]\s*/, '');
+  // Remove checkboxes and common list markers (-, *, bullet points)
+  const withoutCheckbox = stripCheckbox(trimmedLine);
+  const cleanedLine = withoutCheckbox.replace(/^[-*•]\s*/, '');
 
   // Use parse-ingredient library with normalized units
   const results = parseIngredient(cleanedLine, {

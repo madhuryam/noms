@@ -1,6 +1,7 @@
-export { useRecipes } from './useRecipes';
-export { useRecipe, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from './useRecipe';
-export { useCategoryTree, useCategory } from './useCategories';
+export { useRecipes, useInfiniteRecipes } from './useRecipes';
+export type { Recipe } from './useRecipes';
+export { useRecipe, useCreateRecipe, useUpdateRecipe, useDeleteRecipe, useUpdateRecipeCategories } from './useRecipe';
+export { useCategoryTree, useCategory, useMoveCategory } from './useCategories';
 export type { Category } from './useCategories';
 export { useCategoryRecipes } from './useCategoryRecipes';
 export { useVaultImport } from './useVaultImport';

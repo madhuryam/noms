@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { VaultUploader, ImportPreview, ImportProgress } from '../components/import';
 import { useVaultImport } from '../hooks/useVaultImport';
+import { api } from '../lib/api';
 import type { VaultParseResult, ParsedVaultRecipe } from '../components/import/types';
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'complete';
@@ -10,8 +11,24 @@ export function ImportPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<ImportStep>('upload');
   const [parseResult, setParseResult] = useState<VaultParseResult | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { progress, results, isComplete, startImport, reset } = useVaultImport();
+
+  const handleDeleteAll = useCallback(async () => {
+    if (!confirm('Are you sure you want to delete ALL recipes? This cannot be undone.')) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await api.delete('/api/recipes');
+      alert('All recipes deleted successfully');
+    } catch (error) {
+      alert(`Failed to delete recipes: ${error}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, []);
 
   const handleParseComplete = useCallback((result: VaultParseResult) => {
     setParseResult(result);
@@ -53,11 +70,20 @@ export function ImportPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-onedark-fg">Import Recipes</h1>
-        <p className="text-gray-500 dark:text-onedark-fg-muted mt-1">
-          Import recipes from your Obsidian vault or markdown files
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-onedark-fg">Import Recipes</h1>
+          <p className="text-gray-500 dark:text-onedark-fg-muted mt-1">
+            Import recipes from your Obsidian vault or markdown files
+          </p>
+        </div>
+        <button
+          onClick={handleDeleteAll}
+          disabled={isDeleting}
+          className="px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-50 transition-colors"
+        >
+          {isDeleting ? 'Deleting...' : 'Delete All Recipes'}
+        </button>
       </div>
 
       {/* Progress Steps */}

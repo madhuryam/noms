@@ -14,6 +14,7 @@ export interface ParsedVaultRecipe extends ParsedRecipe {
   parseErrors: string[];
   parseWarnings: string[];
   rawContent: string;
+  needsFormatting: boolean; // True if recipe is missing both ingredients and instructions
 }
 
 export interface CategoryNode {

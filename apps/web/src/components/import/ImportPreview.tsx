@@ -9,19 +9,42 @@ interface ImportPreviewProps {
   onCancel: () => void;
 }
 
+const RECIPES_PER_PAGE = 30;
+
 export function ImportPreview({
   result,
   onSelectionChange,
   onStartImport,
   onCancel,
 }: ImportPreviewProps) {
-  const [showAllRecipes, setShowAllRecipes] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<ParsedVaultRecipe | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [liveErrors, setLiveErrors] = useState<string[]>([]);
   const [liveWarnings, setLiveWarnings] = useState<string[]>([]);
+  const [displayCount, setDisplayCount] = useState(RECIPES_PER_PAGE);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  // Infinite scroll - load more when sentinel is visible
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    const container = listContainerRef.current;
+    if (!sentinel || !container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && displayCount < result.recipes.length) {
+          setDisplayCount((prev) => Math.min(prev + RECIPES_PER_PAGE, result.recipes.length));
+        }
+      },
+      { root: container, threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [displayCount, result.recipes.length]);
 
   // Sync edited content when selecting a recipe
   useEffect(() => {
@@ -55,18 +78,25 @@ export function ImportPreview({
     return () => clearTimeout(timer);
   }, [editedContent, isDirty, selectedRecipe]);
 
-  const { selectedCount, warningCount, errorCount } = useMemo(() => {
+  const { selectedCount, warningCount, errorCount, needsFormattingCount } = useMemo(() => {
     let selected = 0;
     let warnings = 0;
     let errors = 0;
+    let needsFormatting = 0;
 
     for (const recipe of result.recipes) {
       if (recipe.selected) selected++;
       if (recipe.parseWarnings.length > 0) warnings++;
       if (recipe.parseErrors.length > 0) errors++;
+      if (recipe.needsFormatting) needsFormatting++;
     }
 
-    return { selectedCount: selected, warningCount: warnings, errorCount: errors };
+    return {
+      selectedCount: selected,
+      warningCount: warnings,
+      errorCount: errors,
+      needsFormattingCount: needsFormatting,
+    };
   }, [result.recipes]);
 
   const toggleRecipe = (index: number) => {
@@ -96,6 +126,11 @@ export function ImportPreview({
       );
       const validation = validateRecipe(parsed);
 
+      // Re-check if recipe still needs formatting after edit
+      const hasNoIngredients = parsed.ingredients.length === 0;
+      const hasNoInstructions = !parsed.instructions || parsed.instructions.trim().length === 0;
+      const needsFormatting = hasNoIngredients && hasNoInstructions;
+
       const updatedRecipe: ParsedVaultRecipe = {
         ...parsed,
         filePath: selectedRecipe.filePath,
@@ -104,6 +139,7 @@ export function ImportPreview({
         parseErrors: validation.errors,
         parseWarnings: validation.warnings,
         rawContent: editedContent,
+        needsFormatting,
       };
 
       return result.recipes.map((r) =>
@@ -126,6 +162,17 @@ export function ImportPreview({
       setIsDirty(false);
     }
   }, [saveCurrentChanges, onSelectionChange, selectedRecipe?.filePath]);
+
+  // Save any pending changes before starting import
+  const handleStartImport = useCallback(() => {
+    if (isDirty && selectedRecipe) {
+      const updatedRecipes = saveCurrentChanges();
+      if (updatedRecipes) {
+        onSelectionChange(updatedRecipes);
+      }
+    }
+    onStartImport();
+  }, [isDirty, selectedRecipe, saveCurrentChanges, onSelectionChange, onStartImport]);
 
   const handleSelectRecipe = useCallback(
     (recipe: ParsedVaultRecipe) => {
@@ -176,12 +223,13 @@ export function ImportPreview({
     [editedContent]
   );
 
-  const displayedRecipes = showAllRecipes ? result.recipes : result.recipes.slice(0, 10);
+  // Show recipes up to the current display count (infinite scroll)
+  const displayedRecipes = result.recipes.slice(0, displayCount);
 
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg p-3 border border-gray-200 dark:border-onedark-bg-highlight">
           <p className="text-xl font-bold text-gray-900 dark:text-onedark-fg">
             {result.recipes.length}
@@ -193,7 +241,16 @@ export function ImportPreview({
           <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">Selected</p>
         </div>
         <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg p-3 border border-gray-200 dark:border-onedark-bg-highlight">
-          <p className="text-xl font-bold text-yellow-600 dark:text-onedark-orange">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 dark:bg-yellow-500" />
+            <p className="text-xl font-bold text-yellow-600 dark:text-yellow-500">
+              {needsFormattingCount}
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">Needs Formatting</p>
+        </div>
+        <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg p-3 border border-gray-200 dark:border-onedark-bg-highlight">
+          <p className="text-xl font-bold text-orange-600 dark:text-onedark-orange">
             {warningCount}
           </p>
           <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">With Warnings</p>
@@ -240,7 +297,7 @@ export function ImportPreview({
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto max-h-[400px]">
+          <div ref={listContainerRef} className="flex-1 overflow-y-auto max-h-[400px]">
             {displayedRecipes.map((recipe, index) => {
               const hasIssues = recipe.parseWarnings.length > 0 || recipe.parseErrors.length > 0;
               const isSelected = selectedRecipe?.filePath === recipe.filePath;
@@ -280,9 +337,17 @@ export function ImportPreview({
 
                   {/* Recipe info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-onedark-fg truncate">
-                      {recipe.title}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      {recipe.needsFormatting && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-yellow-400 dark:bg-yellow-500 flex-shrink-0"
+                          title="Not properly formatted - content placed in instructions"
+                        />
+                      )}
+                      <p className="text-sm font-medium text-gray-900 dark:text-onedark-fg truncate">
+                        {recipe.title}
+                      </p>
+                    </div>
                     {hasIssues && (
                       <div className="flex gap-1.5 mt-0.5">
                         {recipe.parseErrors.length > 0 && (
@@ -301,17 +366,16 @@ export function ImportPreview({
                 </div>
               );
             })}
-          </div>
-          {result.recipes.length > 10 && (
-            <div className="p-2 border-t border-gray-200 dark:border-onedark-bg-highlight">
-              <button
-                onClick={() => setShowAllRecipes(!showAllRecipes)}
-                className="w-full text-xs text-blue-600 dark:text-onedark-blue hover:underline"
+            {/* Sentinel for infinite scroll */}
+            {displayCount < result.recipes.length && (
+              <div
+                ref={loadMoreRef}
+                className="py-3 text-center text-xs text-gray-400 dark:text-onedark-fg-muted"
               >
-                {showAllRecipes ? 'Show less' : `Show all ${result.recipes.length}`}
-              </button>
-            </div>
-          )}
+                Loading more... ({displayCount} of {result.recipes.length})
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: Detail Panel */}
@@ -436,7 +500,7 @@ export function ImportPreview({
           Cancel
         </button>
         <button
-          onClick={onStartImport}
+          onClick={handleStartImport}
           disabled={selectedCount === 0}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-onedark-blue rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >

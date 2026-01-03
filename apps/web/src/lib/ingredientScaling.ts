@@ -257,6 +257,14 @@ export function scaleIngredient(line: string, scaleFactor: number): ScaledIngred
   return { display: display.trim(), original: parsed.original, wasScaled: true };
 }
 
+// Remove markdown checkbox syntax from a line
+function stripCheckbox(line: string): string {
+  return line
+    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
+    .replace(/^[-*]\s+/, '')
+    .trim();
+}
+
 // Scale multiple ingredients
 export function scaleIngredients(ingredientsRaw: string, scaleFactor: number): ScaledIngredient[] {
   if (!ingredientsRaw || typeof ingredientsRaw !== 'string') {
@@ -265,7 +273,7 @@ export function scaleIngredients(ingredientsRaw: string, scaleFactor: number): S
 
   return ingredientsRaw
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => stripCheckbox(line))
     .filter((line) => line.length > 0)
     .map((line) => scaleIngredient(line, scaleFactor));
 }

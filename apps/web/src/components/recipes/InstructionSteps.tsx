@@ -8,6 +8,14 @@ interface InstructionStepsProps {
   checkedItems: Set<number>;
 }
 
+// Remove markdown checkbox syntax from a line
+function stripCheckbox(line: string): string {
+  return line
+    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
+    .replace(/^[-*]\s+/, '')
+    .trim();
+}
+
 function parseInstructions(raw: string): string[] {
   try {
     if (!raw || typeof raw !== 'string') {
@@ -15,7 +23,7 @@ function parseInstructions(raw: string): string[] {
     }
     return raw
       .split('\n')
-      .map((line) => line.trim())
+      .map((line) => stripCheckbox(line))
       .filter((line) => line.length > 0)
       .map((line) => {
         // Remove leading numbers like "1.", "1)", "1:", "Step 1:", etc.

@@ -1,13 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useRecipes } from '../hooks';
-import { RecipeGrid } from '../components/recipes';
+import { useInfiniteRecipes } from '../hooks';
+import { DraggableRecipeGrid } from '../components/recipes';
 
 export function RecipeListPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
-  const { data, isLoading, isError, error } = useRecipes();
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteRecipes();
 
-  const recipes = data?.recipes ?? [];
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Flatten all pages into a single recipes array
+  const recipes = useMemo(() => {
+    return data?.pages.flatMap((page) => page.recipes) ?? [];
+  }, [data?.pages]);
+
+  const total = data?.pages[0]?.pagination.total ?? 0;
+
+  // Infinite scroll - load more when sentinel is visible
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <div className="space-y-6">
@@ -16,8 +42,8 @@ export function RecipeListPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-onedark-fg">Recipes</h1>
           <p className="text-gray-500 dark:text-onedark-fg-muted">
-            {data?.pagination.total
-              ? `${data.pagination.total} recipe${data.pagination.total === 1 ? '' : 's'} in your collection`
+            {total
+              ? `${total} recipe${total === 1 ? '' : 's'} in your collection`
               : 'Manage your recipe collection'}
           </p>
         </div>
@@ -90,10 +116,26 @@ export function RecipeListPage() {
       )}
 
       {/* Loading State */}
-      {isLoading && <RecipeGrid recipes={[]} loading={true} />}
+      {isLoading && <DraggableRecipeGrid recipes={[]} loading={true} />}
 
       {/* Recipes Grid */}
-      {!isLoading && !isError && recipes.length > 0 && <RecipeGrid recipes={recipes} />}
+      {!isLoading && !isError && recipes.length > 0 && (
+        <>
+          <DraggableRecipeGrid recipes={recipes} />
+
+          {/* Load more sentinel */}
+          <div ref={loadMoreRef} className="py-4 text-center">
+            {isFetchingNextPage && (
+              <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">Loading more...</p>
+            )}
+            {!hasNextPage && recipes.length > 0 && (
+              <p className="text-sm text-gray-400 dark:text-onedark-fg-muted">
+                Showing all {recipes.length} recipes
+              </p>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Empty State */}
       {!isLoading && !isError && recipes.length === 0 && (

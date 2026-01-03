@@ -89,3 +89,30 @@ export function useDeleteRecipe() {
     },
   });
 }
+
+interface UpdateRecipeCategoriesInput {
+  categoryIds: number[];
+  primaryCategoryId?: number;
+}
+
+interface UpdateRecipeCategoriesResponse {
+  success: boolean;
+  recipeId: number;
+  categories: { id: number; name: string; slug: string; path: string; is_primary: boolean }[];
+}
+
+export function useUpdateRecipeCategories(id: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UpdateRecipeCategoriesInput): Promise<UpdateRecipeCategoriesResponse> => {
+      return api.put<UpdateRecipeCategoriesResponse>(`/api/recipes/${id}/categories`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipe', id] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categoryRecipes'] });
+    },
+  });
+}
