@@ -11,3 +11,4 @@ export { useAssociations, useAssociation, useCreateAssociation, useUpdateAssocia
 export type { AssociationGroup } from './useAssociations';
 export { useTags, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags, useAddTagToRecipe, useRemoveTagFromRecipe } from './useTags';
 export type { Tag } from './useTags';
+export { useDailySuggestions } from './useDailySuggestions';

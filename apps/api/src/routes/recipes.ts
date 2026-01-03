@@ -135,6 +135,104 @@ recipes.get('/', async (c) => {
   }
 });
 
+// GET /api/recipes/suggestions/daily - Get random recipe suggestions
+// Query params:
+//   - categories: comma-separated category IDs (optional)
+//   - tags: comma-separated tag IDs (optional)
+// If no filters provided, returns random recipes from all recipes
+recipes.get('/suggestions/daily', async (c) => {
+  try {
+    const categoriesParam = c.req.query('categories');
+    const tagsParam = c.req.query('tags');
+
+    const categoryIds = categoriesParam
+      ? categoriesParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+      : [];
+    const tagIds = tagsParam
+      ? tagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+      : [];
+
+    let query: string;
+    const bindings: number[] = [];
+
+    if (categoryIds.length > 0 && tagIds.length > 0) {
+      // Filter by both categories AND tags
+      const catPlaceholders = categoryIds.map(() => '?').join(',');
+      const tagPlaceholders = tagIds.map(() => '?').join(',');
+      query = `
+        SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
+        FROM recipes r
+        JOIN recipe_categories rc ON r.id = rc.recipe_id
+        JOIN recipe_tags rt ON r.id = rt.recipe_id
+        WHERE rc.category_id IN (${catPlaceholders})
+          AND rt.tag_id IN (${tagPlaceholders})
+        ORDER BY RANDOM()
+        LIMIT 10
+      `;
+      bindings.push(...categoryIds, ...tagIds);
+    } else if (categoryIds.length > 0) {
+      // Filter by categories only
+      const placeholders = categoryIds.map(() => '?').join(',');
+      query = `
+        SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
+        FROM recipes r
+        JOIN recipe_categories rc ON r.id = rc.recipe_id
+        WHERE rc.category_id IN (${placeholders})
+        ORDER BY RANDOM()
+        LIMIT 10
+      `;
+      bindings.push(...categoryIds);
+    } else if (tagIds.length > 0) {
+      // Filter by tags only
+      const placeholders = tagIds.map(() => '?').join(',');
+      query = `
+        SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
+        FROM recipes r
+        JOIN recipe_tags rt ON r.id = rt.recipe_id
+        WHERE rt.tag_id IN (${placeholders})
+        ORDER BY RANDOM()
+        LIMIT 10
+      `;
+      bindings.push(...tagIds);
+    } else {
+      // No filters - return random recipes from all
+      query = `
+        SELECT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
+        FROM recipes r
+        ORDER BY RANDOM()
+        LIMIT 10
+      `;
+    }
+
+    const results = await c.env.DB.prepare(query).bind(...bindings).all();
+
+    // Sort results to show recipes with images first
+    const recipes = (results.results ?? []) as Array<{
+      id: number;
+      title: string;
+      image_path: string | null;
+      prep_time_minutes: number | null;
+      cook_time_minutes: number | null;
+    }>;
+    recipes.sort((a, b) => {
+      const aHasImage = a.image_path ? 1 : 0;
+      const bHasImage = b.image_path ? 1 : 0;
+      return bHasImage - aHasImage;
+    });
+
+    return c.json({
+      recipes,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch suggestions',
+      },
+      500
+    );
+  }
+});
+
 // GET /api/recipes/:id - Get single recipe with tags and categories
 recipes.get('/:id', async (c) => {
   const id = Number(c.req.param('id'));

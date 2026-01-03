@@ -1,4 +1,4 @@
-import { FoodAssociations } from '../components/settings';
+import { FoodAssociations, SuggestionsSettings } from '../components/settings';
 
 export function SettingsPage() {
   return (
@@ -10,6 +10,9 @@ export function SettingsPage() {
           Configure your recipe app preferences
         </p>
       </div>
+
+      {/* Daily Suggestions Section */}
+      <SuggestionsSettings />
 
       {/* Food Associations Section */}
       <FoodAssociations />

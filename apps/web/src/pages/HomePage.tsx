@@ -1,8 +1,29 @@
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDailySuggestions } from '../hooks';
+import { SuggestionsBar } from '../components/suggestions';
 
 export function HomePage() {
+  const queryClient = useQueryClient();
+  const { recipes: suggestions, isLoading: suggestionsLoading, isFetching: suggestionsRefreshing } = useDailySuggestions();
+
+  const handleRefreshSuggestions = () => {
+    queryClient.invalidateQueries({ queryKey: ['suggestions', 'daily'] });
+  };
+
   return (
     <div className="space-y-8">
+      {/* Daily Suggestions */}
+      {!suggestionsLoading && suggestions.length > 0 && (
+        <section>
+          <SuggestionsBar
+            recipes={suggestions}
+            onRefresh={handleRefreshSuggestions}
+            isRefreshing={suggestionsRefreshing}
+          />
+        </section>
+      )}
+
       {/* Hero Section */}
       <section className="text-center py-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-onedark-fg mb-4">
