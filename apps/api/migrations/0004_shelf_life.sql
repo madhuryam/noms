@@ -1,0 +1,105 @@
+-- Shelf life data for ingredients
+-- Stores how long items typically last in fridge/freezer
+
+CREATE TABLE shelf_life (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ingredient_name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    fridge_days INTEGER,
+    freezer_days INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_shelf_life_ingredient ON shelf_life(ingredient_name);
+
+-- Insert default shelf life data
+INSERT INTO shelf_life (ingredient_name, fridge_days, freezer_days) VALUES
+    -- Vegetables
+    ('broccoli', 5, 365),
+    ('spinach', 5, 365),
+    ('lettuce', 7, NULL),
+    ('kale', 7, 365),
+    ('carrots', 21, 365),
+    ('celery', 14, 365),
+    ('cucumber', 7, NULL),
+    ('tomato', 7, 60),
+    ('tomatoes', 7, 60),
+    ('bell pepper', 7, 365),
+    ('peppers', 7, 365),
+    ('onion', 30, 365),
+    ('onions', 30, 365),
+    ('garlic', 30, 365),
+    ('mushrooms', 7, 365),
+    ('zucchini', 5, 365),
+    ('squash', 7, 365),
+    ('eggplant', 5, 365),
+    ('cabbage', 14, 365),
+    ('cauliflower', 7, 365),
+    ('asparagus', 4, 365),
+    ('green beans', 5, 365),
+    ('peas', 5, 365),
+    ('corn', 3, 365),
+    ('potatoes', 21, 365),
+    ('sweet potato', 21, 365),
+    -- Fruits
+    ('apples', 30, 365),
+    ('apple', 30, 365),
+    ('bananas', 7, 60),
+    ('banana', 7, 60),
+    ('oranges', 21, 365),
+    ('orange', 21, 365),
+    ('lemons', 21, 120),
+    ('lemon', 21, 120),
+    ('limes', 21, 120),
+    ('lime', 21, 120),
+    ('grapes', 7, 365),
+    ('strawberries', 5, 365),
+    ('blueberries', 7, 365),
+    ('raspberries', 3, 365),
+    ('mango', 5, 365),
+    ('avocado', 5, 180),
+    ('berries', 5, 365),
+    -- Dairy
+    ('milk', 7, 90),
+    ('cream', 7, 120),
+    ('butter', 30, 365),
+    ('cheese', 21, 180),
+    ('yogurt', 14, 60),
+    ('eggs', 35, 365),
+    ('egg', 35, 365),
+    ('sour cream', 14, NULL),
+    -- Meat & Protein
+    ('chicken', 2, 270),
+    ('beef', 3, 270),
+    ('pork', 3, 180),
+    ('ground beef', 2, 120),
+    ('ground meat', 2, 120),
+    ('fish', 2, 180),
+    ('salmon', 2, 180),
+    ('shrimp', 2, 180),
+    ('bacon', 7, 30),
+    ('sausage', 3, 60),
+    ('deli meat', 5, 60),
+    ('tofu', 7, 150),
+    -- Bread & Baked
+    ('bread', 7, 90),
+    ('tortillas', 14, 180),
+    ('bagels', 5, 180),
+    -- Condiments & Sauces
+    ('salsa', 14, 60),
+    ('hummus', 7, 120),
+    ('pesto', 7, 180),
+    -- Herbs
+    ('cilantro', 7, 180),
+    ('parsley', 7, 180),
+    ('basil', 5, 180),
+    ('mint', 7, 180),
+    ('dill', 7, 180),
+    ('thyme', 14, 180),
+    ('rosemary', 14, 180),
+    ('ginger', 21, 180),
+    -- Leftovers/Cooked
+    ('leftovers', 4, 90),
+    ('cooked rice', 4, 180),
+    ('cooked pasta', 4, 60),
+    ('soup', 4, 90);
