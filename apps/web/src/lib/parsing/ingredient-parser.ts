@@ -11,13 +11,11 @@ export interface ParsedIngredient {
   isGroupHeader: boolean;
 }
 
-/**
- * Remove markdown checkbox syntax from a line
- * Handles: [ ], [x], [X], -[ ], - [ ], -[x], - [x], etc.
- */
 function stripCheckbox(line: string): string {
-  // Match checkbox patterns: [ ], [x], [X] with optional leading - or * and spaces
-  return line.replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '$1').trim();
+  return line
+    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
+    .replace(/^[-*•]\s+/, '')
+    .trim();
 }
 
 // Common preparation terms that might appear after ingredient name

@@ -70,14 +70,6 @@ export function saveProgress(
   }
 }
 
-export function clearProgress(recipeId: number): void {
-  try {
-    localStorage.removeItem(getStorageKey(recipeId));
-  } catch {
-    // Silently fail
-  }
-}
-
 // Clean up expired entries (call occasionally to prevent buildup)
 export function cleanupExpiredProgress(): void {
   try {

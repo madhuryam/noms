@@ -5,8 +5,7 @@
   "type": "module",
   "packageManager": "npm@11.5.1",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "scripts": {
     "dev": "concurrently --names \"api,web\" -c \"blue,green\" \"npm run dev -w @noms/api\" \"npm run dev -w @noms/web\"",

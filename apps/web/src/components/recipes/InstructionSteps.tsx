@@ -8,7 +8,6 @@ interface InstructionStepsProps {
   checkedItems: Set<number>;
 }
 
-// Remove markdown checkbox syntax from a line
 function stripCheckbox(line: string): string {
   return line
     .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')

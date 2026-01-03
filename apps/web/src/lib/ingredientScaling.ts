@@ -257,7 +257,6 @@ export function scaleIngredient(line: string, scaleFactor: number): ScaledIngred
   return { display: display.trim(), original: parsed.original, wasScaled: true };
 }
 
-// Remove markdown checkbox syntax from a line
 function stripCheckbox(line: string): string {
   return line
     .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')

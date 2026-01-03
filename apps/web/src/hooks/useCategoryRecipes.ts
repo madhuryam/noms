@@ -1,17 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { Category } from './useCategories';
-
-interface Recipe {
-  id: number;
-  title: string;
-  description: string | null;
-  image_path: string | null;
-  prep_time_minutes: number | null;
-  cook_time_minutes: number | null;
-  servings: number | null;
-  created_at: string;
-}
+import type { Recipe } from './useRecipes';
 
 interface CategoryRecipesResponse {
   category: Category;

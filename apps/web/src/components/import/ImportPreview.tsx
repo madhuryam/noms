@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { extractRecipe, validateRecipe } from '@noms/shared/parsing';
+import { extractRecipe, validateRecipe } from '../../lib/parsing';
 import type { ParsedVaultRecipe, VaultParseResult } from './types';
 
 interface ImportPreviewProps {

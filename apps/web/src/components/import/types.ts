@@ -1,4 +1,4 @@
-import type { ParsedRecipe, ParsedIngredient, ImageRef } from '@noms/shared/parsing';
+import type { ParsedRecipe, ParsedIngredient, ImageRef } from '../../lib/parsing';
 
 export interface VaultFile {
   path: string;

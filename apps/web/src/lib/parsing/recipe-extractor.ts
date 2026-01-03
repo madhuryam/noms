@@ -4,12 +4,7 @@ import { detectSections } from './section-detector';
 import { parseIngredientSection, type ParsedIngredient } from './ingredient-parser';
 import { extractImages, extractImagesFromRawContent, type ImageRef } from './image-extractor';
 
-/**
- * Remove markdown checkbox syntax from text
- * Handles: [ ], [x], [X], -[ ], - [ ], -[x], - [x], etc.
- */
 function stripCheckbox(text: string): string {
-  // Match checkbox patterns at the start of lines
   return text.replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/gm, '$1').trim();
 }
 

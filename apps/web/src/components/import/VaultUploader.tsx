@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { extractRecipe, validateRecipe } from '@noms/shared/parsing';
+import { extractRecipe, validateRecipe } from '../../lib/parsing';
 import type { VaultFile, ParsedVaultRecipe, CategoryNode, VaultParseResult } from './types';
 
 interface VaultUploaderProps {

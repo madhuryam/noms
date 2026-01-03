@@ -55,8 +55,12 @@ export function ImportPage() {
     if (!parseResult) return;
     setStep('importing');
     await startImport(parseResult.recipes, parseResult.images);
+    // Invalidate all queries after import
+    queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    queryClient.invalidateQueries({ queryKey: ['categories'] });
+    queryClient.invalidateQueries({ queryKey: ['tags'] });
     setStep('complete');
-  }, [parseResult, startImport]);
+  }, [parseResult, startImport, queryClient]);
 
   const handleCancel = useCallback(() => {
     setStep('upload');

@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { HealthResponse } from '@noms/shared';
 import { recipes, categories, tags, search, importRoutes, images } from './routes';
+
+interface HealthResponse {
+  status: 'ok' | 'error';
+  timestamp: number;
+}
 
 type Bindings = {
   DB: D1Database;
