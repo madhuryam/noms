@@ -88,7 +88,7 @@ function getImageUrl(imagePath: string | null | undefined): string | null {
 export function RecipeImage({
   imagePath,
   title,
-  recipeId,
+  recipeId: _recipeId,
   className = '',
   aspectRatio = 'video',
   sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw',

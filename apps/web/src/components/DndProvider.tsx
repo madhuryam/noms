@@ -67,7 +67,7 @@ export function DndProvider({ children, onRecipeDrop, onCategoryDrop }: DndProvi
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      const { active, over } = event;
+      const { active: _active, over } = event;
 
       if (over && activeItem) {
         const overId = over.id.toString();

@@ -12,6 +12,8 @@
     "dev:api": "npm run dev -w @noms/api",
     "dev:web": "npm run dev -w @noms/web",
     "build": "turbo run build",
+    "build:prod": "npm run build -w @noms/web && npm run build -w @noms/api",
+    "deploy": "npm run build -w @noms/web && npm run deploy -w @noms/api",
     "typecheck": "turbo run typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { recipes, categories, tags, search, importRoutes, images, associations } from './routes';
+import { validateAccessJWT } from './middleware';
 
 interface HealthResponse {
   status: 'ok' | 'error';
@@ -14,17 +15,27 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// CORS middleware
+// CORS middleware - allows localhost for development
+// In production, frontend is served from same origin so CORS isn't needed
 app.use(
   '/*',
   cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin) => {
+      // Allow requests with no origin (same-origin, curl, etc.)
+      if (!origin) return origin;
+      // Allow localhost for development
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return origin;
+      }
+      // Allow same-origin in production
+      return origin;
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type'],
   })
 );
 
-// Health check endpoint
+// Health check endpoint (public, no auth required)
 app.get('/health', (c) => {
   const response: HealthResponse = {
     status: 'ok',
@@ -32,6 +43,9 @@ app.get('/health', (c) => {
   };
   return c.json(response);
 });
+
+// Cloudflare Access JWT validation for all /api/* routes
+app.use('/api/*', validateAccessJWT);
 
 // Database check endpoint
 app.get('/api/db-check', async (c) => {

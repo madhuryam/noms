@@ -38,4 +38,4 @@ export interface ImportResult {
   error?: string;
 }
 
-export { ParsedRecipe, ParsedIngredient, ImageRef };
+export type { ParsedRecipe, ParsedIngredient, ImageRef };

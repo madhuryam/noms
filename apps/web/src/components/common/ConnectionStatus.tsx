@@ -31,10 +31,10 @@ export function ConnectionStatus() {
     queryFn: checkStorage,
   });
 
-  const getStatus = (query: typeof health) => {
-    if (query.isLoading) return 'loading';
-    if (query.isError || query.data?.status === 'error') return 'error';
-    return 'ok';
+  const getStatus = (query: { isLoading: boolean; isError: boolean; data?: { status?: string } }) => {
+    if (query.isLoading) return 'loading' as const;
+    if (query.isError || query.data?.status === 'error') return 'error' as const;
+    return 'ok' as const;
   };
 
   return (
