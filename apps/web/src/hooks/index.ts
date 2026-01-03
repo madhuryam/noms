@@ -5,3 +5,5 @@ export { useCategoryTree, useCategory, useMoveCategory } from './useCategories';
 export type { Category } from './useCategories';
 export { useCategoryRecipes } from './useCategoryRecipes';
 export { useVaultImport } from './useVaultImport';
+export { useSearch, useSearchSuggestions } from './useSearch';
+export type { SearchResult, SearchSuggestion } from './useSearch';
