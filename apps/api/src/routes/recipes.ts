@@ -88,10 +88,23 @@ recipes.get('/:id', async (c) => {
       .bind(id)
       .all();
 
+    // Get images for this recipe
+    const images = await c.env.DB.prepare(
+      `
+      SELECT id, path, alt, sort_order
+      FROM recipe_images
+      WHERE recipe_id = ?
+      ORDER BY sort_order ASC
+    `
+    )
+      .bind(id)
+      .all();
+
     return c.json({
       ...recipe,
       tags: tags.results,
       categories: categories.results,
+      images: images.results,
     });
   } catch (error) {
     return c.json(
@@ -189,6 +202,7 @@ recipes.put('/:id', async (c) => {
       'notes',
       'image_path',
       'source_path',
+      'source_url',
     ];
 
     const updates: string[] = [];

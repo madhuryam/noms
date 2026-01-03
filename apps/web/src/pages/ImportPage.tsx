@@ -26,7 +26,9 @@ export function ImportPage() {
       await api.delete('/api/recipes');
       // Invalidate all recipe-related queries
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       queryClient.invalidateQueries({ queryKey: ['category'] });
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
       alert('All recipes deleted successfully');
     } catch (error) {
       alert(`Failed to delete recipes: ${error}`);

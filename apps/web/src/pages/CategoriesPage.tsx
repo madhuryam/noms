@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useCategoryTree, useCategory, useCategoryRecipes } from '../hooks';
 import { CategoryBreadcrumb } from '../components/categories';
 import { DraggableRecipeGrid } from '../components/recipes';
@@ -78,49 +79,23 @@ function CategoryCard({ category }: CategoryCardProps) {
 }
 
 function RootCategoriesView() {
-  const { data: categories, isLoading, isError, error } = useCategoryTree();
+  const navigate = useNavigate();
+  const { data: categories, isLoading, isError } = useCategoryTree();
+
+  // Redirect to import page if no categories exist
+  useEffect(() => {
+    if (!isLoading && !isError && (!categories || categories.length === 0)) {
+      navigate('/import', { replace: true });
+    }
+  }, [isLoading, isError, categories, navigate]);
 
   if (isLoading) {
     return <LoadingSkeleton />;
   }
 
-  if (isError) {
-    return (
-      <div className="bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-xl p-8 text-center">
-        <h2 className="text-lg font-semibold text-red-700 dark:text-onedark-red mb-2">
-          Failed to load categories
-        </h2>
-        <p className="text-red-600 dark:text-onedark-red/80">
-          {error instanceof Error ? error.message : 'An error occurred'}
-        </p>
-      </div>
-    );
-  }
-
-  if (!categories || categories.length === 0) {
-    return (
-      <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
-        <svg
-          className="w-16 h-16 mx-auto text-gray-400 dark:text-onedark-fg-muted mb-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-          />
-        </svg>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-onedark-fg mb-2">
-          No categories yet
-        </h3>
-        <p className="text-gray-500 dark:text-onedark-fg-muted mb-6">
-          Create categories to organize your recipes (e.g., Breakfast, Dinner, Desserts)
-        </p>
-      </div>
-    );
+  // Redirect will happen via useEffect, show nothing while waiting
+  if (isError || !categories || categories.length === 0) {
+    return null;
   }
 
   return (
@@ -133,47 +108,25 @@ function RootCategoriesView() {
 }
 
 function CategoryDetailView({ categoryId }: { categoryId: number }) {
+  const navigate = useNavigate();
   const { data, isLoading, isError, error } = useCategory(categoryId);
   const { data: recipesData, isLoading: recipesLoading } = useCategoryRecipes(categoryId, {
     limit: 50,
   });
 
+  // Redirect to import page if category not found
+  useEffect(() => {
+    if (isError && error instanceof Error && error.message.includes('404')) {
+      navigate('/import', { replace: true });
+    }
+  }, [isError, error, navigate]);
+
   if (isLoading) {
     return <LoadingSkeleton />;
   }
 
-  if (isError) {
-    return (
-      <div className="space-y-6">
-        <Link
-          to="/categories"
-          className="inline-flex items-center gap-2 text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to Categories
-        </Link>
-        <div className="bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-xl p-8 text-center">
-          <h2 className="text-lg font-semibold text-red-700 dark:text-onedark-red mb-2">
-            {error instanceof Error && error.message.includes('404')
-              ? 'Category not found'
-              : 'Failed to load category'}
-          </h2>
-          <p className="text-red-600 dark:text-onedark-red/80">
-            {error instanceof Error ? error.message : 'An error occurred'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
+  // Redirect will happen via useEffect for 404, show nothing while waiting
+  if (isError || !data) {
     return null;
   }
 

@@ -5,6 +5,7 @@ interface RecipeMetadataProps {
   servingsUnit?: string | null;
   currentServings: number;
   onServingsChange: (servings: number) => void;
+  sourceUrl?: string | null;
 }
 
 export function RecipeMetadata({
@@ -14,6 +15,7 @@ export function RecipeMetadata({
   servingsUnit: _servingsUnit = 'servings',
   currentServings,
   onServingsChange,
+  sourceUrl,
 }: RecipeMetadataProps) {
   const totalTime = (prepTime || 0) + (cookTime || 0);
 
@@ -119,6 +121,31 @@ export function RecipeMetadata({
             </p>
           </div>
         </div>
+      )}
+
+      {/* Source Link */}
+      {sourceUrl && (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-onedark-bg-highlight rounded-lg text-gray-600 dark:text-onedark-fg-muted hover:bg-gray-200 dark:hover:bg-onedark-bg hover:text-gray-900 dark:hover:text-onedark-fg transition-colors"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            />
+          </svg>
+          <span className="text-sm font-medium">Source</span>
+        </a>
       )}
 
       {/* Servings with Controls */}

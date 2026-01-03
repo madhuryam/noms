@@ -84,6 +84,85 @@ function formatIngredientsRaw(ingredients: ParsedIngredient[]): string {
 }
 
 /**
+ * Extract a source URL from text content
+ * Looks for patterns like "Source: https://...", "[Source](url)", "[Insta Recipe](url)", bare URLs, etc.
+ */
+function extractSourceUrlFromText(text: string | null): string | null {
+  if (!text) return null;
+
+  // Pattern 1: Markdown links with recipe/source-related text
+  const recipeLinkPattern =
+    /\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\((https?:\/\/[^\)]+)\)/i;
+  const recipeLinkMatch = text.match(recipeLinkPattern);
+  if (recipeLinkMatch) return recipeLinkMatch[1];
+
+  // Pattern 2: "Source: URL" or "source: URL"
+  const sourcePattern = /source:?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const sourceMatch = text.match(sourcePattern);
+  if (sourceMatch) return sourceMatch[1];
+
+  // Pattern 3: "Recipe from: URL" or similar
+  const recipeFromPattern =
+    /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const recipeFromMatch = text.match(recipeFromPattern);
+  if (recipeFromMatch) return recipeFromMatch[1];
+
+  // Pattern 4: Any standalone markdown link (not an image)
+  const anyLinkPattern = /(?<!!)\[[^\]]+\]\((https?:\/\/[^\)]+)\)/;
+  const anyLinkMatch = text.match(anyLinkPattern);
+  if (anyLinkMatch) return anyLinkMatch[1];
+
+  // Pattern 5: Bare URL on its own line
+  const bareUrlPattern = /^(https?:\/\/[^\s]+)$/m;
+  const bareUrlMatch = text.match(bareUrlPattern);
+  if (bareUrlMatch) return bareUrlMatch[1];
+
+  return null;
+}
+
+/**
+ * Extract source URL from all recipe content
+ */
+function extractSourceUrl(recipe: ImportRecipe): string | null {
+  // Check metadata first (from frontmatter)
+  if (recipe.metadata?.sourceUrl) return recipe.metadata.sourceUrl;
+
+  // Check all text fields
+  return (
+    extractSourceUrlFromText(recipe.notes) ||
+    extractSourceUrlFromText(recipe.description) ||
+    extractSourceUrlFromText(recipe.instructions) ||
+    extractSourceUrlFromText(recipe.rawContent)
+  );
+}
+
+/**
+ * Clean text by removing images and URLs
+ */
+function cleanText(text: string | null): string | null {
+  if (!text) return null;
+
+  const cleaned = text
+    // Remove Obsidian-style embeds: ![[filename]] or ![[filename|size]]
+    .replace(/!\[\[[^\]]+\]\]/g, '')
+    // Remove standard markdown images: ![alt](path)
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    // Remove HTML img tags
+    .replace(/<img[^>]*>/gi, '')
+    // Remove recipe/source markdown links: [Source](url), [Insta Recipe](url), etc.
+    .replace(/\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\(https?:\/\/[^\)]+\)/gi, '')
+    // Remove "Source: URL" lines
+    .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
+    // Remove bare URLs on their own line
+    .replace(/^https?:\/\/[^\s]+$/gm, '')
+    // Clean up multiple blank lines
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return cleaned || null;
+}
+
+/**
  * Process category paths and create/get category IDs
  * Handles hierarchical paths like "Main Courses/Beef/Steaks"
  */
@@ -235,22 +314,31 @@ importRoutes.post('/vault', async (c) => {
         // Format raw ingredients text for storage and FTS
         const ingredientsRaw = formatIngredientsRaw(recipe.ingredients);
 
+        // Extract source URL from any content
+        const sourceUrl = extractSourceUrl(recipe);
+
+        // Clean text fields (remove images and URLs)
+        const cleanedDescription = cleanText(recipe.description);
+        const cleanedInstructions = cleanText(recipe.instructions);
+        const cleanedNotes = cleanText(recipe.notes);
+
         // Insert the recipe
         const recipeResult = await c.env.DB.prepare(
           `INSERT INTO recipes (
-            title, source_path, markdown_content, description,
+            title, source_path, source_url, markdown_content, description,
             ingredients_raw, instructions_raw, notes,
             prep_time_minutes, cook_time_minutes, servings, servings_unit
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
           .bind(
             recipe.title,
             recipe.filePath,
+            sourceUrl,
             recipe.rawContent,
-            recipe.description,
+            cleanedDescription,
             ingredientsRaw,
-            recipe.instructions,
-            recipe.notes,
+            cleanedInstructions,
+            cleanedNotes,
             recipe.metadata?.prepTime ?? null,
             recipe.metadata?.cookTime ?? null,
             recipe.metadata?.servings ?? null,
@@ -393,6 +481,22 @@ importRoutes.post('/images', async (c) => {
         contentType: file.type || 'image/jpeg',
       },
     });
+
+    // Get current max sort_order for this recipe's images
+    const maxOrder = await c.env.DB.prepare(
+      'SELECT MAX(sort_order) as max_order FROM recipe_images WHERE recipe_id = ?'
+    )
+      .bind(Number(recipeId))
+      .first<{ max_order: number | null }>();
+
+    const sortOrder = (maxOrder?.max_order ?? -1) + 1;
+
+    // Insert into recipe_images table
+    await c.env.DB.prepare(
+      'INSERT INTO recipe_images (recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?)'
+    )
+      .bind(Number(recipeId), r2Path, originalPath ? String(originalPath) : null, sortOrder)
+      .run();
 
     // Update recipe image_path if this is the first/main image
     const existingRecipe = await c.env.DB.prepare('SELECT image_path FROM recipes WHERE id = ?')

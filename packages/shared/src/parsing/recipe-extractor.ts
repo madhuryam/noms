@@ -251,6 +251,51 @@ function parseServings(servings: unknown): { servings: number | null; unit: stri
 }
 
 /**
+ * Extract a URL from notes content
+ * Looks for patterns like "Source: https://...", "[Source](url)", or standalone URLs
+ */
+function extractSourceUrlFromNotes(notes: string | null): string | null {
+  if (!notes) return null;
+
+  // Pattern 1: "Source: URL" or "source: URL" (with or without markdown link)
+  const sourcePattern = /source:?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const sourceMatch = notes.match(sourcePattern);
+  if (sourceMatch) return sourceMatch[1];
+
+  // Pattern 2: Markdown link with "source" text: [Source](url) or [source](url)
+  const linkPattern = /\[source\]\((https?:\/\/[^\)]+)\)/i;
+  const linkMatch = notes.match(linkPattern);
+  if (linkMatch) return linkMatch[1];
+
+  // Pattern 3: "Recipe from: URL" or similar
+  const recipeFromPattern = /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const recipeFromMatch = notes.match(recipeFromPattern);
+  if (recipeFromMatch) return recipeFromMatch[1];
+
+  return null;
+}
+
+/**
+ * Remove source URL lines from notes content
+ */
+function stripSourceFromNotes(notes: string | null): string | null {
+  if (!notes) return null;
+
+  const cleaned = notes
+    // Remove "Source: URL" lines
+    .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
+    // Remove "[Source](url)" lines
+    .replace(/^\[source\]\(https?:\/\/[^\)]+\)$/gim, '')
+    // Remove "Recipe from: URL" lines
+    .replace(/^(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
+    // Clean up multiple blank lines
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return cleaned || null;
+}
+
+/**
  * Extract metadata from frontmatter
  */
 function extractMetadata(frontmatter: Record<string, unknown>): ParsedRecipe['metadata'] {
@@ -333,7 +378,7 @@ export function extractRecipe(content: string, filename: string): ParsedRecipe {
 
   // Extract other sections as markdown
   const pairings = sections.pairings.length > 0 ? nodesToMarkdown(sections.pairings) : null;
-  const notes = sections.notes.length > 0 ? nodesToMarkdown(sections.notes) : null;
+  const rawNotes = sections.notes.length > 0 ? nodesToMarkdown(sections.notes) : null;
   const prep = sections.prep.length > 0 ? nodesToMarkdown(sections.prep) : null;
 
   // Extract images from both AST and raw content (for Obsidian syntax)
@@ -351,6 +396,14 @@ export function extractRecipe(content: string, filename: string): ParsedRecipe {
 
   // Extract metadata from frontmatter
   const metadata = extractMetadata(frontmatter);
+
+  // If no sourceUrl in frontmatter, try to extract from notes
+  if (!metadata.sourceUrl && rawNotes) {
+    metadata.sourceUrl = extractSourceUrlFromNotes(rawNotes);
+  }
+
+  // Strip source URL from notes (so it's not duplicated in display)
+  const notes = stripSourceFromNotes(rawNotes);
 
   return {
     title,

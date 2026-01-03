@@ -224,7 +224,7 @@ export function RecipeDetailPage() {
       {/* Tags */}
       <RecipeTags tags={recipe.tags} categories={recipe.categories} />
 
-      {/* Metadata: Times and Servings */}
+      {/* Metadata: Times, Servings, and Source */}
       <RecipeMetadata
         prepTime={recipe.prep_time_minutes}
         cookTime={recipe.cook_time_minutes}
@@ -232,6 +232,7 @@ export function RecipeDetailPage() {
         servingsUnit={recipe.servings_unit}
         currentServings={currentServings}
         onServingsChange={setServings}
+        sourceUrl={recipe.source_url}
       />
 
       {/* Main Content Grid */}

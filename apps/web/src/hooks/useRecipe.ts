@@ -14,11 +14,13 @@ interface Recipe {
   servings: number | null;
   servings_unit: string | null;
   source_path: string | null;
+  source_url: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
   categories?: { id: number; name: string; slug: string; path: string; is_primary: boolean }[];
   tags?: { id: number; name: string; display_name: string; color: string }[];
+  images?: { id: number; path: string; alt: string | null; sort_order: number }[];
 }
 
 interface CreateRecipeInput {
