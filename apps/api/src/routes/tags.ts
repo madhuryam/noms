@@ -7,14 +7,22 @@ type Bindings = {
 
 const tags = new Hono<{ Bindings: Bindings }>();
 
-// GET /api/tags - List all tags with usage_count
+// GET /api/tags - List all tags with calculated usage_count
 tags.get('/', async (c) => {
   try {
+    // Calculate actual usage count from recipe_tags join
     const results = await c.env.DB.prepare(
       `
-      SELECT id, name, display_name, color, usage_count
-      FROM tags
-      ORDER BY usage_count DESC, name
+      SELECT
+        t.id,
+        t.name,
+        t.display_name,
+        t.color,
+        COUNT(rt.recipe_id) as usage_count
+      FROM tags t
+      LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
+      GROUP BY t.id
+      ORDER BY usage_count DESC, t.name
     `
     ).all();
 
@@ -69,6 +77,229 @@ tags.post('/', async (c) => {
     return c.json(
       {
         error: error instanceof Error ? error.message : 'Failed to create tag',
+      },
+      500
+    );
+  }
+});
+
+// GET /api/tags/:id - Get single tag
+tags.get('/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    const tag = await c.env.DB.prepare(
+      `
+      SELECT
+        t.id,
+        t.name,
+        t.display_name,
+        t.color,
+        COUNT(rt.recipe_id) as usage_count
+      FROM tags t
+      LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
+      WHERE t.id = ?
+      GROUP BY t.id
+    `
+    )
+      .bind(id)
+      .first();
+
+    if (!tag) {
+      return c.json({ error: 'Tag not found' }, 404);
+    }
+
+    return c.json(tag);
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch tag',
+      },
+      500
+    );
+  }
+});
+
+// PUT /api/tags/:id - Update tag
+tags.put('/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    const body = await c.req.json();
+    const { name, display_name, color } = body;
+
+    // Check if tag exists
+    const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE id = ?').bind(id).first();
+
+    if (!existing) {
+      return c.json({ error: 'Tag not found' }, 404);
+    }
+
+    // Build dynamic update
+    const updates: string[] = [];
+    const values: unknown[] = [];
+
+    if (name !== undefined) {
+      const normalizedName = name.toLowerCase().trim();
+      // Check if new name conflicts with another tag
+      const conflict = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ? AND id != ?')
+        .bind(normalizedName, id)
+        .first();
+      if (conflict) {
+        return c.json({ error: 'A tag with this name already exists' }, 409);
+      }
+      updates.push('name = ?');
+      values.push(normalizedName);
+    }
+
+    if (display_name !== undefined) {
+      updates.push('display_name = ?');
+      values.push(display_name);
+    }
+
+    if (color !== undefined) {
+      updates.push('color = ?');
+      values.push(color);
+    }
+
+    if (updates.length === 0) {
+      return c.json({ error: 'No valid fields to update' }, 400);
+    }
+
+    values.push(id);
+
+    await c.env.DB.prepare(`UPDATE tags SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
+
+    const updated = await c.env.DB.prepare(
+      `
+      SELECT
+        t.id,
+        t.name,
+        t.display_name,
+        t.color,
+        COUNT(rt.recipe_id) as usage_count
+      FROM tags t
+      LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
+      WHERE t.id = ?
+      GROUP BY t.id
+    `
+    )
+      .bind(id)
+      .first();
+
+    return c.json(updated);
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to update tag',
+      },
+      500
+    );
+  }
+});
+
+// DELETE /api/tags/:id - Delete tag and remove from all recipes
+tags.delete('/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    const existing = await c.env.DB.prepare('SELECT id, name FROM tags WHERE id = ?')
+      .bind(id)
+      .first<{ id: number; name: string }>();
+
+    if (!existing) {
+      return c.json({ error: 'Tag not found' }, 404);
+    }
+
+    // Delete all recipe_tags associations first
+    await c.env.DB.prepare('DELETE FROM recipe_tags WHERE tag_id = ?').bind(id).run();
+
+    // Delete the tag
+    await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
+
+    return c.json({ success: true, id, name: existing.name });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to delete tag',
+      },
+      500
+    );
+  }
+});
+
+// POST /api/tags/:id/merge - Merge another tag into this one
+tags.post('/:id/merge', async (c) => {
+  const targetId = Number(c.req.param('id'));
+
+  try {
+    const body = await c.req.json();
+    const { sourceId } = body;
+
+    if (!sourceId) {
+      return c.json({ error: 'sourceId is required' }, 400);
+    }
+
+    // Check both tags exist
+    const targetTag = await c.env.DB.prepare('SELECT id, name FROM tags WHERE id = ?')
+      .bind(targetId)
+      .first<{ id: number; name: string }>();
+    const sourceTag = await c.env.DB.prepare('SELECT id, name FROM tags WHERE id = ?')
+      .bind(sourceId)
+      .first<{ id: number; name: string }>();
+
+    if (!targetTag) {
+      return c.json({ error: 'Target tag not found' }, 404);
+    }
+    if (!sourceTag) {
+      return c.json({ error: 'Source tag not found' }, 404);
+    }
+
+    // Move all recipe associations from source to target (ignore duplicates)
+    await c.env.DB.prepare(
+      `
+      INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id)
+      SELECT recipe_id, ? FROM recipe_tags WHERE tag_id = ?
+    `
+    )
+      .bind(targetId, sourceId)
+      .run();
+
+    // Delete source tag associations
+    await c.env.DB.prepare('DELETE FROM recipe_tags WHERE tag_id = ?').bind(sourceId).run();
+
+    // Delete source tag
+    await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(sourceId).run();
+
+    // Get updated target tag
+    const updated = await c.env.DB.prepare(
+      `
+      SELECT
+        t.id,
+        t.name,
+        t.display_name,
+        t.color,
+        COUNT(rt.recipe_id) as usage_count
+      FROM tags t
+      LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
+      WHERE t.id = ?
+      GROUP BY t.id
+    `
+    )
+      .bind(targetId)
+      .first();
+
+    return c.json({
+      success: true,
+      merged: { from: sourceTag.name, into: targetTag.name },
+      tag: updated,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to merge tags',
       },
       500
     );

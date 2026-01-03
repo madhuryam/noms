@@ -136,6 +136,7 @@ export function EditRecipePage() {
             cook_time_minutes: recipe.cook_time_minutes,
             notes: recipe.notes,
             source_url: recipe.source_url,
+            tags: recipe.tags,
           }}
         />
       </div>

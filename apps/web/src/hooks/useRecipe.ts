@@ -49,6 +49,10 @@ export function useRecipe(id: number | undefined) {
       return response;
     },
     enabled: !!id,
+    // Always refetch when component mounts to ensure fresh data
+    refetchOnMount: 'always',
+    // Shorter stale time for individual recipes since they're frequently edited
+    staleTime: 0,
   });
 }
 

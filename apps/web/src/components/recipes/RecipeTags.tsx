@@ -67,7 +67,7 @@ export function RecipeTags({ tags = [], categories = [] }: RecipeTagsProps) {
       {tags.map((tag, index) => (
         <Link
           key={`tag-${tag.id}`}
-          to={`/tags/${tag.name}`}
+          to={`/recipes?tags=${encodeURIComponent(tag.name)}`}
           className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80 ${getColorClass(index, tag.color)}`}
         >
           {tag.display_name || tag.name}

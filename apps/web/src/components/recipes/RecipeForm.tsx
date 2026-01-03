@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateRecipe, useUpdateRecipe } from '../../hooks';
+import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemoveTagFromRecipe, useCreateTag } from '../../hooks';
 import { DEFAULT_SERVINGS } from '../../lib/constants';
+import { TagSelector } from '../tags';
 
 interface FormData {
   title: string;
@@ -21,6 +22,13 @@ interface FormErrors {
   instructions_raw?: string;
 }
 
+interface RecipeTag {
+  id: number;
+  name: string;
+  display_name: string;
+  color?: string | null;
+}
+
 interface RecipeFormProps {
   mode?: 'create' | 'edit';
   recipeId?: number;
@@ -34,6 +42,7 @@ interface RecipeFormProps {
     cook_time_minutes: number | null;
     notes: string | null;
     source_url: string | null;
+    tags?: RecipeTag[];
   };
 }
 
@@ -41,6 +50,14 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
   const navigate = useNavigate();
   const createRecipe = useCreateRecipe();
   const updateRecipe = useUpdateRecipe(recipeId ?? 0);
+
+  // Tag hooks
+  const { data: availableTags = [] } = useTags();
+  const addTagToRecipe = useAddTagToRecipe();
+  const removeTagFromRecipe = useRemoveTagFromRecipe();
+  const createTag = useCreateTag();
+
+  const [selectedTags, setSelectedTags] = useState<RecipeTag[]>([]);
 
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -68,6 +85,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         notes: initialData.notes ?? '',
         source_url: initialData.source_url ?? '',
       });
+      setSelectedTags(initialData.tags ?? []);
     }
   }, [initialData]);
 
@@ -144,6 +162,46 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
+  };
+
+  // Handle tag changes - for edit mode, immediately update via API
+  const handleTagsChange = async (newTags: RecipeTag[]) => {
+    if (mode === 'edit' && recipeId) {
+      // Find tags that were added
+      const addedTags = newTags.filter((t) => !selectedTags.some((st) => st.id === t.id));
+      // Find tags that were removed
+      const removedTags = selectedTags.filter((t) => !newTags.some((nt) => nt.id === t.id));
+
+      // Add new tags
+      for (const tag of addedTags) {
+        try {
+          await addTagToRecipe.mutateAsync({ recipeId, tagId: tag.id });
+        } catch (error) {
+          console.error('Failed to add tag:', error);
+        }
+      }
+
+      // Remove old tags
+      for (const tag of removedTags) {
+        try {
+          await removeTagFromRecipe.mutateAsync({ recipeId, tagId: tag.id });
+        } catch (error) {
+          console.error('Failed to remove tag:', error);
+        }
+      }
+    }
+
+    setSelectedTags(newTags);
+  };
+
+  // Create a new tag
+  const handleCreateTag = async (name: string): Promise<RecipeTag> => {
+    const newTag = await createTag.mutateAsync({ name, display_name: name });
+    // If in edit mode, also add it to the recipe
+    if (mode === 'edit' && recipeId) {
+      await addTagToRecipe.mutateAsync({ recipeId, tagId: newTag.id });
+    }
+    return newTag;
   };
 
   return (
@@ -355,6 +413,23 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         />
         <p className="mt-1 text-xs text-gray-500 dark:text-onedark-fg-muted">
           Link to the original recipe source
+        </p>
+      </div>
+
+      {/* Tags */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1">
+          Tags
+        </label>
+        <TagSelector
+          selectedTags={selectedTags}
+          availableTags={availableTags}
+          onChange={handleTagsChange}
+          onCreateTag={handleCreateTag}
+          placeholder="Add tags (e.g., quick-and-easy, vegetarian)..."
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-onedark-fg-muted">
+          Tags help organize and filter recipes
         </p>
       </div>
 

@@ -1,12 +1,56 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { useInfiniteRecipes } from '../hooks';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useInfiniteRecipes, useTags } from '../hooks';
 import { DraggableRecipeGrid } from '../components/recipes';
+import { TagFilter } from '../components/tags';
 
 export function RecipeListPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get tag filters from URL
+  const selectedTagNames = useMemo(() => {
+    const tagsParam = searchParams.get('tags');
+    return tagsParam ? tagsParam.split(',').filter(Boolean) : [];
+  }, [searchParams]);
+
+  const tagMode = (searchParams.get('tagMode') as 'all' | 'any') || 'all';
+
+  // Fetch all tags for the filter component
+  const { data: allTags = [] } = useTags();
+
+  // Convert tag names to IDs for the query
+  const selectedTagIds = useMemo(() => {
+    return allTags
+      .filter((tag) => selectedTagNames.includes(tag.name))
+      .map((tag) => tag.id);
+  }, [allTags, selectedTagNames]);
+
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteRecipes();
+    useInfiniteRecipes({ tags: selectedTagIds, tagMode });
+
+  // Update URL when tags change
+  const handleTagsChange = (tags: string[]) => {
+    setSearchParams((prev) => {
+      if (tags.length === 0) {
+        prev.delete('tags');
+      } else {
+        prev.set('tags', tags.join(','));
+      }
+      return prev;
+    });
+  };
+
+  const handleModeChange = (mode: 'all' | 'any') => {
+    setSearchParams((prev) => {
+      if (mode === 'all') {
+        prev.delete('tagMode');
+      } else {
+        prev.set('tagMode', mode);
+      }
+      return prev;
+    });
+  };
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +150,17 @@ export function RecipeListPage() {
         </div>
       </div>
 
+      {/* Tag Filter */}
+      {allTags.length > 0 && (
+        <TagFilter
+          tags={allTags}
+          selectedTags={selectedTagNames}
+          onTagsChange={handleTagsChange}
+          tagMode={tagMode}
+          onModeChange={handleModeChange}
+        />
+      )}
+
       {/* Error State */}
       {isError && (
         <div className="bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-xl p-6 text-center">
@@ -154,25 +209,36 @@ export function RecipeListPage() {
             />
           </svg>
           <h3 className="text-lg font-medium text-gray-900 dark:text-onedark-fg mb-2">
-            No recipes yet
+            {selectedTagNames.length > 0 ? 'No matching recipes' : 'No recipes yet'}
           </h3>
           <p className="text-gray-500 dark:text-onedark-fg-muted mb-6">
-            Get started by adding your first recipe
+            {selectedTagNames.length > 0
+              ? 'Try adjusting your tag filters or search criteria'
+              : 'Get started by adding your first recipe'}
           </p>
-          <Link
-            to="/recipes/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Add Your First Recipe
-          </Link>
+          {selectedTagNames.length > 0 ? (
+            <button
+              onClick={() => handleTagsChange([])}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-300 dark:hover:bg-onedark-bg transition-colors"
+            >
+              Clear Filters
+            </button>
+          ) : (
+            <Link
+              to="/recipes/new"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Add Your First Recipe
+            </Link>
+          )}
         </div>
       )}
     </div>

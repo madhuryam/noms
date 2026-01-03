@@ -1,16 +1,5 @@
 import { RecipeCard } from './RecipeCard';
-
-interface Recipe {
-  id: number;
-  title: string;
-  description?: string | null;
-  image_path?: string | null;
-  prep_time_minutes?: number | null;
-  cook_time_minutes?: number | null;
-  servings?: number | null;
-  categories?: string[];
-  tags?: string[];
-}
+import type { Recipe } from '../../hooks/useRecipes';
 
 interface RecipeGridProps {
   recipes: Recipe[];

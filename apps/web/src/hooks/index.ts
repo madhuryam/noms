@@ -1,5 +1,5 @@
 export { useRecipes, useInfiniteRecipes } from './useRecipes';
-export type { Recipe } from './useRecipes';
+export type { Recipe, RecipeTag } from './useRecipes';
 export { useRecipe, useCreateRecipe, useUpdateRecipe, useDeleteRecipe, useUpdateRecipeCategories } from './useRecipe';
 export { useCategoryTree, useCategory, useMoveCategory } from './useCategories';
 export type { Category } from './useCategories';
@@ -9,3 +9,5 @@ export { useSearch, useSearchSuggestions, useSpellCheck } from './useSearch';
 export type { SearchResult, SearchSuggestion } from './useSearch';
 export { useAssociations, useAssociation, useCreateAssociation, useUpdateAssociation, useDeleteAssociation } from './useAssociations';
 export type { AssociationGroup } from './useAssociations';
+export { useTags, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags, useAddTagToRecipe, useRemoveTagFromRecipe } from './useTags';
+export type { Tag } from './useTags';

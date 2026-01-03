@@ -1,21 +1,10 @@
 import { useRef } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import type { DragItem } from '../DndProvider';
 import { RecipeImage } from '../common/RecipeImage';
-
-interface Recipe {
-  id: number;
-  title: string;
-  description?: string | null;
-  image_path?: string | null;
-  prep_time_minutes?: number | null;
-  cook_time_minutes?: number | null;
-  servings?: number | null;
-  categories?: string[];
-  tags?: string[];
-}
+import type { Recipe } from '../../hooks/useRecipes';
 
 interface DraggableRecipeGridProps {
   recipes: Recipe[];
@@ -148,12 +137,14 @@ function DraggableRecipeCard({ recipe }: DraggableRecipeCardProps) {
                 </span>
               ))}
               {recipe.tags?.slice(0, 2).map((tag) => (
-                <span
-                  key={tag}
-                  className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted rounded-full"
+                <Link
+                  key={tag.id}
+                  to={`/recipes?tags=${encodeURIComponent(tag.name)}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted rounded-full hover:bg-gray-200 dark:hover:bg-onedark-bg transition-colors"
                 >
-                  {tag}
-                </span>
+                  {tag.display_name}
+                </Link>
               ))}
             </div>
           )}

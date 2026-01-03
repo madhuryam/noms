@@ -7,30 +7,118 @@ type Bindings = {
 
 const recipes = new Hono<{ Bindings: Bindings }>();
 
-// GET /api/recipes - List all recipes with pagination
+// GET /api/recipes - List all recipes with pagination and tag filtering
 recipes.get('/', async (c) => {
   const limit = Math.min(Number(c.req.query('limit')) || 20, 100);
   const offset = Number(c.req.query('offset')) || 0;
+  const tagsParam = c.req.query('tags'); // comma-separated tag names or ids
+  const tagMode = c.req.query('tagMode') || 'all'; // 'all' (AND) or 'any' (OR)
 
   try {
-    const results = await c.env.DB.prepare(
-      `
-      SELECT id, title, description, image_path, prep_time_minutes,
-             cook_time_minutes, servings, created_at
-      FROM recipes
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `
-    )
-      .bind(limit, offset)
+    let query = `
+      SELECT DISTINCT r.id, r.title, r.description, r.image_path, r.prep_time_minutes,
+             r.cook_time_minutes, r.servings, r.created_at
+      FROM recipes r
+    `;
+    let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
+    const bindings: unknown[] = [];
+    const countBindings: unknown[] = [];
+
+    // Handle tag filtering
+    if (tagsParam) {
+      const tagValues = tagsParam.split(',').map((t) => t.trim().toLowerCase());
+      const tagCount = tagValues.length;
+
+      if (tagCount > 0) {
+        // Join with recipe_tags and tags
+        const tagJoin = `
+          JOIN recipe_tags rt ON r.id = rt.recipe_id
+          JOIN tags t ON rt.tag_id = t.id
+        `;
+        query += tagJoin;
+        countQuery += tagJoin;
+
+        // Build WHERE clause for tag names or IDs
+        const tagConditions = tagValues
+          .map(() => '(LOWER(t.name) = ? OR CAST(t.id AS TEXT) = ?)')
+          .join(' OR ');
+        query += ` WHERE (${tagConditions})`;
+        countQuery += ` WHERE (${tagConditions})`;
+
+        // Add bindings for each tag (twice: once for name, once for id)
+        for (const tag of tagValues) {
+          bindings.push(tag, tag);
+          countBindings.push(tag, tag);
+        }
+
+        // For AND logic, require all tags to match
+        if (tagMode === 'all' && tagCount > 1) {
+          query += ` GROUP BY r.id HAVING COUNT(DISTINCT t.id) >= ${tagCount}`;
+          countQuery = `SELECT COUNT(*) as total FROM (${countQuery} GROUP BY r.id HAVING COUNT(DISTINCT t.id) >= ${tagCount})`;
+        }
+      }
+    }
+
+    // Add ordering and pagination
+    if (!tagsParam || tagMode !== 'all') {
+      query += ' ORDER BY r.created_at DESC';
+    } else {
+      query += ' ORDER BY r.created_at DESC';
+    }
+    query += ' LIMIT ? OFFSET ?';
+    bindings.push(limit, offset);
+
+    const results = await c.env.DB.prepare(query)
+      .bind(...bindings)
       .all();
 
-    const countResult = await c.env.DB.prepare('SELECT COUNT(*) as total FROM recipes').first<{
-      total: number;
-    }>();
+    const countResult = await c.env.DB.prepare(countQuery)
+      .bind(...countBindings)
+      .first<{ total: number }>();
+
+    // Get tags for each recipe
+    const recipeIds = (results.results ?? []).map((r) => (r as { id: number }).id);
+    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null }>> = {};
+
+    if (recipeIds.length > 0) {
+      const placeholders = recipeIds.map(() => '?').join(',');
+      const tagsResult = await c.env.DB.prepare(
+        `
+        SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color
+        FROM recipe_tags rt
+        JOIN tags t ON rt.tag_id = t.id
+        WHERE rt.recipe_id IN (${placeholders})
+      `
+      )
+        .bind(...recipeIds)
+        .all();
+
+      // Group tags by recipe_id
+      for (const row of tagsResult.results ?? []) {
+        const r = row as { recipe_id: number; id: number; name: string; display_name: string; color: string | null };
+        if (!recipeTags[r.recipe_id]) {
+          recipeTags[r.recipe_id] = [];
+        }
+        recipeTags[r.recipe_id].push({
+          id: r.id,
+          name: r.name,
+          display_name: r.display_name,
+          color: r.color,
+        });
+      }
+    }
+
+    // Attach tags to each recipe
+    const recipesWithTags = (results.results ?? []).map((recipe) => {
+      const r = recipe as { id: number };
+      return {
+        ...recipe,
+        tags: recipeTags[r.id] ?? [],
+      };
+    });
 
     return c.json({
-      recipes: results.results,
+      recipes: recipesWithTags,
       pagination: {
         limit,
         offset,

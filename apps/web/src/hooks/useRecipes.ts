@@ -1,6 +1,13 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
+export interface RecipeTag {
+  id: number;
+  name: string;
+  display_name: string;
+  color: string | null;
+}
+
 export interface Recipe {
   id: number;
   title: string;
@@ -10,6 +17,8 @@ export interface Recipe {
   cook_time_minutes: number | null;
   servings: number | null;
   created_at: string;
+  categories?: string[];
+  tags?: RecipeTag[];
 }
 
 interface RecipesResponse {
@@ -41,18 +50,33 @@ export function useRecipes(options: UseRecipesOptions = {}) {
       return response;
     },
     enabled,
+    // Ensure fresh data when navigating back to recipes list
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 }
 
 const RECIPES_PER_PAGE = 24;
 
-export function useInfiniteRecipes() {
+interface UseInfiniteRecipesOptions {
+  tags?: number[];
+  tagMode?: 'all' | 'any';
+}
+
+export function useInfiniteRecipes(options: UseInfiniteRecipesOptions = {}) {
+  const { tags = [], tagMode = 'all' } = options;
+
   return useInfiniteQuery({
-    queryKey: ['recipes'],
+    queryKey: ['recipes', { tags, tagMode }],
     queryFn: async ({ pageParam = 0 }): Promise<RecipesResponse> => {
       const params = new URLSearchParams();
       params.set('limit', String(RECIPES_PER_PAGE));
       params.set('offset', String(pageParam));
+
+      if (tags.length > 0) {
+        params.set('tags', tags.join(','));
+        params.set('tagMode', tagMode);
+      }
 
       const response = await api.get<RecipesResponse>(`/api/recipes?${params}`);
       return response;
@@ -63,5 +87,8 @@ export function useInfiniteRecipes() {
       const nextOffset = offset + limit;
       return nextOffset < total ? nextOffset : undefined;
     },
+    // Ensure fresh data when navigating back to recipes list
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 }

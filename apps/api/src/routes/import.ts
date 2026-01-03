@@ -137,6 +137,58 @@ function extractSourceUrl(recipe: ImportRecipe): string | null {
 }
 
 /**
+ * Detect if a recipe should be tagged as "quick-and-easy"
+ * Based on total time under 30 minutes or keywords in title/description
+ */
+function detectQuickAndEasy(recipe: ImportRecipe): boolean {
+  // Check total time (prep + cook)
+  const prepTime = recipe.metadata?.prepTime ?? 0;
+  const cookTime = recipe.metadata?.cookTime ?? 0;
+  const totalTime = recipe.metadata?.totalTime ?? (prepTime + cookTime);
+
+  // If we have time data and it's under 30 minutes
+  if (totalTime > 0 && totalTime <= 30) {
+    return true;
+  }
+
+  // Check for keywords in title
+  const title = recipe.title.toLowerCase();
+  const quickKeywords = [
+    'quick',
+    'easy',
+    'simple',
+    'fast',
+    '5-minute',
+    '10-minute',
+    '15-minute',
+    '20-minute',
+    '5 minute',
+    '10 minute',
+    '15 minute',
+    '20 minute',
+    'weeknight',
+    'no-cook',
+    'no cook',
+    'one-pot',
+    'one pot',
+    'sheet pan',
+    'dump',
+  ];
+
+  if (quickKeywords.some((keyword) => title.includes(keyword))) {
+    return true;
+  }
+
+  // Check description for keywords
+  const description = (recipe.description ?? '').toLowerCase();
+  if (quickKeywords.some((keyword) => description.includes(keyword))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Clean text by removing images and URLs
  */
 function cleanText(text: string | null): string | null {
@@ -392,8 +444,17 @@ importRoutes.post('/vault', async (c) => {
 
       // Process tags - first get/create all tags
       const tagIds: number[] = [];
-      if (recipe.metadata?.tags && recipe.metadata.tags.length > 0) {
-        for (const tagName of recipe.metadata.tags) {
+
+      // Get tags from metadata
+      const tagsToProcess = [...(recipe.metadata?.tags ?? [])];
+
+      // Auto-detect quick-and-easy tag
+      if (detectQuickAndEasy(recipe) && !tagsToProcess.some((t) => t.toLowerCase() === 'quick-and-easy')) {
+        tagsToProcess.push('quick-and-easy');
+      }
+
+      if (tagsToProcess.length > 0) {
+        for (const tagName of tagsToProcess) {
           const normalized = tagName.toLowerCase().trim();
           const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ?')
             .bind(normalized)
