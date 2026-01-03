@@ -276,150 +276,177 @@ async function insertRecipeIngredients(
 }
 
 // POST /api/import/vault - Import recipes from vault
+// Imports a SINGLE recipe at a time (client batches requests)
 importRoutes.post('/vault', async (c) => {
   try {
     const body = await c.req.json<ImportRequest>();
     const { recipes } = body;
 
-    if (!recipes || !Array.isArray(recipes)) {
+    if (!recipes || !Array.isArray(recipes) || recipes.length === 0) {
       return c.json({ error: 'recipes array is required' }, 400);
     }
 
+    // Process only the first recipe (client should send one at a time)
+    const recipe = recipes[0];
     const results: ImportResult[] = [];
 
-    // First, collect all unique category paths
-    const allCategoryPaths: string[] = [];
-    for (const recipe of recipes) {
-      if (recipe.category) {
-        allCategoryPaths.push(recipe.category);
-      }
-      // Also add categories from metadata
-      if (recipe.metadata?.categories) {
-        allCategoryPaths.push(...recipe.metadata.categories);
-      }
-    }
-
-    // Process all categories first
-    let categoryMap: CategoryMap = {};
     try {
-      categoryMap = await processCategories(c.env.DB, allCategoryPaths);
-    } catch (error) {
-      console.error('Failed to process categories:', error);
-      // Continue with empty category map - recipes can still be imported
-    }
+      // Collect statements for batch execution
+      const statements: D1PreparedStatement[] = [];
 
-    // Process each recipe
-    for (const recipe of recipes) {
-      try {
-        // Format raw ingredients text for storage and FTS
-        const ingredientsRaw = formatIngredientsRaw(recipe.ingredients);
+      // Format raw ingredients text for storage and FTS
+      const ingredientsRaw = formatIngredientsRaw(recipe.ingredients);
 
-        // Extract source URL from any content
-        const sourceUrl = extractSourceUrl(recipe);
+      // Extract source URL from any content
+      const sourceUrl = extractSourceUrl(recipe);
 
-        // Clean text fields (remove images and URLs)
-        const cleanedDescription = cleanText(recipe.description);
-        const cleanedInstructions = cleanText(recipe.instructions);
-        const cleanedNotes = cleanText(recipe.notes);
+      // Clean text fields (remove images and URLs)
+      const cleanedDescription = cleanText(recipe.description);
+      const cleanedInstructions = cleanText(recipe.instructions);
+      const cleanedNotes = cleanText(recipe.notes);
 
-        // Insert the recipe
-        const recipeResult = await c.env.DB.prepare(
-          `INSERT INTO recipes (
-            title, source_path, source_url, markdown_content, description,
-            ingredients_raw, instructions_raw, notes,
-            prep_time_minutes, cook_time_minutes, servings, servings_unit
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      // Insert the recipe first to get the ID
+      const recipeResult = await c.env.DB.prepare(
+        `INSERT INTO recipes (
+          title, source_path, source_url, markdown_content, description,
+          ingredients_raw, instructions_raw, notes,
+          prep_time_minutes, cook_time_minutes, servings, servings_unit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          recipe.title,
+          recipe.filePath,
+          sourceUrl,
+          recipe.rawContent,
+          cleanedDescription,
+          ingredientsRaw,
+          cleanedInstructions,
+          cleanedNotes,
+          recipe.metadata?.prepTime ?? null,
+          recipe.metadata?.cookTime ?? null,
+          recipe.metadata?.servings ?? null,
+          recipe.metadata?.servingsUnit ?? 'servings'
         )
-          .bind(
-            recipe.title,
-            recipe.filePath,
-            sourceUrl,
-            recipe.rawContent,
-            cleanedDescription,
-            ingredientsRaw,
-            cleanedInstructions,
-            cleanedNotes,
-            recipe.metadata?.prepTime ?? null,
-            recipe.metadata?.cookTime ?? null,
-            recipe.metadata?.servings ?? null,
-            recipe.metadata?.servingsUnit ?? 'servings'
-          )
-          .run();
+        .run();
 
-        const recipeId = recipeResult.meta.last_row_id as number;
+      const recipeId = recipeResult.meta.last_row_id as number;
 
-        // Link to categories
-        const categoriesToLink: number[] = [];
+      // Process category if present
+      if (recipe.category) {
+        const parts = recipe.category
+          .split('/')
+          .map((p) => p.trim())
+          .filter(Boolean);
 
-        // Add folder-based category
-        if (recipe.category && categoryMap[recipe.category]) {
-          categoriesToLink.push(categoryMap[recipe.category]);
-        }
+        let parentId: number | null = null;
 
-        // Add metadata categories
-        if (recipe.metadata?.categories) {
-          for (const catPath of recipe.metadata.categories) {
-            if (categoryMap[catPath] && !categoriesToLink.includes(categoryMap[catPath])) {
-              categoriesToLink.push(categoryMap[catPath]);
-            }
+        for (let i = 0; i < parts.length; i++) {
+          const name = parts[i];
+          const slug = generateSlug(name);
+          const depth = i;
+          const pathParts = parts.slice(0, i);
+          const currentPath = pathParts.length > 0 ? pathParts.join('/') : '';
+
+          // Check if category exists
+          const existing = await c.env.DB.prepare('SELECT id FROM categories WHERE slug = ? AND depth = ?')
+            .bind(slug, depth)
+            .first<{ id: number }>();
+
+          if (existing) {
+            parentId = existing.id;
+          } else {
+            const catResult = await c.env.DB.prepare(
+              `INSERT INTO categories (name, slug, parent_id, path, depth) VALUES (?, ?, ?, ?, ?)`
+            )
+              .bind(name, slug, parentId, currentPath, depth)
+              .run();
+            parentId = catResult.meta.last_row_id as number;
           }
         }
 
-        // Insert category links
-        for (let i = 0; i < categoriesToLink.length; i++) {
-          await c.env.DB.prepare(
-            `INSERT OR IGNORE INTO recipe_categories (recipe_id, category_id, is_primary)
-             VALUES (?, ?, ?)`
-          )
-            .bind(recipeId, categoriesToLink[i], i === 0 ? 1 : 0)
-            .run();
+        // Link recipe to leaf category
+        if (parentId) {
+          statements.push(
+            c.env.DB.prepare(
+              `INSERT OR IGNORE INTO recipe_categories (recipe_id, category_id, is_primary) VALUES (?, ?, 1)`
+            ).bind(recipeId, parentId)
+          );
         }
-
-        // Insert ingredients
-        if (recipe.ingredients.length > 0) {
-          await insertRecipeIngredients(c.env.DB, recipeId, recipe.ingredients);
-        }
-
-        // Handle tags
-        if (recipe.metadata?.tags && recipe.metadata.tags.length > 0) {
-          for (const tagName of recipe.metadata.tags) {
-            try {
-              const tagId = await getOrCreateTag(c.env.DB, tagName);
-              await c.env.DB.prepare(
-                `INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)`
-              )
-                .bind(recipeId, tagId)
-                .run();
-
-              // Update tag usage count
-              await c.env.DB.prepare(`UPDATE tags SET usage_count = usage_count + 1 WHERE id = ?`)
-                .bind(tagId)
-                .run();
-            } catch (tagError) {
-              console.error(`Failed to add tag "${tagName}":`, tagError);
-              // Continue with other tags
-            }
-          }
-        }
-
-        // Collect image paths that need uploading
-        const imagePaths = recipe.images?.map((img) => img.path) ?? [];
-
-        results.push({
-          recipeId,
-          title: recipe.title,
-          success: true,
-          imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
-        });
-      } catch (error) {
-        console.error(`Failed to import recipe "${recipe.title}":`, error);
-        results.push({
-          recipeId: 0,
-          title: recipe.title,
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
       }
+
+      // Add ingredients to batch
+      let currentGroup: string | null = null;
+      let sortOrder = 0;
+      for (const ing of recipe.ingredients) {
+        if (ing.isGroupHeader) {
+          currentGroup = ing.name;
+          continue;
+        }
+        statements.push(
+          c.env.DB.prepare(
+            `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(recipeId, ing.quantity, ing.unit, ing.original, ing.preparation, currentGroup, sortOrder++)
+        );
+      }
+
+      // Process tags - first get/create all tags
+      const tagIds: number[] = [];
+      if (recipe.metadata?.tags && recipe.metadata.tags.length > 0) {
+        for (const tagName of recipe.metadata.tags) {
+          const normalized = tagName.toLowerCase().trim();
+          const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ?')
+            .bind(normalized)
+            .first<{ id: number }>();
+
+          if (existing) {
+            tagIds.push(existing.id);
+          } else {
+            const tagResult = await c.env.DB.prepare(
+              'INSERT INTO tags (name, display_name, usage_count) VALUES (?, ?, 1)'
+            )
+              .bind(normalized, tagName.trim())
+              .run();
+            tagIds.push(tagResult.meta.last_row_id as number);
+          }
+        }
+
+        // Add tag links to batch
+        for (const tagId of tagIds) {
+          statements.push(
+            c.env.DB.prepare(`INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)`).bind(
+              recipeId,
+              tagId
+            )
+          );
+          statements.push(
+            c.env.DB.prepare(`UPDATE tags SET usage_count = usage_count + 1 WHERE id = ?`).bind(tagId)
+          );
+        }
+      }
+
+      // Execute all remaining statements in a single batch
+      if (statements.length > 0) {
+        await c.env.DB.batch(statements);
+      }
+
+      // Collect image paths that need uploading
+      const imagePaths = recipe.images?.map((img) => img.path) ?? [];
+
+      results.push({
+        recipeId,
+        title: recipe.title,
+        success: true,
+        imagePaths: imagePaths.length > 0 ? imagePaths : undefined,
+      });
+    } catch (error) {
+      console.error(`Failed to import recipe "${recipe.title}":`, error);
+      results.push({
+        recipeId: 0,
+        title: recipe.title,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
 
     const successCount = results.filter((r) => r.success).length;
@@ -430,7 +457,6 @@ importRoutes.post('/vault', async (c) => {
       imported: successCount,
       failed: failCount,
       results,
-      categoryMap,
     });
   } catch (error) {
     return c.json(

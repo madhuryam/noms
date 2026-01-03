@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import type { ParsedVaultRecipe, ImportResult } from '../components/import/types';
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 1; // Send one recipe at a time to avoid Worker CPU limits
 const IMAGE_UPLOAD_CONCURRENCY = 3;
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
 
 /**
  * Resolve a relative path from a base directory

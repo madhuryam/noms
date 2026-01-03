@@ -11,6 +11,7 @@ interface HealthResponse {
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
+  ASSETS: Fetcher;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -128,5 +129,10 @@ app.route('/api/associations', associations);
 // They're mounted at /api/tags but the routes include /recipes/:id/tags paths
 // So we need to re-mount for the recipe-tag endpoints
 app.route('/api', tags);
+
+// Fallback: delegate all non-API routes to static assets (SPA)
+app.all('*', async (c) => {
+  return c.env.ASSETS.fetch(c.req.raw);
+});
 
 export default app;
