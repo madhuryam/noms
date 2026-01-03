@@ -9,7 +9,7 @@ interface FormData {
   description: string;
   ingredients_raw: string;
   instructions_raw: string;
-  servings: number;
+  servings: string;
   prep_time_minutes: string;
   cook_time_minutes: string;
   notes: string;
@@ -64,7 +64,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     description: '',
     ingredients_raw: '',
     instructions_raw: '',
-    servings: DEFAULT_SERVINGS,
+    servings: String(DEFAULT_SERVINGS),
     prep_time_minutes: '',
     cook_time_minutes: '',
     notes: '',
@@ -79,7 +79,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         description: initialData.description ?? '',
         ingredients_raw: initialData.ingredients_raw ?? '',
         instructions_raw: initialData.instructions_raw ?? '',
-        servings: initialData.servings ?? DEFAULT_SERVINGS,
+        servings: String(initialData.servings ?? DEFAULT_SERVINGS),
         prep_time_minutes: initialData.prep_time_minutes?.toString() ?? '',
         cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
         notes: initialData.notes ?? '',
@@ -124,7 +124,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       description: formData.description.trim() || null,
       ingredients_raw: formData.ingredients_raw.trim(),
       instructions_raw: formData.instructions_raw.trim(),
-      servings: formData.servings,
+      servings: formData.servings ? Number(formData.servings) : DEFAULT_SERVINGS,
       prep_time_minutes: formData.prep_time_minutes
         ? Number(formData.prep_time_minutes)
         : null,
@@ -137,6 +137,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
     try {
       const recipe = await mutation.mutateAsync(payload);
+
+      // For new recipes, add selected tags after creation
+      if (mode === 'create' && selectedTags.length > 0) {
+        for (const tag of selectedTags) {
+          try {
+            await addTagToRecipe.mutateAsync({ recipeId: recipe.id, tagId: tag.id });
+          } catch (error) {
+            console.error('Failed to add tag to new recipe:', error);
+          }
+        }
+      }
+
       navigate(`/recipes/${recipe.id}`);
     } catch {
       // Error is handled by mutation state
@@ -154,14 +166,8 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    if (name === 'servings') {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: Math.max(1, Number(value) || 1),
-      }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    // Allow empty string for all number fields to enable backspacing
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Handle tag changes - for edit mode, immediately update via API

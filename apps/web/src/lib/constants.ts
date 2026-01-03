@@ -1,5 +1,5 @@
 // Recipe defaults
-export const DEFAULT_SERVINGS = 4;
+export const DEFAULT_SERVINGS = 2;
 export const DEFAULT_SERVINGS_UNIT = 'servings';
 
 // Pagination defaults

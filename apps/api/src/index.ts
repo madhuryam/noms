@@ -59,7 +59,8 @@ app.use('/api/*', async (c, next) => {
   }
 
   // Apply JWT validation for production
-  return validateAccessJWT(c, next);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return validateAccessJWT(c as any, next);
 });
 
 // Database check endpoint
