@@ -32,3 +32,5 @@ export {
   useDeleteShelfLife,
 } from './useShelfLife';
 export type { ShelfLifeEntry } from './useShelfLife';
+export { usePantrySuggestions, useRecipeMatch } from './usePantryMatch';
+export type { MatchedRecipe, IngredientMatch } from './usePantryMatch';

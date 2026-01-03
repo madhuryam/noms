@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { usePantryItems } from '../hooks';
 import { AddItemForm, PantryList, FridgeList, BulkAddModal } from '../components/pantry';
 
@@ -13,7 +13,7 @@ export function PantryPage() {
   const fridgeCount = allItems.filter((i) => i.location === 'fridge').length;
   const freezerCount = allItems.filter((i) => i.location === 'freezer').length;
 
-  const tabs: { id: TabType; label: string; count: number; icon: JSX.Element }[] = [
+  const tabs: { id: TabType; label: string; count: number; icon: ReactNode }[] = [
     {
       id: 'pantry',
       label: 'Pantry',

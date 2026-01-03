@@ -233,6 +233,390 @@ recipes.get('/suggestions/daily', async (c) => {
   }
 });
 
+// GET /api/recipes/suggestions/pantry - Get recipes matching pantry contents
+recipes.get('/suggestions/pantry', async (c) => {
+  const maxMissing = Math.min(Number(c.req.query('maxMissing')) || 3, 10);
+  const limit = Math.min(Number(c.req.query('limit')) || 20, 50);
+  const includeLocations = c.req.query('locations') || 'all'; // 'pantry', 'fridge', 'freezer', 'all'
+
+  try {
+    // Get all pantry items based on location filter
+    let pantryQuery = `
+      SELECT p.id, p.ingredient_id, p.normalized_name, i.normalized_name as ingredient_normalized_name
+      FROM pantry_items p
+      LEFT JOIN ingredients i ON p.ingredient_id = i.id
+    `;
+    const pantryBindings: string[] = [];
+
+    if (includeLocations !== 'all') {
+      const locations = includeLocations.split(',').map(l => l.trim());
+      const placeholders = locations.map(() => '?').join(',');
+      pantryQuery += ` WHERE p.location IN (${placeholders})`;
+      pantryBindings.push(...locations);
+    }
+
+    const pantryResult = await c.env.DB.prepare(pantryQuery).bind(...pantryBindings).all();
+    const pantryItems = (pantryResult.results ?? []) as Array<{
+      id: number;
+      ingredient_id: number | null;
+      normalized_name: string;
+      ingredient_normalized_name: string | null;
+    }>;
+
+    // Build a set of normalized names and ingredient IDs we have
+    const pantryIngredientIds = new Set<number>();
+    const pantryNormalizedNames = new Set<string>();
+
+    for (const item of pantryItems) {
+      if (item.ingredient_id) {
+        pantryIngredientIds.add(item.ingredient_id);
+      }
+      pantryNormalizedNames.add(item.normalized_name.toLowerCase());
+      if (item.ingredient_normalized_name) {
+        pantryNormalizedNames.add(item.ingredient_normalized_name.toLowerCase());
+      }
+    }
+
+    // Get food associations for expanded matching
+    const associationsResult = await c.env.DB.prepare(`
+      SELECT t1.term as term1, t2.term as term2
+      FROM food_association_terms t1
+      JOIN food_association_terms t2 ON t1.group_id = t2.group_id
+      WHERE t1.term != t2.term
+    `).all();
+
+    // Build association map
+    const associations = new Map<string, Set<string>>();
+    for (const row of (associationsResult.results ?? []) as Array<{ term1: string; term2: string }>) {
+      const t1 = row.term1.toLowerCase();
+      const t2 = row.term2.toLowerCase();
+      if (!associations.has(t1)) {
+        associations.set(t1, new Set());
+      }
+      associations.get(t1)!.add(t2);
+    }
+
+    // Get all recipes with their ingredients
+    const recipesResult = await c.env.DB.prepare(`
+      SELECT r.id, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
+      FROM recipes r
+    `).all();
+
+    const recipes = (recipesResult.results ?? []) as Array<{
+      id: number;
+      title: string;
+      description: string | null;
+      image_path: string | null;
+      prep_time_minutes: number | null;
+      cook_time_minutes: number | null;
+      servings: number | null;
+    }>;
+
+    // For each recipe, get ingredients and calculate match
+    const recipeMatches: Array<{
+      recipe: typeof recipes[0];
+      matched_count: number;
+      total_count: number;
+      match_percent: number;
+      missing_ingredients: string[];
+      matched_ingredients: string[];
+    }> = [];
+
+    for (const recipe of recipes) {
+      const ingredientsResult = await c.env.DB.prepare(`
+        SELECT ri.ingredient_id, ri.raw_text, ri.is_optional, i.normalized_name
+        FROM recipe_ingredients ri
+        LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+        WHERE ri.recipe_id = ?
+      `)
+        .bind(recipe.id)
+        .all();
+
+      const ingredients = (ingredientsResult.results ?? []) as Array<{
+        ingredient_id: number | null;
+        raw_text: string;
+        is_optional: number;
+        normalized_name: string | null;
+      }>;
+
+      // Only count required ingredients
+      const requiredIngredients = ingredients.filter(i => i.is_optional !== 1);
+
+      if (requiredIngredients.length === 0) {
+        continue; // Skip recipes with no ingredients
+      }
+
+      let matchedCount = 0;
+      const missingIngredients: string[] = [];
+      const matchedIngredients: string[] = [];
+
+      for (const ing of requiredIngredients) {
+        let isMatched = false;
+
+        // Check by ingredient_id
+        if (ing.ingredient_id && pantryIngredientIds.has(ing.ingredient_id)) {
+          isMatched = true;
+        }
+
+        // Check by normalized name
+        if (!isMatched && ing.normalized_name) {
+          const normalizedLower = ing.normalized_name.toLowerCase();
+          if (pantryNormalizedNames.has(normalizedLower)) {
+            isMatched = true;
+          }
+
+          // Check food associations
+          if (!isMatched) {
+            const relatedTerms = associations.get(normalizedLower);
+            if (relatedTerms) {
+              for (const term of relatedTerms) {
+                if (pantryNormalizedNames.has(term)) {
+                  isMatched = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (isMatched) {
+          matchedCount++;
+          matchedIngredients.push(ing.raw_text);
+        } else {
+          missingIngredients.push(ing.raw_text);
+        }
+      }
+
+      const totalCount = requiredIngredients.length;
+      const missingCount = totalCount - matchedCount;
+
+      if (missingCount <= maxMissing) {
+        recipeMatches.push({
+          recipe,
+          matched_count: matchedCount,
+          total_count: totalCount,
+          match_percent: Math.round((matchedCount / totalCount) * 100),
+          missing_ingredients: missingIngredients,
+          matched_ingredients: matchedIngredients,
+        });
+      }
+    }
+
+    // Sort by match_percent DESC, then by total_count ASC (prefer simpler recipes)
+    recipeMatches.sort((a, b) => {
+      if (b.match_percent !== a.match_percent) {
+        return b.match_percent - a.match_percent;
+      }
+      return a.total_count - b.total_count;
+    });
+
+    // Apply limit
+    const limitedResults = recipeMatches.slice(0, limit);
+
+    // Get tags for the recipes
+    const recipeIds = limitedResults.map(r => r.recipe.id);
+    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null }>> = {};
+
+    if (recipeIds.length > 0) {
+      const placeholders = recipeIds.map(() => '?').join(',');
+      const tagsResult = await c.env.DB.prepare(`
+        SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color
+        FROM recipe_tags rt
+        JOIN tags t ON rt.tag_id = t.id
+        WHERE rt.recipe_id IN (${placeholders})
+      `)
+        .bind(...recipeIds)
+        .all();
+
+      for (const row of (tagsResult.results ?? []) as Array<{ recipe_id: number; id: number; name: string; display_name: string; color: string | null }>) {
+        if (!recipeTags[row.recipe_id]) {
+          recipeTags[row.recipe_id] = [];
+        }
+        recipeTags[row.recipe_id].push({
+          id: row.id,
+          name: row.name,
+          display_name: row.display_name,
+          color: row.color,
+        });
+      }
+    }
+
+    return c.json({
+      recipes: limitedResults.map(match => ({
+        ...match.recipe,
+        tags: recipeTags[match.recipe.id] ?? [],
+        matched_count: match.matched_count,
+        total_count: match.total_count,
+        match_percent: match.match_percent,
+        missing_ingredients: match.missing_ingredients,
+        matched_ingredients: match.matched_ingredients,
+      })),
+      pantry_item_count: pantryItems.length,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch pantry suggestions',
+      },
+      500
+    );
+  }
+});
+
+// GET /api/recipes/:id/match - Get ingredient match info for a single recipe
+recipes.get('/:id/match', async (c) => {
+  const id = Number(c.req.param('id'));
+  const includeLocations = c.req.query('locations') || 'all';
+
+  try {
+    // Check recipe exists
+    const recipe = await c.env.DB.prepare('SELECT id, title FROM recipes WHERE id = ?')
+      .bind(id)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
+    // Get pantry items
+    let pantryQuery = `
+      SELECT p.id, p.ingredient_id, p.normalized_name, p.name, i.normalized_name as ingredient_normalized_name
+      FROM pantry_items p
+      LEFT JOIN ingredients i ON p.ingredient_id = i.id
+    `;
+    const pantryBindings: string[] = [];
+
+    if (includeLocations !== 'all') {
+      const locations = includeLocations.split(',').map(l => l.trim());
+      const placeholders = locations.map(() => '?').join(',');
+      pantryQuery += ` WHERE p.location IN (${placeholders})`;
+      pantryBindings.push(...locations);
+    }
+
+    const pantryResult = await c.env.DB.prepare(pantryQuery).bind(...pantryBindings).all();
+    const pantryItems = (pantryResult.results ?? []) as Array<{
+      id: number;
+      ingredient_id: number | null;
+      normalized_name: string;
+      name: string;
+      ingredient_normalized_name: string | null;
+    }>;
+
+    const pantryIngredientIds = new Set<number>();
+    const pantryNormalizedNames = new Map<string, string>(); // normalized -> display name
+
+    for (const item of pantryItems) {
+      if (item.ingredient_id) {
+        pantryIngredientIds.add(item.ingredient_id);
+      }
+      pantryNormalizedNames.set(item.normalized_name.toLowerCase(), item.name);
+      if (item.ingredient_normalized_name) {
+        pantryNormalizedNames.set(item.ingredient_normalized_name.toLowerCase(), item.name);
+      }
+    }
+
+    // Get food associations
+    const associationsResult = await c.env.DB.prepare(`
+      SELECT t1.term as term1, t2.term as term2
+      FROM food_association_terms t1
+      JOIN food_association_terms t2 ON t1.group_id = t2.group_id
+      WHERE t1.term != t2.term
+    `).all();
+
+    const associations = new Map<string, Set<string>>();
+    for (const row of (associationsResult.results ?? []) as Array<{ term1: string; term2: string }>) {
+      const t1 = row.term1.toLowerCase();
+      const t2 = row.term2.toLowerCase();
+      if (!associations.has(t1)) {
+        associations.set(t1, new Set());
+      }
+      associations.get(t1)!.add(t2);
+    }
+
+    // Get recipe ingredients
+    const ingredientsResult = await c.env.DB.prepare(`
+      SELECT ri.id, ri.ingredient_id, ri.raw_text, ri.is_optional, ri.group_name, ri.sort_order, i.normalized_name
+      FROM recipe_ingredients ri
+      LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+      WHERE ri.recipe_id = ?
+      ORDER BY ri.sort_order ASC
+    `)
+      .bind(id)
+      .all();
+
+    const ingredients = (ingredientsResult.results ?? []) as Array<{
+      id: number;
+      ingredient_id: number | null;
+      raw_text: string;
+      is_optional: number;
+      group_name: string | null;
+      sort_order: number;
+      normalized_name: string | null;
+    }>;
+
+    const ingredientMatches = ingredients.map(ing => {
+      let isMatched = false;
+      let matchedPantryItem: string | null = null;
+
+      // Check by ingredient_id
+      if (ing.ingredient_id && pantryIngredientIds.has(ing.ingredient_id)) {
+        isMatched = true;
+      }
+
+      // Check by normalized name
+      if (!isMatched && ing.normalized_name) {
+        const normalizedLower = ing.normalized_name.toLowerCase();
+        if (pantryNormalizedNames.has(normalizedLower)) {
+          isMatched = true;
+          matchedPantryItem = pantryNormalizedNames.get(normalizedLower) ?? null;
+        }
+
+        // Check food associations
+        if (!isMatched) {
+          const relatedTerms = associations.get(normalizedLower);
+          if (relatedTerms) {
+            for (const term of relatedTerms) {
+              if (pantryNormalizedNames.has(term)) {
+                isMatched = true;
+                matchedPantryItem = pantryNormalizedNames.get(term) ?? null;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        id: ing.id,
+        raw_text: ing.raw_text,
+        is_optional: ing.is_optional === 1,
+        group_name: ing.group_name,
+        have_ingredient: isMatched,
+        matched_pantry_item: matchedPantryItem,
+      };
+    });
+
+    const requiredIngredients = ingredientMatches.filter(i => !i.is_optional);
+    const matchedCount = requiredIngredients.filter(i => i.have_ingredient).length;
+    const totalCount = requiredIngredients.length;
+
+    return c.json({
+      recipe_id: id,
+      ingredients: ingredientMatches,
+      matched_count: matchedCount,
+      total_count: totalCount,
+      match_percent: totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to get recipe match',
+      },
+      500
+    );
+  }
+});
+
 // GET /api/recipes/:id - Get single recipe with tags and categories
 recipes.get('/:id', async (c) => {
   const id = Number(c.req.param('id'));

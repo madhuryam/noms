@@ -10,4 +10,5 @@ export { PantryPage } from './PantryPage';
 export { ImportPage } from './ImportPage';
 export { SearchPage } from './SearchPage';
 export { SettingsPage } from './SettingsPage';
+export { WhatCanIMakePage } from './WhatCanIMakePage';
 export { NotFoundPage } from './NotFoundPage';

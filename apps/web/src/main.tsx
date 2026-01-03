@@ -19,6 +19,7 @@ import {
   ImportPage,
   SearchPage,
   SettingsPage,
+  WhatCanIMakePage,
   NotFoundPage,
 } from './pages';
 import './index.css';
@@ -76,6 +77,8 @@ function AppWithDnd() {
           <Route path="/tags" element={<TagsPage />} />
           <Route path="/meal-plans" element={<MealPlansPage />} />
           <Route path="/pantry" element={<PantryPage />} />
+          <Route path="/inventory" element={<PantryPage />} />
+          <Route path="/what-can-i-make" element={<WhatCanIMakePage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings" element={<SettingsPage />} />

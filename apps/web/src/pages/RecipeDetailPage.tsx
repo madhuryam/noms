@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useRecipe, useDeleteRecipe } from '../hooks';
+import { useRecipe, useDeleteRecipe, useRecipeMatch } from '../hooks';
 import {
   RecipeHeader,
   RecipeMetadata,
@@ -8,6 +8,7 @@ import {
   IngredientList,
   InstructionSteps,
 } from '../components/recipes';
+import { MatchSummaryBadge } from '../components/suggestions';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
 import { DEFAULT_SERVINGS } from '../lib/constants';
 
@@ -106,6 +107,7 @@ export function RecipeDetailPage() {
   const recipeId = id ? Number(id) : undefined;
 
   const { data: recipe, isLoading, isError, error } = useRecipe(recipeId);
+  const { data: matchData } = useRecipeMatch(recipeId);
   const deleteRecipe = useDeleteRecipe();
   const { ingredientsChecked, instructionsChecked, updateIngredients, updateInstructions } =
     useRecipeProgress(recipeId);
@@ -223,6 +225,23 @@ export function RecipeDetailPage() {
 
       {/* Tags */}
       <RecipeTags tags={recipe.tags} categories={recipe.categories} />
+
+      {/* Pantry Match Badge */}
+      {matchData && matchData.total_count > 0 && (
+        <div className="flex items-center gap-3">
+          <MatchSummaryBadge
+            matchPercent={matchData.match_percent}
+            matchedCount={matchData.matched_count}
+            totalCount={matchData.total_count}
+          />
+          <Link
+            to="/what-can-i-make"
+            className="text-sm text-blue-600 dark:text-onedark-blue hover:underline"
+          >
+            Find more recipes
+          </Link>
+        </div>
+      )}
 
       {/* Metadata: Times, Servings, and Source */}
       <RecipeMetadata

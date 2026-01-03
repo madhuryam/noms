@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCategoryTree, useTags } from '../../hooks';
 
 const STORAGE_KEY = 'suggestions-settings';

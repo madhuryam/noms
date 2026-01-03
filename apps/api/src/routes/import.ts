@@ -71,13 +71,27 @@ function generateSlug(name: string): string {
 }
 
 /**
+ * Strip checkbox markers and list prefixes from an ingredient line
+ */
+function cleanIngredientLine(line: string): string {
+  return line
+    // Remove checkbox patterns: "- [ ]", "- [x]", "- [X]", "* [ ]", etc.
+    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
+    // Remove list markers: "- ", "* ", "• "
+    .replace(/^[-*•]\s+/, '')
+    .trim();
+}
+
+/**
  * Format ingredients as raw text for storage and FTS
+ * Cleans checkbox markers and list prefixes for cleaner storage
  */
 function formatIngredientsRaw(ingredients: ParsedIngredient[]): string {
   return ingredients
     .map((ing) => {
       if (ing.isGroupHeader) return `\n${ing.name}:`;
-      return ing.original;
+      // Clean the line to remove checkbox markers before storing
+      return cleanIngredientLine(ing.original);
     })
     .join('\n')
     .trim();
