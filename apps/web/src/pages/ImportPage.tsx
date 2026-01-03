@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { VaultUploader, ImportPreview, ImportProgress } from '../components/import';
 import { useVaultImport } from '../hooks/useVaultImport';
 import { api } from '../lib/api';
@@ -9,11 +10,12 @@ type ImportStep = 'upload' | 'preview' | 'importing' | 'complete';
 
 export function ImportPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<ImportStep>('upload');
   const [parseResult, setParseResult] = useState<VaultParseResult | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { progress, results, isComplete, startImport, reset } = useVaultImport();
+  const { progress, imageProgress, results, isComplete, startImport, reset } = useVaultImport();
 
   const handleDeleteAll = useCallback(async () => {
     if (!confirm('Are you sure you want to delete ALL recipes? This cannot be undone.')) {
@@ -22,13 +24,16 @@ export function ImportPage() {
     setIsDeleting(true);
     try {
       await api.delete('/api/recipes');
+      // Invalidate all recipe-related queries
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['category'] });
       alert('All recipes deleted successfully');
     } catch (error) {
       alert(`Failed to delete recipes: ${error}`);
     } finally {
       setIsDeleting(false);
     }
-  }, []);
+  }, [queryClient]);
 
   const handleParseComplete = useCallback((result: VaultParseResult) => {
     setParseResult(result);
@@ -47,7 +52,7 @@ export function ImportPage() {
   const handleStartImport = useCallback(async () => {
     if (!parseResult) return;
     setStep('importing');
-    await startImport(parseResult.recipes);
+    await startImport(parseResult.recipes, parseResult.images);
     setStep('complete');
   }, [parseResult, startImport]);
 
@@ -146,6 +151,8 @@ export function ImportPage() {
           <ImportProgress
             total={progress.total}
             processed={progress.processed}
+            imageTotal={imageProgress.total}
+            imageProcessed={imageProgress.processed}
             results={results}
             isComplete={isComplete}
             onViewRecipes={handleViewRecipes}

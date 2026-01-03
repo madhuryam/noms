@@ -218,6 +218,7 @@ export function RecipeDetailPage() {
         title={recipe.title}
         description={recipe.description}
         imagePath={recipe.image_path}
+        recipeId={recipe.id}
       />
 
       {/* Tags */}

@@ -4,6 +4,8 @@ import type { ImportResult } from './types';
 interface ImportProgressProps {
   total: number;
   processed: number;
+  imageTotal: number;
+  imageProcessed: number;
   results: ImportResult[];
   isComplete: boolean;
   onViewRecipes: () => void;
@@ -13,6 +15,8 @@ interface ImportProgressProps {
 export function ImportProgress({
   total,
   processed,
+  imageTotal,
+  imageProcessed,
   results,
   isComplete,
   onViewRecipes,
@@ -29,6 +33,9 @@ export function ImportProgress({
   }, [results]);
 
   const progressPercent = total > 0 ? (processed / total) * 100 : 0;
+  const imageProgressPercent = imageTotal > 0 ? (imageProcessed / imageTotal) * 100 : 0;
+  const isUploadingImages = imageTotal > 0 && imageProcessed < imageTotal;
+  const recipesComplete = processed >= total;
 
   return (
     <div className="space-y-6">
@@ -56,6 +63,7 @@ export function ImportProgress({
             </h2>
             <p className="text-gray-500 dark:text-onedark-fg-muted mt-1">
               Successfully imported {successCount} of {total} recipes
+              {imageTotal > 0 && ` with ${imageTotal} images`}
             </p>
           </>
         ) : (
@@ -82,32 +90,58 @@ export function ImportProgress({
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-onedark-fg">
-              Importing Recipes...
+              {isUploadingImages ? 'Uploading Images...' : 'Importing Recipes...'}
             </h2>
             <p className="text-gray-500 dark:text-onedark-fg-muted mt-1">
-              {processed} of {total} recipes processed
+              {isUploadingImages
+                ? `${imageProcessed} of ${imageTotal} images uploaded`
+                : `${processed} of ${total} recipes processed`}
             </p>
           </>
         )}
       </div>
 
-      {/* Progress Bar */}
-      <div className="w-full max-w-md mx-auto">
-        <div className="bg-gray-200 dark:bg-onedark-bg-highlight rounded-full h-3 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${
-              isComplete
-                ? failCount > 0
-                  ? 'bg-yellow-500'
-                  : 'bg-green-500 dark:bg-green-400'
-                : 'bg-blue-500 dark:bg-onedark-blue'
-            }`}
-            style={{ width: `${progressPercent}%` }}
-          />
+      {/* Progress Bars */}
+      <div className="w-full max-w-md mx-auto space-y-3">
+        {/* Recipe progress */}
+        <div>
+          <div className="flex justify-between text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
+            <span>Recipes</span>
+            <span>{processed}/{total}</span>
+          </div>
+          <div className="bg-gray-200 dark:bg-onedark-bg-highlight rounded-full h-2.5 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                recipesComplete
+                  ? failCount > 0
+                    ? 'bg-yellow-500'
+                    : 'bg-green-500 dark:bg-green-400'
+                  : 'bg-blue-500 dark:bg-onedark-blue'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
-        <p className="text-center text-sm text-gray-500 dark:text-onedark-fg-muted mt-2">
-          {Math.round(progressPercent)}%
-        </p>
+
+        {/* Image progress (only show if there are images) */}
+        {(imageTotal > 0 || recipesComplete) && imageTotal > 0 && (
+          <div>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
+              <span>Images</span>
+              <span>{imageProcessed}/{imageTotal}</span>
+            </div>
+            <div className="bg-gray-200 dark:bg-onedark-bg-highlight rounded-full h-2.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  imageProcessed >= imageTotal
+                    ? 'bg-green-500 dark:bg-green-400'
+                    : 'bg-purple-500 dark:bg-purple-400'
+                }`}
+                style={{ width: `${imageProgressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Summary Stats */}
