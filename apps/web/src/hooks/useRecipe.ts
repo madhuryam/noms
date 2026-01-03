@@ -25,14 +25,15 @@ interface Recipe {
 
 interface CreateRecipeInput {
   title: string;
-  description?: string;
+  description?: string | null;
   ingredients_raw?: string;
   instructions_raw?: string;
   servings?: number;
   servings_unit?: string;
-  prep_time_minutes?: number;
-  cook_time_minutes?: number;
-  notes?: string;
+  prep_time_minutes?: number | null;
+  cook_time_minutes?: number | null;
+  notes?: string | null;
+  source_url?: string | null;
 }
 
 interface UpdateRecipeInput extends Partial<CreateRecipeInput> {

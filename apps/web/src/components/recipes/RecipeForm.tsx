@@ -12,6 +12,7 @@ interface FormData {
   prep_time_minutes: string;
   cook_time_minutes: string;
   notes: string;
+  source_url: string;
 }
 
 interface FormErrors {
@@ -32,6 +33,7 @@ interface RecipeFormProps {
     prep_time_minutes: number | null;
     cook_time_minutes: number | null;
     notes: string | null;
+    source_url: string | null;
   };
 }
 
@@ -49,6 +51,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     prep_time_minutes: '',
     cook_time_minutes: '',
     notes: '',
+    source_url: '',
   });
 
   // Populate form when initialData changes (for edit mode)
@@ -63,6 +66,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         prep_time_minutes: initialData.prep_time_minutes?.toString() ?? '',
         cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
         notes: initialData.notes ?? '',
+        source_url: initialData.source_url ?? '',
       });
     }
   }, [initialData]);
@@ -99,17 +103,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
 
     const payload = {
       title: formData.title.trim(),
-      description: formData.description.trim() || undefined,
+      description: formData.description.trim() || null,
       ingredients_raw: formData.ingredients_raw.trim(),
       instructions_raw: formData.instructions_raw.trim(),
       servings: formData.servings,
       prep_time_minutes: formData.prep_time_minutes
         ? Number(formData.prep_time_minutes)
-        : undefined,
+        : null,
       cook_time_minutes: formData.cook_time_minutes
         ? Number(formData.cook_time_minutes)
-        : undefined,
-      notes: formData.notes.trim() || undefined,
+        : null,
+      notes: formData.notes.trim() || null,
+      source_url: formData.source_url.trim() || null,
     };
 
     try {
@@ -329,6 +334,28 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           placeholder="Any additional notes, tips, or variations..."
           className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none"
         />
+      </div>
+
+      {/* Source URL */}
+      <div>
+        <label
+          htmlFor="source_url"
+          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
+        >
+          Source URL
+        </label>
+        <input
+          type="url"
+          id="source_url"
+          name="source_url"
+          value={formData.source_url}
+          onChange={handleChange}
+          placeholder="https://example.com/recipe"
+          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-onedark-fg-muted">
+          Link to the original recipe source
+        </p>
       </div>
 
       {/* Error Message */}
