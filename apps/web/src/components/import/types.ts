@@ -15,6 +15,8 @@ export interface ParsedVaultRecipe extends ParsedRecipe {
   parseWarnings: string[];
   rawContent: string;
   needsFormatting: boolean; // True if recipe is missing both ingredients and instructions
+  isDuplicate?: boolean; // True if recipe already exists in database
+  existingId?: number; // ID of existing recipe if duplicate
 }
 
 export interface CategoryNode {

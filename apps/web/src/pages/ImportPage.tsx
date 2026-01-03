@@ -8,6 +8,10 @@ import type { VaultParseResult, ParsedVaultRecipe } from '../components/import/t
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'complete';
 
+interface DuplicateCheckResponse {
+  duplicates: Record<string, { id: number; title: string; matchType: 'title' | 'path' }>;
+}
+
 export function ImportPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -29,16 +33,59 @@ export function ImportPage() {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       queryClient.invalidateQueries({ queryKey: ['category'] });
       queryClient.invalidateQueries({ queryKey: ['tags'] });
+
+      // Clear duplicate status from all recipes in preview (since all recipes are now deleted)
+      if (parseResult) {
+        const clearedRecipes = parseResult.recipes.map((recipe) => ({
+          ...recipe,
+          isDuplicate: false,
+          existingId: undefined,
+          selected: true, // Re-select all since they're no longer duplicates
+        }));
+        setParseResult({ ...parseResult, recipes: clearedRecipes });
+      }
+
       alert('All recipes deleted successfully');
     } catch (error) {
       alert(`Failed to delete recipes: ${error}`);
     } finally {
       setIsDeleting(false);
     }
-  }, [queryClient]);
+  }, [queryClient, parseResult]);
 
-  const handleParseComplete = useCallback((result: VaultParseResult) => {
-    setParseResult(result);
+  const handleParseComplete = useCallback(async (result: VaultParseResult) => {
+    // Check for duplicates before showing preview
+    try {
+      const recipesToCheck = result.recipes.map((r) => ({
+        title: r.title,
+        filePath: r.filePath,
+      }));
+
+      const response = await api.post<DuplicateCheckResponse>('/api/import/check-duplicates', {
+        recipes: recipesToCheck,
+      });
+
+      // Mark duplicates in the recipes
+      const updatedRecipes = result.recipes.map((recipe) => {
+        const duplicate = response.duplicates[recipe.filePath];
+        if (duplicate) {
+          return {
+            ...recipe,
+            isDuplicate: true,
+            existingId: duplicate.id,
+            selected: false, // Deselect duplicates by default
+          };
+        }
+        return recipe;
+      });
+
+      setParseResult({ ...result, recipes: updatedRecipes });
+    } catch (error) {
+      console.error('Failed to check duplicates:', error);
+      // Continue without duplicate info if check fails
+      setParseResult(result);
+    }
+
     setStep('preview');
   }, []);
 
@@ -51,10 +98,12 @@ export function ImportPage() {
     [parseResult]
   );
 
-  const handleStartImport = useCallback(async () => {
+  const handleStartImport = useCallback(async (finalRecipes?: ParsedVaultRecipe[]) => {
     if (!parseResult) return;
     setStep('importing');
-    await startImport(parseResult.recipes, parseResult.images);
+    // Use passed recipes if available (contains latest edits), otherwise fall back to state
+    const recipesToImport = finalRecipes ?? parseResult.recipes;
+    await startImport(recipesToImport, parseResult.images);
     // Invalidate all queries after import
     queryClient.invalidateQueries({ queryKey: ['recipes'] });
     queryClient.invalidateQueries({ queryKey: ['categories'] });

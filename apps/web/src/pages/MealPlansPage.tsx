@@ -1,48 +1,241 @@
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import {
+  useMealSlots,
+  useMealPlan,
+  useMealPlanForWeek,
+  useCreateMealPlan,
+  useAddPlannedMeal,
+  useUpdatePlannedMeal,
+  useDeletePlannedMeal,
+  getWeekDates,
+  formatDateKey,
+  type PlannedMeal,
+} from '../hooks';
+import { WeekCalendar, AddMealModal, MealPlanControls } from '../components/meal-plans';
+
+// Get the start of the week (Monday) for a given date
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  // If Sunday (0), go back 6 days; otherwise go back (day - 1) days
+  const diff = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - diff);
+  return d;
+}
+
 export function MealPlansPage() {
+  // Current week state
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+  const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
+  const weekEnd = weekDates[6];
+
+  // Compute date keys
+  const startDateKey = formatDateKey(weekStart);
+  const endDateKey = formatDateKey(weekEnd);
+
+  // Modal state
+  const [addMealModal, setAddMealModal] = useState<{
+    isOpen: boolean;
+    slotId: number;
+    slotName: string;
+    date: string;
+  }>({ isOpen: false, slotId: 0, slotName: '', date: '' });
+
+  // Fetch meal slots
+  const { data: slots = [] } = useMealSlots();
+
+  // Find a plan that covers the current week
+  const { plan: weekPlan, isLoading: isPlansLoading } = useMealPlanForWeek(startDateKey, endDateKey);
+
+  // Track active plan ID (either from found plan or newly created)
+  const [activePlanId, setActivePlanId] = useState<number | null>(null);
+
+  // Update active plan ID when week plan changes
+  useEffect(() => {
+    if (weekPlan?.id) {
+      setActivePlanId(weekPlan.id);
+    } else {
+      setActivePlanId(null);
+    }
+  }, [weekPlan?.id]);
+
+  // Fetch full plan data with meals
+  const { data: planData, isLoading: isPlanLoading } = useMealPlan(activePlanId ?? undefined);
+
+  // Mutations
+  const createPlan = useCreateMealPlan();
+  const addMeal = useAddPlannedMeal();
+  const updateMeal = useUpdatePlannedMeal();
+  const deleteMeal = useDeletePlannedMeal();
+
+  // Navigation handlers
+  const handlePreviousWeek = useCallback(() => {
+    setWeekStart((prev) => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() - 7);
+      return newDate;
+    });
+  }, []);
+
+  const handleNextWeek = useCallback(() => {
+    setWeekStart((prev) => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + 7);
+      return newDate;
+    });
+  }, []);
+
+  const handleToday = useCallback(() => {
+    setWeekStart(getWeekStart(new Date()));
+  }, []);
+
+  // Add meal handler
+  const handleAddMeal = useCallback(
+    (slotId: number, date: string) => {
+      const slot = slots.find((s) => s.id === slotId);
+      setAddMealModal({
+        isOpen: true,
+        slotId,
+        slotName: slot?.display_name ?? 'Meal',
+        date,
+      });
+    },
+    [slots]
+  );
+
+  // Confirm adding a meal
+  const handleConfirmAddMeal = async (
+    recipeId: number | null,
+    scalingFactor: number,
+    customTitle?: string
+  ) => {
+    let planId = activePlanId;
+
+    // Create a plan if one doesn't exist for this week
+    if (!planId) {
+      try {
+        const newPlan = await createPlan.mutateAsync({
+          start_date: startDateKey,
+          end_date: endDateKey,
+        });
+        planId = newPlan.id;
+        setActivePlanId(newPlan.id);
+      } catch (error) {
+        console.error('Failed to create meal plan:', error);
+        return;
+      }
+    }
+
+    // Add the meal
+    try {
+      await addMeal.mutateAsync({
+        planId,
+        recipe_id: recipeId ?? undefined,
+        custom_title: customTitle,
+        meal_slot_id: addMealModal.slotId,
+        planned_date: addMealModal.date,
+        scaling_factor: scalingFactor,
+      });
+    } catch (error) {
+      console.error('Failed to add meal:', error);
+    }
+
+    setAddMealModal({ isOpen: false, slotId: 0, slotName: '', date: '' });
+  };
+
+  // Remove meal handler
+  const handleRemoveMeal = async (meal: PlannedMeal) => {
+    if (!activePlanId) return;
+
+    try {
+      await deleteMeal.mutateAsync({
+        planId: activePlanId,
+        mealId: meal.id,
+      });
+    } catch (error) {
+      console.error('Failed to remove meal:', error);
+    }
+  };
+
+  // Toggle meal completion
+  const handleToggleComplete = async (meal: PlannedMeal) => {
+    if (!activePlanId) return;
+
+    try {
+      await updateMeal.mutateAsync({
+        planId: activePlanId,
+        mealId: meal.id,
+        is_completed: !meal.is_completed,
+      });
+    } catch (error) {
+      console.error('Failed to update meal:', error);
+    }
+  };
+
+  // Filter meals to only show those in the current week
+  const weekMeals = useMemo(() => {
+    if (!planData?.meals) return [];
+    return planData.meals.filter(
+      (meal) => meal.planned_date >= startDateKey && meal.planned_date <= endDateKey
+    );
+  }, [planData?.meals, startDateKey, endDateKey]);
+
+  const isLoading = isPlansLoading || isPlanLoading || createPlan.isPending;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-onedark-fg">Meal Plans</h1>
-          <p className="text-gray-500 dark:text-onedark-fg-muted">Plan your weekly meals</p>
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          <span className="hidden sm:inline">New Plan</span>
-        </button>
-      </div>
+      {/* Controls */}
+      <MealPlanControls
+        startDate={weekStart}
+        endDate={weekEnd}
+        onPreviousWeek={handlePreviousWeek}
+        onNextWeek={handleNextWeek}
+        onToday={handleToday}
+        planName={planData?.name}
+        isLoading={isLoading}
+      />
 
-      {/* Empty State */}
-      <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
-        <svg
-          className="w-16 h-16 mx-auto text-gray-400 dark:text-onedark-fg-muted mb-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+      {/* Calendar or Empty State */}
+      {slots.length === 0 && isPlansLoading ? (
+        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
+          <p className="text-gray-500 dark:text-onedark-fg-muted mt-4">Loading...</p>
+        </div>
+      ) : (
+        <>
+          <WeekCalendar
+            weekDates={weekDates}
+            slots={slots}
+            meals={weekMeals}
+            onAddMeal={handleAddMeal}
+            onRemoveMeal={handleRemoveMeal}
+            onToggleComplete={handleToggleComplete}
           />
-        </svg>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-onedark-fg mb-2">
-          No meal plans yet
-        </h3>
-        <p className="text-gray-500 dark:text-onedark-fg-muted mb-6">
-          Create a meal plan to organize your weekly cooking
-        </p>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Your First Meal Plan
-        </button>
-      </div>
+
+          {/* Quick stats */}
+          {weekMeals.length > 0 && (
+            <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-onedark-fg-muted">
+              <span>
+                {weekMeals.length} meal{weekMeals.length !== 1 ? 's' : ''} planned
+              </span>
+              <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
+              <span>
+                {weekMeals.filter((m) => m.is_completed).length} completed
+              </span>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Add Meal Modal */}
+      <AddMealModal
+        isOpen={addMealModal.isOpen}
+        onClose={() => setAddMealModal({ isOpen: false, slotId: 0, slotName: '', date: '' })}
+        onSelect={handleConfirmAddMeal}
+        slotName={addMealModal.slotName}
+        date={addMealModal.date}
+      />
     </div>
   );
 }

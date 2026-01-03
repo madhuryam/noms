@@ -34,3 +34,20 @@ export {
 export type { ShelfLifeEntry } from './useShelfLife';
 export { usePantrySuggestions, useRecipeMatch } from './usePantryMatch';
 export type { MatchedRecipe, IngredientMatch } from './usePantryMatch';
+export {
+  useMealSlots,
+  useMealPlans,
+  useMealPlanForWeek,
+  useCurrentMealPlan,
+  useMealPlan,
+  useCreateMealPlan,
+  useUpdateMealPlan,
+  useDeleteMealPlan,
+  useAddPlannedMeal,
+  useUpdatePlannedMeal,
+  useDeletePlannedMeal,
+  getWeekDates,
+  formatDateKey,
+  groupMealsByDateAndSlot,
+} from './useMealPlan';
+export type { MealSlot, PlannedMeal, MealPlan } from './useMealPlan';

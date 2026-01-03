@@ -34,17 +34,21 @@ interface UseRecipesOptions {
   limit?: number;
   offset?: number;
   enabled?: boolean;
+  sortBy?: 'created_at' | 'title';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export function useRecipes(options: UseRecipesOptions = {}) {
-  const { limit = 20, offset = 0, enabled = true } = options;
+  const { limit = 20, offset = 0, enabled = true, sortBy, sortOrder } = options;
 
   return useQuery({
-    queryKey: ['recipes', { limit, offset }],
+    queryKey: ['recipes', { limit, offset, sortBy, sortOrder }],
     queryFn: async (): Promise<RecipesResponse> => {
       const params = new URLSearchParams();
       params.set('limit', String(limit));
       params.set('offset', String(offset));
+      if (sortBy) params.set('sortBy', sortBy);
+      if (sortOrder) params.set('sortOrder', sortOrder);
 
       const response = await api.get<RecipesResponse>(`/api/recipes?${params}`);
       return response;

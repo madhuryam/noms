@@ -7,3 +7,4 @@ export { default as images } from './images';
 export { default as associations } from './associations';
 export { default as pantry } from './pantry';
 export { default as shelfLife } from './shelfLife';
+export { default as mealPlans } from './meal-plans';

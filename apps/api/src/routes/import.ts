@@ -246,34 +246,49 @@ async function processCategories(db: D1Database, categoryPaths: string[]): Promi
 
     for (let i = 0; i < parts.length; i++) {
       const name = parts[i];
-      const slug = generateSlug(name);
       const pathParts = parts.slice(0, i);
       currentPath = pathParts.length > 0 ? pathParts.join('/') : '';
       const depth = i;
 
-      // Check if category exists
+      // Generate slug - include parent ID for uniqueness at nested levels
+      const baseSlug = generateSlug(name);
+      const slug: string = depth > 0 && parentId ? `${baseSlug}-${parentId}` : baseSlug;
+
+      // Check if category exists by slug (slug is globally unique)
       const existing = await db
-        .prepare('SELECT id FROM categories WHERE slug = ? AND depth = ?')
-        .bind(slug, depth)
+        .prepare('SELECT id FROM categories WHERE slug = ?')
+        .bind(slug)
         .first<{ id: number }>();
 
       if (existing) {
         parentId = existing.id;
       } else {
-        // Create the category
-        const result = await db
+        // Also check if a category with this name exists with this parent
+        const byNameAndParent: { id: number } | null = await db
           .prepare(
-            `INSERT INTO categories (name, slug, parent_id, path, depth)
-             VALUES (?, ?, ?, ?, ?)`
+            'SELECT id FROM categories WHERE name = ? AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))'
           )
-          .bind(name, slug, parentId, currentPath, depth)
-          .run();
+          .bind(name, parentId, parentId)
+          .first();
 
-        parentId = result.meta.last_row_id as number;
+        if (byNameAndParent) {
+          parentId = byNameAndParent.id;
+        } else {
+          // Create the category
+          const result = await db
+            .prepare(
+              `INSERT INTO categories (name, slug, parent_id, path, depth)
+               VALUES (?, ?, ?, ?, ?)`
+            )
+            .bind(name, slug, parentId, currentPath, depth)
+            .run();
+
+          parentId = result.meta.last_row_id as number;
+        }
       }
 
       // Store the full path mapping for leaf categories
-      if (i === parts.length - 1) {
+      if (i === parts.length - 1 && parentId !== null) {
         categoryMap[fullPath] = parentId;
       }
     }
@@ -332,7 +347,7 @@ async function insertRecipeIngredients(
         recipeId,
         ing.quantity,
         ing.unit,
-        ing.original,
+        cleanIngredientLine(ing.original),
         ing.preparation,
         currentGroup,
         sortOrder++
@@ -357,6 +372,29 @@ importRoutes.post('/vault', async (c) => {
     const results: ImportResult[] = [];
 
     try {
+      // Check for duplicate by title only
+      // (We don't check source_path because user may have edited title to import as new recipe)
+      const existingByTitle = await c.env.DB.prepare('SELECT id, title FROM recipes WHERE title = ?')
+        .bind(recipe.title)
+        .first<{ id: number; title: string }>();
+
+      if (existingByTitle) {
+        results.push({
+          recipeId: existingByTitle.id,
+          title: recipe.title,
+          success: true,
+          error: `Skipped: already exists as "${existingByTitle.title}"`,
+        });
+
+        return c.json({
+          success: true,
+          imported: 0,
+          failed: 0,
+          skipped: 1,
+          results,
+        });
+      }
+
       // Collect statements for batch execution
       const statements: D1PreparedStatement[] = [];
 
@@ -408,25 +446,39 @@ importRoutes.post('/vault', async (c) => {
 
         for (let i = 0; i < parts.length; i++) {
           const name = parts[i];
-          const slug = generateSlug(name);
           const depth = i;
           const pathParts = parts.slice(0, i);
           const currentPath = pathParts.length > 0 ? pathParts.join('/') : '';
 
-          // Check if category exists
-          const existing = await c.env.DB.prepare('SELECT id FROM categories WHERE slug = ? AND depth = ?')
-            .bind(slug, depth)
+          // Generate slug - include parent path for uniqueness at nested levels
+          const baseSlug = generateSlug(name);
+          const slug: string = depth > 0 && parentId ? `${baseSlug}-${parentId}` : baseSlug;
+
+          // Check if category exists by slug (slug is globally unique)
+          const existing = await c.env.DB.prepare('SELECT id FROM categories WHERE slug = ?')
+            .bind(slug)
             .first<{ id: number }>();
 
           if (existing) {
             parentId = existing.id;
           } else {
-            const catResult = await c.env.DB.prepare(
-              `INSERT INTO categories (name, slug, parent_id, path, depth) VALUES (?, ?, ?, ?, ?)`
+            // Also check if a category with this name exists at this depth with this parent
+            const byNameAndParent: { id: number } | null = await c.env.DB.prepare(
+              'SELECT id FROM categories WHERE name = ? AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))'
             )
-              .bind(name, slug, parentId, currentPath, depth)
-              .run();
-            parentId = catResult.meta.last_row_id as number;
+              .bind(name, parentId, parentId)
+              .first();
+
+            if (byNameAndParent) {
+              parentId = byNameAndParent.id;
+            } else {
+              const catResult = await c.env.DB.prepare(
+                `INSERT INTO categories (name, slug, parent_id, path, depth) VALUES (?, ?, ?, ?, ?)`
+              )
+                .bind(name, slug, parentId, currentPath, depth)
+                .run();
+              parentId = catResult.meta.last_row_id as number;
+            }
           }
         }
 
@@ -452,7 +504,7 @@ importRoutes.post('/vault', async (c) => {
           c.env.DB.prepare(
             `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).bind(recipeId, ing.quantity, ing.unit, ing.original, ing.preparation, currentGroup, sortOrder++)
+          ).bind(recipeId, ing.quantity, ing.unit, cleanIngredientLine(ing.original), ing.preparation, currentGroup, sortOrder++)
         );
       }
 
@@ -621,6 +673,40 @@ importRoutes.post('/images', async (c) => {
       {
         error: error instanceof Error ? error.message : 'Failed to upload image',
       },
+      500
+    );
+  }
+});
+
+// POST /api/import/check-duplicates - Check which recipes already exist
+importRoutes.post('/check-duplicates', async (c) => {
+  try {
+    const body = await c.req.json<{
+      recipes: Array<{ title: string; filePath: string }>;
+    }>();
+
+    if (!body.recipes || !Array.isArray(body.recipes)) {
+      return c.json({ error: 'recipes array is required' }, 400);
+    }
+
+    const duplicates: Record<string, { id: number; title: string; matchType: 'title' | 'path' }> = {};
+
+    // Check each recipe for duplicates by title only
+    // (User can change title to import as new recipe)
+    for (const recipe of body.recipes) {
+      const byTitle = await c.env.DB.prepare('SELECT id, title FROM recipes WHERE title = ?')
+        .bind(recipe.title)
+        .first<{ id: number; title: string }>();
+
+      if (byTitle) {
+        duplicates[recipe.filePath] = { id: byTitle.id, title: byTitle.title, matchType: 'title' };
+      }
+    }
+
+    return c.json({ duplicates });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to check duplicates' },
       500
     );
   }
