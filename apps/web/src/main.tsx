@@ -18,6 +18,7 @@ import {
   PantryPage,
   ImportPage,
   SearchPage,
+  SettingsPage,
   NotFoundPage,
 } from './pages';
 import './index.css';
@@ -77,6 +78,7 @@ function AppWithDnd() {
           <Route path="/pantry" element={<PantryPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

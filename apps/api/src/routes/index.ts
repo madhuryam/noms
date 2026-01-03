@@ -4,3 +4,4 @@ export { default as tags } from './tags';
 export { default as search } from './search';
 export { default as importRoutes } from './import';
 export { default as images } from './images';
+export { default as associations } from './associations';

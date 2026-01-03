@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { recipes, categories, tags, search, importRoutes, images } from './routes';
+import { recipes, categories, tags, search, importRoutes, images, associations } from './routes';
 
 interface HealthResponse {
   status: 'ok' | 'error';
@@ -108,6 +108,7 @@ app.route('/api/tags', tags);
 app.route('/api/search', search);
 app.route('/api/import', importRoutes);
 app.route('/api/images', images);
+app.route('/api/associations', associations);
 
 // Recipe tag routes are defined in tags.ts but need /api prefix
 // They're mounted at /api/tags but the routes include /recipes/:id/tags paths

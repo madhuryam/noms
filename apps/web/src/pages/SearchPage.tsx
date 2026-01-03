@@ -28,6 +28,7 @@ export function SearchPage() {
 
   const results = data?.results || [];
   const total = data?.pagination?.total || 0;
+  const expandedTerms = data?.expandedTerms || [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -74,6 +75,11 @@ export function SearchPage() {
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
                 {total} {total === 1 ? 'result' : 'results'} for "{query}"
+                {expandedTerms.length > 0 && (
+                  <span className="text-gray-400 dark:text-onedark-fg-muted">
+                    {' '}(also: {expandedTerms.join(', ')})
+                  </span>
+                )}
                 {isFetching && (
                   <span className="ml-2 text-blue-500 dark:text-onedark-blue">Updating...</span>
                 )}

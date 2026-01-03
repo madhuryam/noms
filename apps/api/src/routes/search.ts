@@ -8,9 +8,67 @@ type Bindings = {
 const search = new Hono<{ Bindings: Bindings }>();
 
 /**
- * Escape special FTS5 characters and build a safe search query
+ * Expand a single term to include all associated terms from food associations
+ * Returns the expanded terms (excluding the original if found in associations)
  */
-function buildFtsQuery(query: string): string | null {
+async function expandTerm(term: string, db: D1Database): Promise<string[]> {
+  try {
+    const result = await db
+      .prepare(
+        `
+      SELECT t2.term
+      FROM food_association_terms t1
+      JOIN food_association_terms t2 ON t1.group_id = t2.group_id
+      WHERE LOWER(t1.term) = LOWER(?)
+      `
+      )
+      .bind(term)
+      .all();
+
+    if (result.results && result.results.length > 0) {
+      return (result.results as { term: string }[]).map((r) => r.term);
+    }
+  } catch {
+    // Table may not exist yet, just return original term
+  }
+  return [term];
+}
+
+/**
+ * Get all expanded terms for a query (for display purposes)
+ * Returns terms that were added via associations (not the original terms)
+ */
+async function getExpandedTermsForDisplay(query: string, db: D1Database): Promise<string[]> {
+  const cleaned = query
+    .trim()
+    .replace(/['"^$*():]/g, '')
+    .replace(/\s+/g, ' ');
+
+  if (cleaned.length < 2) {
+    return [];
+  }
+
+  const originalTerms = cleaned.split(' ').filter((term) => term.length > 0);
+  const allExpandedTerms: string[] = [];
+
+  for (const term of originalTerms) {
+    const expanded = await expandTerm(term, db);
+    // Only include terms that weren't in the original query
+    const additionalTerms = expanded.filter(
+      (t) => !originalTerms.some((orig) => orig.toLowerCase() === t.toLowerCase())
+    );
+    allExpandedTerms.push(...additionalTerms);
+  }
+
+  // Remove duplicates
+  return [...new Set(allExpandedTerms)];
+}
+
+/**
+ * Escape special FTS5 characters and build a safe search query
+ * Expands terms using food associations for multilingual search
+ */
+async function buildFtsQuery(query: string, db: D1Database): Promise<string | null> {
   const cleaned = query
     .trim()
     .replace(/['"^$*():]/g, '') // Remove FTS5 special chars
@@ -20,13 +78,22 @@ function buildFtsQuery(query: string): string | null {
     return null;
   }
 
-  // Split into terms and create prefix-match query
-  const terms = cleaned
-    .split(' ')
-    .filter((term) => term.length > 0)
-    .map((term) => `"${term}"*`);
+  // Split into terms
+  const originalTerms = cleaned.split(' ').filter((term) => term.length > 0);
 
-  return terms.length > 0 ? terms.join(' ') : null;
+  // Expand each term with associations
+  const expandedTermGroups = await Promise.all(
+    originalTerms.map(async (term) => {
+      const expanded = await expandTerm(term, db);
+      // Create OR group for expanded terms: ("batata"* OR "potato"* OR "potatoes"*)
+      if (expanded.length > 1) {
+        return '(' + expanded.map((t) => `"${t}"*`).join(' OR ') + ')';
+      }
+      return `"${term}"*`;
+    })
+  );
+
+  return expandedTermGroups.length > 0 ? expandedTermGroups.join(' ') : null;
 }
 
 // GET /api/search?q=query - Full-text search using FTS5
@@ -43,7 +110,7 @@ search.get('/', async (c) => {
     });
   }
 
-  const ftsQuery = buildFtsQuery(query);
+  const ftsQuery = await buildFtsQuery(query, c.env.DB);
   if (!ftsQuery) {
     return c.json({
       results: [],
@@ -92,9 +159,13 @@ search.get('/', async (c) => {
       .bind(ftsQuery)
       .first<{ total: number }>();
 
+    // Get expanded terms for display
+    const expandedTerms = await getExpandedTermsForDisplay(query, c.env.DB);
+
     return c.json({
       results: results.results,
       query,
+      expandedTerms,
       pagination: {
         limit,
         offset,
@@ -120,7 +191,7 @@ search.get('/suggestions', async (c) => {
     return c.json({ suggestions: [] });
   }
 
-  const ftsQuery = buildFtsQuery(query);
+  const ftsQuery = await buildFtsQuery(query, c.env.DB);
   if (!ftsQuery) {
     return c.json({ suggestions: [] });
   }

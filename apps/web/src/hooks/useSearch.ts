@@ -21,6 +21,7 @@ export interface SearchResult {
 export interface SearchResponse {
   results: SearchResult[];
   query: string;
+  expandedTerms?: string[];
   pagination: {
     limit: number;
     offset: number;

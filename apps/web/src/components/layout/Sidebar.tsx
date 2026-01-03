@@ -155,7 +155,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Bottom section */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-onedark-bg-highlight">
-          <button className="flex items-center gap-3 w-full px-3 py-2 text-sm font-medium text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight transition-colors">
+          <NavLink
+            to="/settings"
+            onClick={onClose}
+            className={({ isActive }) =>
+              `flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-50 text-blue-600 dark:bg-onedark-blue/10 dark:text-onedark-blue'
+                  : 'text-gray-700 hover:bg-gray-100 dark:text-onedark-fg dark:hover:bg-onedark-bg-highlight'
+              }`
+            }
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -171,7 +181,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               />
             </svg>
             Settings
-          </button>
+          </NavLink>
         </div>
       </aside>
     </>

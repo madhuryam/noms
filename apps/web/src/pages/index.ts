@@ -9,4 +9,5 @@ export { MealPlansPage } from './MealPlansPage';
 export { PantryPage } from './PantryPage';
 export { ImportPage } from './ImportPage';
 export { SearchPage } from './SearchPage';
+export { SettingsPage } from './SettingsPage';
 export { NotFoundPage } from './NotFoundPage';
