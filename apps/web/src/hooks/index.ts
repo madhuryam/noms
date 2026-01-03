@@ -5,7 +5,7 @@ export { useCategoryTree, useCategory, useMoveCategory } from './useCategories';
 export type { Category } from './useCategories';
 export { useCategoryRecipes } from './useCategoryRecipes';
 export { useVaultImport } from './useVaultImport';
-export { useSearch, useSearchSuggestions } from './useSearch';
+export { useSearch, useSearchSuggestions, useSpellCheck } from './useSearch';
 export type { SearchResult, SearchSuggestion } from './useSearch';
 export { useAssociations, useAssociation, useCreateAssociation, useUpdateAssociation, useDeleteAssociation } from './useAssociations';
 export type { AssociationGroup } from './useAssociations';

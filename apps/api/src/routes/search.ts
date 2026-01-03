@@ -8,6 +8,36 @@ type Bindings = {
 const search = new Hono<{ Bindings: Bindings }>();
 
 /**
+ * Calculate Levenshtein distance between two strings
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
  * Expand a single term to include all associated terms from food associations
  * Returns the expanded terms (excluding the original if found in associations)
  */
@@ -277,6 +307,87 @@ search.post('/rebuild', async (c) => {
       },
       500
     );
+  }
+});
+
+// GET /api/search/spell-check?q=query - Suggest similar terms for typos
+search.get('/spell-check', async (c) => {
+  const query = c.req.query('q');
+
+  if (!query || query.trim().length < 2) {
+    return c.json({ suggestions: [] });
+  }
+
+  const term = query.trim().toLowerCase();
+
+  try {
+    // Gather terms from multiple sources
+    const allTerms = new Set<string>();
+
+    // 1. Food association terms
+    try {
+      const assocResult = await c.env.DB.prepare(
+        `SELECT DISTINCT term FROM food_association_terms`
+      ).all();
+      (assocResult.results as { term: string }[]).forEach((r) => allTerms.add(r.term));
+    } catch {
+      // Table may not exist
+    }
+
+    // 2. Words from recipe titles
+    const titlesResult = await c.env.DB.prepare(
+      `SELECT DISTINCT title FROM recipes`
+    ).all();
+    (titlesResult.results as { title: string }[]).forEach((r) => {
+      // Split title into words and add each
+      r.title.split(/\s+/).forEach((word) => {
+        const cleaned = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (cleaned.length >= 3) {
+          allTerms.add(cleaned);
+        }
+      });
+    });
+
+    // 3. Ingredient names
+    const ingredientsResult = await c.env.DB.prepare(
+      `SELECT DISTINCT name FROM ingredients WHERE name IS NOT NULL`
+    ).all();
+    (ingredientsResult.results as { name: string }[]).forEach((r) => {
+      r.name.split(/\s+/).forEach((word) => {
+        const cleaned = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (cleaned.length >= 3) {
+          allTerms.add(cleaned);
+        }
+      });
+    });
+
+    // 4. Tag names
+    const tagsResult = await c.env.DB.prepare(
+      `SELECT DISTINCT name FROM tags`
+    ).all();
+    (tagsResult.results as { name: string }[]).forEach((r) => {
+      allTerms.add(r.name.toLowerCase());
+    });
+
+    // Calculate distance for each term and find close matches
+    const suggestions = Array.from(allTerms)
+      .map((t) => ({
+        term: t,
+        distance: levenshteinDistance(term, t.toLowerCase()),
+      }))
+      .filter((item) => {
+        // Allow up to 2 edits for short words, 3 for longer words
+        const maxDistance = term.length <= 5 ? 2 : 3;
+        return item.distance > 0 && item.distance <= maxDistance;
+      })
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 5)
+      .map((item) => item.term);
+
+    return c.json({ suggestions });
+  } catch (error) {
+    console.error('Spell check error:', error);
+    return c.json({ suggestions: [] });
   }
 });
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useSearch } from '../hooks/useSearch';
+import { useSearch, useSpellCheck } from '../hooks/useSearch';
 import { SearchBar, SearchResults } from '../components/search';
 
 export function SearchPage() {
@@ -29,6 +29,10 @@ export function SearchPage() {
   const results = data?.results || [];
   const total = data?.pagination?.total || 0;
   const expandedTerms = data?.expandedTerms || [];
+
+  // Only check spelling when we have no results
+  const { data: spellCheckData } = useSpellCheck(query, total === 0 && !isLoading && query.length >= 2);
+  const spellSuggestions = spellCheckData?.suggestions || [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -85,6 +89,27 @@ export function SearchPage() {
                 )}
               </p>
             </div>
+
+            {/* Did you mean? */}
+            {total === 0 && spellSuggestions.length > 0 && (
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  Did you mean:{' '}
+                  {spellSuggestions.map((suggestion, index) => (
+                    <span key={suggestion}>
+                      {index > 0 && ', '}
+                      <button
+                        onClick={() => setQuery(suggestion)}
+                        className="font-medium underline hover:text-amber-900 dark:hover:text-amber-100"
+                      >
+                        {suggestion}
+                      </button>
+                    </span>
+                  ))}
+                  ?
+                </p>
+              </div>
+            )}
 
             <SearchResults results={results} query={query} />
           </>

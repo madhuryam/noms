@@ -40,6 +40,10 @@ export interface SuggestionsResponse {
   suggestions: SearchSuggestion[];
 }
 
+export interface SpellCheckResponse {
+  suggestions: string[];
+}
+
 /**
  * Hook for debounced value
  */
@@ -108,5 +112,24 @@ export function useSearchSuggestions(query: string) {
     },
     enabled: debouncedQuery.length >= 2,
     staleTime: 30000,
+  });
+}
+
+/**
+ * Spell check for typo suggestions
+ */
+export function useSpellCheck(query: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['spellCheck', query],
+    queryFn: async (): Promise<SpellCheckResponse> => {
+      if (!query || query.trim().length < 2) {
+        return { suggestions: [] };
+      }
+
+      const params = new URLSearchParams({ q: query });
+      return api.get<SpellCheckResponse>(`/api/search/spell-check?${params}`);
+    },
+    enabled: enabled && query.length >= 2,
+    staleTime: 60000, // Cache for 1 minute
   });
 }

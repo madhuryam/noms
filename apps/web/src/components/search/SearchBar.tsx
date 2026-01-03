@@ -26,6 +26,11 @@ export function SearchBar({
   const { data: suggestionsData, isLoading } = useSearchSuggestions(query);
   const suggestions = suggestionsData?.suggestions || [];
 
+  // Sync internal state when initialQuery changes (e.g., from "did you mean" clicks)
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
   // Close suggestions when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
