@@ -149,7 +149,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* Category Tree */}
           <div className="pt-4 mt-4 border-t border-gray-200 dark:border-onedark-bg-highlight">
-            <CategoryNav collapsible={true} defaultExpanded={false} />
+            <CategoryNav collapsible={true} defaultExpanded={true} />
           </div>
         </nav>
 

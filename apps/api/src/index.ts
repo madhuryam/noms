@@ -45,8 +45,22 @@ app.get('/health', (c) => {
   return c.json(response);
 });
 
-// Cloudflare Access JWT validation for all /api/* routes
-app.use('/api/*', validateAccessJWT);
+// Cloudflare Access JWT validation for all /api/* routes (skip for local dev)
+app.use('/api/*', async (c, next) => {
+  const host = c.req.header('host') || '';
+  const origin = c.req.header('origin') || '';
+  const isLocalDev = host.includes('localhost') || host.includes('127.0.0.1') ||
+                     origin.includes('localhost') || origin.includes('127.0.0.1');
+
+  if (isLocalDev) {
+    // Skip auth entirely for local development
+    await next();
+    return;
+  }
+
+  // Apply JWT validation for production
+  return validateAccessJWT(c, next);
+});
 
 // Database check endpoint
 app.get('/api/db-check', async (c) => {
