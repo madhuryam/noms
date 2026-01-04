@@ -36,8 +36,16 @@ function getWeekStart(date: Date): Date {
 }
 
 export function MealPlansPage() {
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'calendar' | 'shopping'>('calendar');
+  // Tab state - persist in localStorage
+  const [activeTab, setActiveTab] = useState<'calendar' | 'shopping'>(() => {
+    const stored = localStorage.getItem('meal-plans-active-tab');
+    return stored === 'shopping' ? 'shopping' : 'calendar';
+  });
+
+  // Persist tab changes to localStorage
+  useEffect(() => {
+    localStorage.setItem('meal-plans-active-tab', activeTab);
+  }, [activeTab]);
 
   // Current week state
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
@@ -97,7 +105,17 @@ export function MealPlansPage() {
     useCustomCategories(activePlanId ?? undefined);
   const { itemCategories, assignItem, assignItems } = useItemCategories(activePlanId ?? undefined);
   const { itemOrder, reorderItems } = useItemOrder(activePlanId ?? undefined);
-  const { togglePantryStatus, getEffectivePantryStatus } = usePantryOverrides(activePlanId ?? undefined);
+  const { togglePantryStatus, getEffectivePantryStatus, cleanupOrphanedOverrides } = usePantryOverrides(activePlanId ?? undefined);
+
+  // Clean up orphaned pantry overrides when shopping list changes
+  // This ensures items reset to "buy" when recipes are removed and re-added
+  useEffect(() => {
+    if (!shoppingData) return;
+    const currentItemNames = new Set(
+      shoppingData.categories.flatMap((cat) => cat.items.map((item) => item.normalizedName))
+    );
+    cleanupOrphanedOverrides(currentItemNames);
+  }, [shoppingData, cleanupOrphanedOverrides]);
 
   // Shopping list UI state
   const [hidePantry, setHidePantry] = useState(true);
@@ -395,7 +413,7 @@ export function MealPlansPage() {
                 </div>
               </div>
 
-              {/* Hide pantry toggle */}
+              {/* Hide "don't need" toggle */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -404,7 +422,7 @@ export function MealPlansPage() {
                   className="w-4 h-4 rounded border-gray-300 dark:border-onedark-bg-highlight text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-600 dark:text-onedark-fg-muted">
-                  Hide items in pantry ({shoppingData.itemsInPantry})
+                  Hide items I don't need
                 </span>
               </label>
             </div>

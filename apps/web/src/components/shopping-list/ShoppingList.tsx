@@ -104,6 +104,9 @@ export function ShoppingList({
     .flatMap((cat) => cat.items)
     .filter((item) => {
       if (deletedItems.has(item.normalizedName)) return false;
+      // Never hide checked items - user wants to see what they've checked off
+      if (checkedItems.has(item.normalizedName)) return true;
+      // Hide items that are "don't buy" or in pantry (when toggle is on)
       if (hidePantry && getEffectiveBuyStatus(item.normalizedName, item.inPantry)) return false;
       return true;
     });
@@ -243,7 +246,7 @@ export function ShoppingList({
             onClick={onToggleHidePantry}
             className="mt-2 text-blue-500 dark:text-onedark-blue hover:underline text-sm"
           >
-            Show items in pantry
+            Show all items
           </button>
         )}
       </div>
@@ -355,6 +358,7 @@ export function ShoppingList({
                           onDelete={() => onDeleteItem(item.normalizedName)}
                           shouldBuy={!getEffectiveBuyStatus(item.normalizedName, item.inPantry)}
                           onToggleBuy={() => onToggleBuyStatus(item.normalizedName, item.inPantry)}
+                          isInPantry={item.inPantry}
                         />
                       );
                     })}
@@ -400,6 +404,7 @@ export function ShoppingList({
                         onDelete={() => onDeleteItem(item.normalizedName)}
                         shouldBuy={!getEffectiveBuyStatus(item.normalizedName, item.inPantry)}
                         onToggleBuy={() => onToggleBuyStatus(item.normalizedName, item.inPantry)}
+                        isInPantry={item.inPantry}
                       />
                     );
                   })}
@@ -464,6 +469,7 @@ interface SortableShoppingListItemRowProps {
   onDelete: () => void;
   shouldBuy: boolean;
   onToggleBuy: () => void;
+  isInPantry: boolean; // true if item is actually in pantry (not just marked don't buy)
 }
 
 function SortableShoppingListItemRow(props: SortableShoppingListItemRowProps) {
@@ -506,6 +512,7 @@ interface ShoppingListItemRowProps {
   onDelete: () => void;
   shouldBuy: boolean;
   onToggleBuy: () => void;
+  isInPantry: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
@@ -521,6 +528,7 @@ function ShoppingListItemRow({
   onDelete,
   shouldBuy,
   onToggleBuy,
+  isInPantry,
   dragHandleProps,
 }: ShoppingListItemRowProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -711,11 +719,13 @@ function ShoppingListItemRow({
               className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
                 shouldBuy
                   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50'
-                  : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-500 dark:text-onedark-fg-muted hover:bg-gray-200 dark:hover:bg-onedark-bg'
+                  : isInPantry
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                    : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-500 dark:text-onedark-fg-muted hover:bg-gray-200 dark:hover:bg-onedark-bg'
               }`}
-              title={shouldBuy ? "Click to mark as don't buy" : 'Click to mark as buy'}
+              title={shouldBuy ? "Click to mark as don't need" : 'Click to mark as need to buy'}
             >
-              {shouldBuy ? 'buy' : "don't buy"}
+              {shouldBuy ? 'buy' : isInPantry ? 'in pantry' : "don't buy"}
             </button>
             <button
               onClick={startEdit}

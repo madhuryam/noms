@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 
 export interface ShoppingListRecipe {
@@ -60,23 +60,34 @@ export function useShoppingList(
 // Hook to manage checked items in localStorage
 export function useCheckedItems(planId: number | undefined) {
   const storageKey = `shopping-list-checked-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(() => {
-    if (!planId) return new Set();
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setCheckedItems(new Set());
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return new Set(JSON.parse(stored));
+        setCheckedItems(new Set(JSON.parse(stored)));
+      } else {
+        setCheckedItems(new Set());
       }
     } catch {
-      // Ignore parse errors
+      setCheckedItems(new Set());
     }
-    return new Set();
-  });
+    // Mark as initialized after setting state
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage when checked items change
+  // Sync to localStorage when checked items change (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(Array.from(checkedItems)));
   }, [checkedItems, storageKey, planId]);
 
@@ -118,23 +129,33 @@ export function useCheckedItems(planId: number | undefined) {
 // Hook to manage text overrides in localStorage (whole item text)
 export function useQuantityOverrides(planId: number | undefined) {
   const storageKey = `shopping-list-overrides-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [overrides, setOverrides] = useState<Map<string, string>>(() => {
-    if (!planId) return new Map();
+  const [overrides, setOverrides] = useState<Map<string, string>>(new Map());
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setOverrides(new Map());
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return new Map(JSON.parse(stored));
+        setOverrides(new Map(JSON.parse(stored)));
+      } else {
+        setOverrides(new Map());
       }
     } catch {
-      // Ignore parse errors
+      setOverrides(new Map());
     }
-    return new Map();
-  });
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage
+  // Sync to localStorage (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(Array.from(overrides.entries())));
   }, [overrides, storageKey, planId]);
 
@@ -193,23 +214,33 @@ export function formatQuantity(quantity: number | null, unit: string | null): st
 // Hook to manage deleted items in localStorage
 export function useDeletedItems(planId: number | undefined) {
   const storageKey = `shopping-list-deleted-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [deletedItems, setDeletedItems] = useState<Set<string>>(() => {
-    if (!planId) return new Set();
+  const [deletedItems, setDeletedItems] = useState<Set<string>>(new Set());
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setDeletedItems(new Set());
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return new Set(JSON.parse(stored));
+        setDeletedItems(new Set(JSON.parse(stored)));
+      } else {
+        setDeletedItems(new Set());
       }
     } catch {
-      // Ignore parse errors
+      setDeletedItems(new Set());
     }
-    return new Set();
-  });
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage
+  // Sync to localStorage (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(Array.from(deletedItems)));
   }, [deletedItems, storageKey, planId]);
 
@@ -251,23 +282,33 @@ export interface CustomCategory {
 // Hook to manage custom categories in localStorage
 export function useCustomCategories(planId: number | undefined) {
   const storageKey = `shopping-list-categories-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [categories, setCategories] = useState<CustomCategory[]>(() => {
-    if (!planId) return [];
+  const [categories, setCategories] = useState<CustomCategory[]>([]);
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setCategories([]);
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return JSON.parse(stored);
+        setCategories(JSON.parse(stored));
+      } else {
+        setCategories([]);
       }
     } catch {
-      // Ignore parse errors
+      setCategories([]);
     }
-    return [];
-  });
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage
+  // Sync to localStorage (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(categories));
   }, [categories, storageKey, planId]);
 
@@ -311,23 +352,33 @@ export function useCustomCategories(planId: number | undefined) {
 // Hook to manage item-to-category assignments in localStorage
 export function useItemCategories(planId: number | undefined) {
   const storageKey = `shopping-list-item-categories-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [itemCategories, setItemCategories] = useState<Map<string, string>>(() => {
-    if (!planId) return new Map();
+  const [itemCategories, setItemCategories] = useState<Map<string, string>>(new Map());
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setItemCategories(new Map());
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return new Map(JSON.parse(stored));
+        setItemCategories(new Map(JSON.parse(stored)));
+      } else {
+        setItemCategories(new Map());
       }
     } catch {
-      // Ignore parse errors
+      setItemCategories(new Map());
     }
-    return new Map();
-  });
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage
+  // Sync to localStorage (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(Array.from(itemCategories.entries())));
   }, [itemCategories, storageKey, planId]);
 
@@ -395,23 +446,33 @@ export function useItemCategories(planId: number | undefined) {
 // Hook to manage item ordering in localStorage
 export function useItemOrder(planId: number | undefined) {
   const storageKey = `shopping-list-order-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [itemOrder, setItemOrder] = useState<string[]>(() => {
-    if (!planId) return [];
+  const [itemOrder, setItemOrder] = useState<string[]>([]);
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setItemOrder([]);
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return JSON.parse(stored);
+        setItemOrder(JSON.parse(stored));
+      } else {
+        setItemOrder([]);
       }
     } catch {
-      // Ignore parse errors
+      setItemOrder([]);
     }
-    return [];
-  });
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage
+  // Sync to localStorage (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(itemOrder));
   }, [itemOrder, storageKey, planId]);
 
@@ -428,23 +489,33 @@ export function useItemOrder(planId: number | undefined) {
 // Hook to manage pantry status overrides in localStorage
 export function usePantryOverrides(planId: number | undefined) {
   const storageKey = `shopping-list-pantry-overrides-${planId}`;
+  const isInitialized = useRef(false);
 
-  const [pantryOverrides, setPantryOverrides] = useState<Map<string, boolean>>(() => {
-    if (!planId) return new Map();
+  const [pantryOverrides, setPantryOverrides] = useState<Map<string, boolean>>(new Map());
+
+  // Load from localStorage when planId changes
+  useEffect(() => {
+    isInitialized.current = false;
+    if (!planId) {
+      setPantryOverrides(new Map());
+      return;
+    }
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        return new Map(JSON.parse(stored));
+        setPantryOverrides(new Map(JSON.parse(stored)));
+      } else {
+        setPantryOverrides(new Map());
       }
     } catch {
-      // Ignore parse errors
+      setPantryOverrides(new Map());
     }
-    return new Map();
-  });
+    isInitialized.current = true;
+  }, [planId, storageKey]);
 
-  // Sync to localStorage
+  // Sync to localStorage (only after initialization)
   useEffect(() => {
-    if (!planId) return;
+    if (!planId || !isInitialized.current) return;
     localStorage.setItem(storageKey, JSON.stringify(Array.from(pantryOverrides.entries())));
   }, [pantryOverrides, storageKey, planId]);
 
@@ -478,6 +549,21 @@ export function usePantryOverrides(planId: number | undefined) {
     [pantryOverrides]
   );
 
+  // Remove overrides for items not in the current list (cleanup orphaned overrides)
+  const cleanupOrphanedOverrides = useCallback((currentItemNames: Set<string>) => {
+    setPantryOverrides((prev) => {
+      let hasChanges = false;
+      const next = new Map(prev);
+      for (const name of next.keys()) {
+        if (!currentItemNames.has(name)) {
+          next.delete(name);
+          hasChanges = true;
+        }
+      }
+      return hasChanges ? next : prev;
+    });
+  }, []);
+
   const clearPantryOverride = useCallback((normalizedName: string) => {
     setPantryOverrides((prev) => {
       const next = new Map(prev);
@@ -491,6 +577,7 @@ export function usePantryOverrides(planId: number | undefined) {
     togglePantryStatus,
     getEffectivePantryStatus,
     clearPantryOverride,
+    cleanupOrphanedOverrides,
   };
 }
 
