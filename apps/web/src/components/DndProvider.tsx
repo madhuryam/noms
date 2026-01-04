@@ -76,7 +76,7 @@ export function DndProvider({ children, onRecipeDrop, onCategoryDrop }: DndProvi
         if (activeItem.type === 'recipe' && overId.startsWith('category-')) {
           const categoryId = parseInt(overId.replace('category-', ''), 10);
           if (!isNaN(categoryId)) {
-            onRecipeDrop?.(activeItem.id, categoryId);
+            onRecipeDrop?.(activeItem.id as number, categoryId);
           }
         }
 
@@ -84,13 +84,13 @@ export function DndProvider({ children, onRecipeDrop, onCategoryDrop }: DndProvi
         if (activeItem.type === 'category' && overId.startsWith('category-')) {
           const newParentId = parseInt(overId.replace('category-', ''), 10);
           if (!isNaN(newParentId) && newParentId !== activeItem.id) {
-            onCategoryDrop?.(activeItem.id, newParentId);
+            onCategoryDrop?.(activeItem.id as number, newParentId);
           }
         }
 
         // Handle category drop to root
         if (activeItem.type === 'category' && overId === 'category-root') {
-          onCategoryDrop?.(activeItem.id, null);
+          onCategoryDrop?.(activeItem.id as number, null);
         }
       }
 

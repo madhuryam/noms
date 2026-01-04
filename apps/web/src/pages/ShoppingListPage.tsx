@@ -24,7 +24,7 @@ export function ShoppingListPage() {
   const endDateParam = searchParams.get('endDate') || undefined;
 
   const { data, isLoading, error } = useShoppingList(planId, startDateParam, endDateParam);
-  const { checkedItems, toggleItem, isChecked, clearAll, checkAll, checkedCount } =
+  const { checkedItems, toggleItem, clearAll, checkAll, checkedCount } =
     useCheckedItems(planId);
   const { overrides, setOverride, clearOverride } = useQuantityOverrides(planId);
   const { deletedItems, deleteItem, restoreItem } = useDeletedItems(planId);
@@ -101,7 +101,6 @@ export function ShoppingListPage() {
     setShowExportMenu(false);
   };
 
-  const uncheckedCount = data.totalItems - checkedCount;
   const formatDateRange = () => {
     const start = new Date(data.startDate + 'T00:00:00');
     const end = new Date(data.endDate + 'T00:00:00');

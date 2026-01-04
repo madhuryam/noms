@@ -28,7 +28,6 @@ export function MealPlanControls({
   onToday,
   onCreatePlan,
   onClearPlan,
-  planId,
   planName,
   isLoading,
   mealCount = 0,

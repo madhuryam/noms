@@ -60,7 +60,6 @@ export function ShoppingList({
   onClearOverride,
   deletedItems,
   onDeleteItem,
-  onRestoreItem,
   customCategories,
   onAddCategory,
   onUpdateCategory,
