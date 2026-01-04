@@ -708,6 +708,20 @@ exportRoutes.post('/import', async (c) => {
       shelfLife: 0,
     };
 
+    // Helper to convert undefined to null (D1 doesn't accept undefined)
+    const n = <T>(value: T | undefined): T | null => value === undefined ? null : value;
+
+    // Helper to batch statements (D1 supports up to 100 statements per batch)
+    const BATCH_SIZE = 50;
+    async function runBatched(statements: D1PreparedStatement[]) {
+      for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+        const batch = statements.slice(i, i + BATCH_SIZE);
+        if (batch.length > 0) {
+          await db.batch(batch);
+        }
+      }
+    }
+
     // Clear existing data in reverse dependency order
     await db.batch([
       db.prepare('DELETE FROM planned_meals'),
@@ -727,54 +741,44 @@ exportRoutes.post('/import', async (c) => {
       db.prepare('DELETE FROM categories'),
     ]);
 
-    // Helper to convert undefined to null (D1 doesn't accept undefined)
-    const n = <T>(value: T | undefined): T | null => value === undefined ? null : value;
-
     // Import categories (order by depth to ensure parents exist first)
     if (importData.categories?.length) {
       const sortedCategories = [...importData.categories].sort((a, b) => a.depth - b.depth);
-      for (const cat of sortedCategories) {
-        await db
-          .prepare(
-            'INSERT INTO categories (id, name, slug, parent_id, path, depth, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
-          )
+      const categoryStmts = sortedCategories.map((cat) =>
+        db
+          .prepare('INSERT INTO categories (id, name, slug, parent_id, path, depth, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)')
           .bind(cat.id, cat.name, cat.slug, n(cat.parent_id), n(cat.path), cat.depth, cat.sort_order)
-          .run();
-        stats.categories++;
-      }
+      );
+      await runBatched(categoryStmts);
+      stats.categories = sortedCategories.length;
     }
 
     // Import tags
     if (importData.tags?.length) {
-      for (const tag of importData.tags) {
-        await db
-          .prepare(
-            'INSERT INTO tags (id, name, display_name, color, usage_count) VALUES (?, ?, ?, ?, ?)'
-          )
+      const tagStmts = importData.tags.map((tag) =>
+        db
+          .prepare('INSERT INTO tags (id, name, display_name, color, usage_count) VALUES (?, ?, ?, ?, ?)')
           .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0)
-          .run();
-        stats.tags++;
-      }
+      );
+      await runBatched(tagStmts);
+      stats.tags = importData.tags.length;
     }
 
     // Import ingredients
     if (importData.ingredients?.length) {
-      for (const ing of importData.ingredients) {
-        await db
-          .prepare(
-            'INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)'
-          )
+      const ingStmts = importData.ingredients.map((ing) =>
+        db
+          .prepare('INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)')
           .bind(ing.id, ing.name, n(ing.name_plural), ing.normalized_name, n(ing.category))
-          .run();
-        stats.ingredients++;
-      }
+      );
+      await runBatched(ingStmts);
+      stats.ingredients = importData.ingredients.length;
     }
 
-    // Import recipes with all relations
+    // Import recipes - batch the base recipes first
     if (importData.recipes?.length) {
-      for (const recipe of importData.recipes) {
-        // Insert base recipe
-        await db
+      const recipeStmts = importData.recipes.map((recipe) =>
+        db
           .prepare(`
             INSERT INTO recipes (
               id, title, source_path, source_url, markdown_content, description,
@@ -804,81 +808,98 @@ exportRoutes.post('/import', async (c) => {
             n(recipe.last_accessed_at),
             recipe.cook_count ?? 0
           )
-          .run();
-        stats.recipes++;
+      );
+      await runBatched(recipeStmts);
+      stats.recipes = importData.recipes.length;
 
-        // Insert recipe categories
+      // Batch recipe categories
+      const recipeCatStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
         for (const cat of recipe.categories || []) {
-          await db
-            .prepare('INSERT INTO recipe_categories (recipe_id, category_id, is_primary) VALUES (?, ?, ?)')
-            .bind(recipe.id, cat.id, cat.is_primary ?? 0)
-            .run();
+          recipeCatStmts.push(
+            db.prepare('INSERT INTO recipe_categories (recipe_id, category_id, is_primary) VALUES (?, ?, ?)')
+              .bind(recipe.id, cat.id, cat.is_primary ?? 0)
+          );
         }
+      }
+      await runBatched(recipeCatStmts);
 
-        // Insert recipe tags
+      // Batch recipe tags
+      const recipeTagStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
         for (const tag of recipe.tags || []) {
-          await db
-            .prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
-            .bind(recipe.id, tag.id)
-            .run();
+          recipeTagStmts.push(
+            db.prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
+              .bind(recipe.id, tag.id)
+          );
         }
+      }
+      await runBatched(recipeTagStmts);
 
-        // Insert recipe images
+      // Batch recipe images
+      const recipeImgStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
         for (const img of recipe.images || []) {
-          await db
-            .prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?, ?)')
-            .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order ?? 0)
-            .run();
+          recipeImgStmts.push(
+            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?, ?)')
+              .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order ?? 0)
+          );
         }
+      }
+      await runBatched(recipeImgStmts);
 
-        // Insert recipe ingredients
+      // Batch recipe ingredients
+      const recipeIngStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
         for (const ing of recipe.ingredients || []) {
-          await db
-            .prepare(`
+          recipeIngStmts.push(
+            db.prepare(`
               INSERT INTO recipe_ingredients (
                 id, recipe_id, ingredient_id, quantity, unit, raw_text,
                 preparation, notes, is_optional, group_name, sort_order
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
-            .bind(
-              ing.id,
-              recipe.id,
-              n(ing.ingredient_id),
-              n(ing.quantity),
-              n(ing.unit),
-              ing.raw_text,
-              n(ing.preparation),
-              n(ing.notes),
-              ing.is_optional ?? 0,
-              n(ing.group_name),
-              ing.sort_order ?? 0
-            )
-            .run();
+              .bind(
+                ing.id,
+                recipe.id,
+                n(ing.ingredient_id),
+                n(ing.quantity),
+                n(ing.unit),
+                ing.raw_text,
+                n(ing.preparation),
+                n(ing.notes),
+                ing.is_optional ?? 0,
+                n(ing.group_name),
+                ing.sort_order ?? 0
+              )
+          );
         }
       }
+      await runBatched(recipeIngStmts);
 
-      // Insert recipe pairings (after all recipes exist)
+      // Batch recipe pairings (after all recipes exist)
+      const pairingStmts: D1PreparedStatement[] = [];
       for (const recipe of importData.recipes) {
         for (const pairing of recipe.pairings || []) {
-          await db
-            .prepare(
-              'INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_type, notes) VALUES (?, ?, ?, ?, ?)'
-            )
-            .bind(pairing.id, recipe.id, pairing.paired_recipe_id, pairing.pairing_type, n(pairing.notes))
-            .run();
+          // Skip pairings with undefined/null required fields
+          if (pairing.id === undefined || pairing.id === null) continue;
+          pairingStmts.push(
+            db.prepare('INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_type, notes) VALUES (?, ?, ?, ?, ?)')
+              .bind(pairing.id, recipe.id, n(pairing.paired_recipe_id), n(pairing.pairing_type) ?? 'side', n(pairing.notes))
+          );
         }
       }
+      await runBatched(pairingStmts);
     }
 
     // Import pantry items
     if (importData.pantryItems?.length) {
-      for (const item of importData.pantryItems) {
-        await db
-          .prepare(`
-            INSERT INTO pantry_items (
-              id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `)
+      const pantryStmts = importData.pantryItems.map((item) =>
+        db.prepare(`
+          INSERT INTO pantry_items (
+            id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
           .bind(
             item.id,
             n(item.ingredient_id),
@@ -890,48 +911,41 @@ exportRoutes.post('/import', async (c) => {
             n(item.expiration_date),
             item.is_staple ?? 0
           )
-          .run();
-        stats.pantryItems++;
-      }
+      );
+      await runBatched(pantryStmts);
+      stats.pantryItems = importData.pantryItems.length;
     }
 
-    // Import meal slots (keeping existing if same)
+    // Import meal slots
     if (importData.mealSlots?.length) {
       await db.prepare('DELETE FROM meal_slots').run();
-      for (const slot of importData.mealSlots) {
-        await db
-          .prepare(
-            'INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)'
-          )
+      const slotStmts = importData.mealSlots.map((slot) =>
+        db.prepare('INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)')
           .bind(slot.id, slot.name, slot.display_name, slot.sort_order, slot.default_servings ?? 1)
-          .run();
-        stats.mealSlots++;
-      }
+      );
+      await runBatched(slotStmts);
+      stats.mealSlots = importData.mealSlots.length;
     }
 
     // Import meal plans
     if (importData.mealPlans?.length) {
-      for (const plan of importData.mealPlans) {
-        await db
-          .prepare(
-            'INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-          )
+      const planStmts = importData.mealPlans.map((plan) =>
+        db.prepare('INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)')
           .bind(plan.id, n(plan.name), plan.start_date, plan.end_date, plan.is_template ?? 0, n(plan.created_at))
-          .run();
-        stats.mealPlans++;
-      }
+      );
+      await runBatched(planStmts);
+      stats.mealPlans = importData.mealPlans.length;
     }
 
     // Import planned meals
     if (importData.plannedMeals?.length) {
-      for (const meal of importData.plannedMeals) {
-        await db
-          .prepare(`
-            INSERT INTO planned_meals (
-              id, meal_plan_id, recipe_id, custom_title, meal_slot_id,
-              planned_date, scaling_factor, notes, is_completed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `)
+      const mealStmts = importData.plannedMeals.map((meal) =>
+        db.prepare(`
+          INSERT INTO planned_meals (
+            id, meal_plan_id, recipe_id, custom_title, meal_slot_id,
+            planned_date, scaling_factor, notes, is_completed
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
           .bind(
             meal.id,
             meal.meal_plan_id,
@@ -943,40 +957,35 @@ exportRoutes.post('/import', async (c) => {
             n(meal.notes),
             meal.is_completed ?? 0
           )
-          .run();
-        stats.plannedMeals++;
-      }
+      );
+      await runBatched(mealStmts);
+      stats.plannedMeals = importData.plannedMeals.length;
     }
 
     // Import food association groups
     if (importData.foodAssociationGroups?.length) {
-      for (const group of importData.foodAssociationGroups) {
-        await db
-          .prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
+      const groupStmts = importData.foodAssociationGroups.map((group) =>
+        db.prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
           .bind(group.id, group.name, n(group.created_at))
-          .run();
-        stats.foodGroups++;
-      }
+      );
+      await runBatched(groupStmts);
+      stats.foodGroups = importData.foodAssociationGroups.length;
     }
 
     // Import food association terms
     if (importData.foodAssociationTerms?.length) {
-      for (const term of importData.foodAssociationTerms) {
-        await db
-          .prepare('INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)')
+      const termStmts = importData.foodAssociationTerms.map((term) =>
+        db.prepare('INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)')
           .bind(term.id, term.group_id, term.term, n(term.created_at))
-          .run();
-        stats.foodTerms++;
-      }
+      );
+      await runBatched(termStmts);
+      stats.foodTerms = importData.foodAssociationTerms.length;
     }
 
     // Import shelf life
     if (importData.shelfLife?.length) {
-      for (const entry of importData.shelfLife) {
-        await db
-          .prepare(
-            'INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-          )
+      const shelfStmts = importData.shelfLife.map((entry) =>
+        db.prepare('INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
           .bind(
             entry.id,
             entry.ingredient_name,
@@ -985,9 +994,9 @@ exportRoutes.post('/import', async (c) => {
             n(entry.created_at),
             n(entry.updated_at)
           )
-          .run();
-        stats.shelfLife++;
-      }
+      );
+      await runBatched(shelfStmts);
+      stats.shelfLife = importData.shelfLife.length;
     }
 
     return c.json({
