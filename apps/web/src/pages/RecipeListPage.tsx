@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useInfiniteRecipes, useTags } from '../hooks';
 import { DraggableRecipeGrid } from '../components/recipes';
 import { TagFilter } from '../components/tags';
+import { ErrorState, EmptyState, EmptyStateIcons, getErrorMessage } from '../components/common';
 
 export function RecipeListPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
@@ -26,7 +27,7 @@ export function RecipeListPage() {
       .map((tag) => tag.id);
   }, [allTags, selectedTagNames]);
 
-  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+  const { data, isLoading, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteRecipes({ tags: selectedTagIds, tagMode });
 
   // Update URL when tags change
@@ -163,11 +164,11 @@ export function RecipeListPage() {
 
       {/* Error State */}
       {isError && (
-        <div className="bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-xl p-6 text-center">
-          <p className="text-red-600 dark:text-onedark-red">
-            {error instanceof Error ? error.message : 'Failed to load recipes'}
-          </p>
-        </div>
+        <ErrorState
+          title="Failed to load recipes"
+          message={getErrorMessage(error)}
+          onRetry={() => refetch()}
+        />
       )}
 
       {/* Loading State */}
@@ -194,52 +195,27 @@ export function RecipeListPage() {
 
       {/* Empty State */}
       {!isLoading && !isError && recipes.length === 0 && (
-        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
-          <svg
-            className="w-16 h-16 mx-auto text-gray-400 dark:text-onedark-fg-muted mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-            />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-onedark-fg mb-2">
-            {selectedTagNames.length > 0 ? 'No matching recipes' : 'No recipes yet'}
-          </h3>
-          <p className="text-gray-500 dark:text-onedark-fg-muted mb-6">
-            {selectedTagNames.length > 0
+        <EmptyState
+          icon={selectedTagNames.length > 0 ? EmptyStateIcons.filter : EmptyStateIcons.recipes}
+          title={selectedTagNames.length > 0 ? 'No matching recipes' : 'No recipes yet'}
+          description={
+            selectedTagNames.length > 0
               ? 'Try adjusting your tag filters or search criteria'
-              : 'Get started by adding your first recipe'}
-          </p>
-          {selectedTagNames.length > 0 ? (
-            <button
-              onClick={() => handleTagsChange([])}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-300 dark:hover:bg-onedark-bg transition-colors"
-            >
-              Clear Filters
-            </button>
-          ) : (
-            <Link
-              to="/recipes/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Add Your First Recipe
-            </Link>
-          )}
-        </div>
+              : 'Get started by adding your first recipe'
+          }
+          actionLabel={selectedTagNames.length > 0 ? undefined : 'Add Your First Recipe'}
+          actionLink={selectedTagNames.length > 0 ? undefined : '/recipes/new'}
+          secondaryAction={
+            selectedTagNames.length > 0 ? (
+              <button
+                onClick={() => handleTagsChange([])}
+                className="px-4 py-2 bg-gray-200 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-300 dark:hover:bg-onedark-bg transition-colors"
+              >
+                Clear Filters
+              </button>
+            ) : undefined
+          }
+        />
       )}
     </div>
   );

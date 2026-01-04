@@ -10,6 +10,7 @@ import {
   PairingsSection,
 } from '../components/recipes';
 import { MatchSummaryBadge } from '../components/suggestions';
+import { RecipeDetailSkeleton, ErrorState, EmptyState, EmptyStateIcons, getErrorMessage } from '../components/common';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
 import { DEFAULT_SERVINGS } from '../lib/constants';
 
@@ -57,57 +58,12 @@ function useRecipeProgress(recipeId: number | undefined) {
   };
 }
 
-function LoadingSkeleton() {
-  return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
-      {/* Breadcrumb skeleton */}
-      <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-32" />
-
-      {/* Image skeleton */}
-      <div className="aspect-video max-h-80 bg-gray-200 dark:bg-onedark-bg-highlight rounded-xl" />
-
-      {/* Title skeleton */}
-      <div className="space-y-2">
-        <div className="h-8 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-2/3" />
-        <div className="h-5 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-1/2" />
-      </div>
-
-      {/* Metadata skeleton */}
-      <div className="flex gap-6 py-4 border-y border-gray-200 dark:border-onedark-bg-highlight">
-        <div className="h-12 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-24" />
-        <div className="h-12 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-24" />
-        <div className="h-12 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-24" />
-      </div>
-
-      {/* Content skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6 space-y-3">
-            <div className="h-6 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-1/3" />
-            <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-full" />
-            <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-full" />
-            <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-3/4" />
-          </div>
-        </div>
-        <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6 space-y-4">
-            <div className="h-6 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-1/4" />
-            <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-full" />
-            <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-full" />
-            <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-full" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const recipeId = id ? Number(id) : undefined;
 
-  const { data: recipe, isLoading, isError, error } = useRecipe(recipeId);
+  const { data: recipe, isLoading, isError, error, refetch } = useRecipe(recipeId);
   const { data: matchData } = useRecipeMatch(recipeId);
   const deleteRecipe = useDeleteRecipe();
   const { ingredientsChecked, instructionsChecked, updateIngredients, updateInstructions } =
@@ -134,39 +90,26 @@ export function RecipeDetailPage() {
   };
 
   if (isLoading) {
-    return <LoadingSkeleton />;
+    return <RecipeDetailSkeleton />;
   }
 
   if (isError) {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-red-50 dark:bg-onedark-red/10 border border-red-200 dark:border-onedark-red/30 rounded-xl p-8 text-center">
-          <svg
-            className="w-12 h-12 mx-auto text-red-500 dark:text-onedark-red mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <h2 className="text-lg font-semibold text-red-700 dark:text-onedark-red mb-2">
-            Failed to load recipe
-          </h2>
-          <p className="text-red-600 dark:text-onedark-red/80 mb-4">
-            {error instanceof Error ? error.message : 'An error occurred'}
-          </p>
-          <Link
-            to="/recipes"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Back to Recipes
-          </Link>
-        </div>
+        <ErrorState
+          variant="full"
+          title="Failed to load recipe"
+          message={getErrorMessage(error)}
+          onRetry={() => refetch()}
+          action={
+            <Link
+              to="/recipes"
+              className="px-4 py-2 border border-gray-200 dark:border-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight transition-colors"
+            >
+              Back to Recipes
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -174,30 +117,13 @@ export function RecipeDetailPage() {
   if (!recipe) {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-8 text-center">
-          <svg
-            className="w-12 h-12 mx-auto text-gray-400 dark:text-onedark-fg-muted mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-2">
-            Recipe not found
-          </h2>
-          <p className="text-gray-500 dark:text-onedark-fg-muted mb-4">
-            This recipe may have been deleted or doesn't exist.
-          </p>
-          <Link to="/recipes" className="text-blue-600 dark:text-onedark-blue hover:underline">
-            Back to Recipes
-          </Link>
-        </div>
+        <EmptyState
+          icon={EmptyStateIcons.recipes}
+          title="Recipe not found"
+          description="This recipe may have been deleted or doesn't exist."
+          actionLabel="Back to Recipes"
+          actionLink="/recipes"
+        />
       </div>
     );
   }

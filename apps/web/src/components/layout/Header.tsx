@@ -10,15 +10,16 @@ export function Header({ onMenuClick }: HeaderProps) {
   const isSearchPage = location.pathname === '/search';
 
   return (
-    <header className="sticky top-0 z-10 bg-white dark:bg-onedark-bg-lighter border-b border-gray-200 dark:border-onedark-bg-highlight">
+    <header className="sticky top-0 z-10 bg-white dark:bg-onedark-bg-lighter border-b border-gray-200 dark:border-onedark-bg-highlight" role="banner">
       <div className="flex items-center justify-between h-16 px-4">
         {/* Mobile menu button */}
         <button
           onClick={onMenuClick}
-          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight lg:hidden"
-          aria-label="Toggle menu"
+          className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter"
+          aria-label="Open navigation menu"
+          aria-expanded="false"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -29,13 +30,13 @@ export function Header({ onMenuClick }: HeaderProps) {
         </button>
 
         {/* Logo / App Title - hidden on desktop since sidebar shows it */}
-        <Link to="/" className="flex items-center gap-2 lg:hidden">
+        <Link to="/" className="flex items-center gap-2 lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter rounded">
           <span className="text-xl font-bold text-gray-800 dark:text-onedark-blue">Noms</span>
         </Link>
 
         {/* Search Bar - hidden on search page to avoid duplicate search inputs */}
         {!isSearchPage && (
-          <div className="flex-1 max-w-xl mx-4 hidden sm:block">
+          <div className="flex-1 max-w-xl mx-4 hidden sm:block" role="search">
             <SearchBar placeholder="Search recipes..." />
           </div>
         )}
@@ -45,9 +46,10 @@ export function Header({ onMenuClick }: HeaderProps) {
           <div className="flex items-center gap-2">
             <Link
               to="/search"
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight sm:hidden"
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight sm:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter"
+              aria-label="Search recipes"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

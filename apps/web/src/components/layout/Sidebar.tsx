@@ -111,7 +111,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Backdrop for mobile */}
-      {isOpen && <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={onClose} />}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Sidebar */}
       <aside
@@ -122,15 +128,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           lg:translate-x-0
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
+        role="navigation"
+        aria-label="Main navigation"
       >
         {/* Logo area */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-onedark-bg-highlight">
           <span className="text-xl font-bold text-gray-800 dark:text-onedark-blue">Noms</span>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight lg:hidden"
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg"
+            aria-label="Close navigation menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -142,21 +151,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }} aria-label="Primary">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter ${
                   isActive
                     ? 'bg-blue-50 text-blue-600 dark:bg-onedark-blue/10 dark:text-onedark-blue'
                     : 'text-gray-700 hover:bg-gray-100 dark:text-onedark-fg dark:hover:bg-onedark-bg-highlight'
                 }`
               }
             >
-              {item.icon}
+              <span aria-hidden="true">{item.icon}</span>
               {item.label}
             </NavLink>
           ))}
@@ -173,14 +182,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             to="/settings"
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+              `flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter ${
                 isActive
                   ? 'bg-blue-50 text-blue-600 dark:bg-onedark-blue/10 dark:text-onedark-blue'
                   : 'text-gray-700 hover:bg-gray-100 dark:text-onedark-fg dark:hover:bg-onedark-bg-highlight'
               }`
             }
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

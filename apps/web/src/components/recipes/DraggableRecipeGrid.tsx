@@ -3,7 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate, Link } from 'react-router-dom';
 import type { DragItem } from '../DndProvider';
-import { RecipeImage } from '../common/RecipeImage';
+import { RecipeImage, RecipeGridSkeleton } from '../common';
 import type { Recipe } from '../../hooks/useRecipes';
 
 interface DraggableRecipeGridProps {
@@ -156,23 +156,7 @@ function DraggableRecipeCard({ recipe }: DraggableRecipeCardProps) {
 
 export function DraggableRecipeGrid({ recipes, loading = false }: DraggableRecipeGridProps) {
   if (loading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden animate-pulse"
-          >
-            <div className="aspect-video bg-gray-200 dark:bg-onedark-bg-highlight" />
-            <div className="p-4 space-y-3">
-              <div className="h-5 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-3/4" />
-              <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-full" />
-              <div className="h-4 bg-gray-200 dark:bg-onedark-bg-highlight rounded w-2/3" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <RecipeGridSkeleton count={8} />;
   }
 
   if (recipes.length === 0) {
