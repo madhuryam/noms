@@ -71,3 +71,5 @@ export type {
   ShoppingListResponse,
   CustomCategory,
 } from './useShoppingList';
+export { usePairings, useAddPairing, useRemovePairing, PAIRING_TYPES } from './usePairings';
+export type { Pairing, AddPairingInput } from './usePairings';

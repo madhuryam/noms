@@ -7,3 +7,5 @@ export { RecipeMetadata } from './RecipeMetadata';
 export { RecipeTags } from './RecipeTags';
 export { IngredientList } from './IngredientList';
 export { InstructionSteps } from './InstructionSteps';
+export { PairingsSection } from './PairingsSection';
+export { PairingSelector } from './PairingSelector';

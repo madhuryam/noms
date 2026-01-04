@@ -984,4 +984,196 @@ recipes.delete('/', async (c) => {
   }
 });
 
+// ============================================
+// Recipe Pairings
+// ============================================
+
+interface Pairing {
+  id: number;
+  recipe_id: number;
+  paired_recipe_id: number | null;
+  pairing_text: string | null;
+  pairing_type: string;
+  notes: string | null;
+  // Joined recipe data (when paired_recipe_id is set)
+  paired_recipe_title?: string;
+  paired_recipe_image_path?: string;
+}
+
+// GET /api/recipes/:id/pairings - Get all pairings for a recipe (bidirectional)
+recipes.get('/:id/pairings', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    // Get pairings where this recipe is the source
+    const outgoingResult = await c.env.DB.prepare(`
+      SELECT
+        p.id, p.recipe_id, p.paired_recipe_id, p.pairing_text, p.pairing_type, p.notes,
+        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path
+      FROM recipe_pairings p
+      LEFT JOIN recipes r ON p.paired_recipe_id = r.id
+      WHERE p.recipe_id = ?
+    `)
+      .bind(id)
+      .all<Pairing>();
+
+    // Get pairings where this recipe is the target (reverse direction)
+    const incomingResult = await c.env.DB.prepare(`
+      SELECT
+        p.id, p.paired_recipe_id as recipe_id, p.recipe_id as paired_recipe_id,
+        p.pairing_text, p.pairing_type, p.notes,
+        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path
+      FROM recipe_pairings p
+      LEFT JOIN recipes r ON p.recipe_id = r.id
+      WHERE p.paired_recipe_id = ?
+    `)
+      .bind(id)
+      .all<Pairing>();
+
+    // Combine and deduplicate (prefer outgoing if both exist)
+    const outgoing = outgoingResult.results || [];
+    const incoming = incomingResult.results || [];
+
+    // Create a set of paired recipe IDs from outgoing to avoid duplicates
+    const outgoingPairedIds = new Set(outgoing.map(p => p.paired_recipe_id));
+
+    // Add incoming pairings that aren't already in outgoing
+    const combined = [
+      ...outgoing,
+      ...incoming.filter(p => !outgoingPairedIds.has(p.paired_recipe_id))
+    ];
+
+    return c.json(combined);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to get pairings' },
+      500
+    );
+  }
+});
+
+// POST /api/recipes/:id/pairings - Add a pairing
+recipes.post('/:id/pairings', async (c) => {
+  const id = Number(c.req.param('id'));
+
+  try {
+    const body = await c.req.json<{
+      paired_recipe_id?: number;
+      pairing_text?: string;
+      pairing_type: string;
+      notes?: string;
+    }>();
+
+    const { paired_recipe_id, pairing_text, pairing_type, notes } = body;
+
+    // Validate: must have either paired_recipe_id or pairing_text
+    if (!paired_recipe_id && !pairing_text) {
+      return c.json({ error: 'Either paired_recipe_id or pairing_text is required' }, 400);
+    }
+
+    if (!pairing_type) {
+      return c.json({ error: 'pairing_type is required' }, 400);
+    }
+
+    // Check if recipe exists
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
+      .bind(id)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
+    // If paired_recipe_id provided, verify it exists
+    if (paired_recipe_id) {
+      const pairedRecipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
+        .bind(paired_recipe_id)
+        .first();
+
+      if (!pairedRecipe) {
+        return c.json({ error: 'Paired recipe not found' }, 404);
+      }
+
+      // Can't pair with itself
+      if (paired_recipe_id === id) {
+        return c.json({ error: 'Cannot pair a recipe with itself' }, 400);
+      }
+    }
+
+    // Check for duplicate pairing
+    if (paired_recipe_id) {
+      const existing = await c.env.DB.prepare(`
+        SELECT id FROM recipe_pairings
+        WHERE recipe_id = ? AND paired_recipe_id = ? AND pairing_type = ?
+      `)
+        .bind(id, paired_recipe_id, pairing_type)
+        .first();
+
+      if (existing) {
+        return c.json({ error: 'This pairing already exists' }, 409);
+      }
+    }
+
+    // Insert the pairing
+    const result = await c.env.DB.prepare(`
+      INSERT INTO recipe_pairings (recipe_id, paired_recipe_id, pairing_text, pairing_type, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `)
+      .bind(id, paired_recipe_id ?? null, pairing_text ?? null, pairing_type, notes ?? null)
+      .run();
+
+    const newPairingId = result.meta.last_row_id;
+
+    // Fetch the created pairing with joined data
+    const pairing = await c.env.DB.prepare(`
+      SELECT
+        p.id, p.recipe_id, p.paired_recipe_id, p.pairing_text, p.pairing_type, p.notes,
+        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path
+      FROM recipe_pairings p
+      LEFT JOIN recipes r ON p.paired_recipe_id = r.id
+      WHERE p.id = ?
+    `)
+      .bind(newPairingId)
+      .first<Pairing>();
+
+    return c.json(pairing, 201);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to add pairing' },
+      500
+    );
+  }
+});
+
+// DELETE /api/recipes/:id/pairings/:pairingId - Remove a pairing
+recipes.delete('/:id/pairings/:pairingId', async (c) => {
+  const recipeId = Number(c.req.param('id'));
+  const pairingId = Number(c.req.param('pairingId'));
+
+  try {
+    // Verify the pairing exists and belongs to this recipe (or is a reverse pairing)
+    const pairing = await c.env.DB.prepare(`
+      SELECT id FROM recipe_pairings
+      WHERE id = ? AND (recipe_id = ? OR paired_recipe_id = ?)
+    `)
+      .bind(pairingId, recipeId, recipeId)
+      .first();
+
+    if (!pairing) {
+      return c.json({ error: 'Pairing not found' }, 404);
+    }
+
+    await c.env.DB.prepare('DELETE FROM recipe_pairings WHERE id = ?')
+      .bind(pairingId)
+      .run();
+
+    return c.json({ success: true, id: pairingId });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete pairing' },
+      500
+    );
+  }
+});
+
 export default recipes;

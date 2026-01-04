@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemoveTagFromRecipe, useCreateTag } from '../../hooks';
 import { DEFAULT_SERVINGS } from '../../lib/constants';
 import { TagSelector } from '../tags';
+import { PairingSelector } from './PairingSelector';
 
 // Section for the editor (used by both ingredients and instructions)
 interface EditorSection {
@@ -705,6 +706,11 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           Tags help organize and filter recipes
         </p>
       </div>
+
+      {/* Pairings - only shown in edit mode */}
+      {mode === 'edit' && recipeId && (
+        <PairingSelector recipeId={recipeId} />
+      )}
 
       {/* Error Message */}
       {mutation.isError && (

@@ -7,6 +7,7 @@ import {
   RecipeTags,
   IngredientList,
   InstructionSteps,
+  PairingsSection,
 } from '../components/recipes';
 import { MatchSummaryBadge } from '../components/suggestions';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
@@ -330,6 +331,9 @@ export function RecipeDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Pairings */}
+          <PairingsSection recipeId={recipe.id} />
         </div>
       </div>
 
