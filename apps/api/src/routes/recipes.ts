@@ -13,11 +13,18 @@ recipes.get('/', async (c) => {
   const offset = Number(c.req.query('offset')) || 0;
   const tagsParam = c.req.query('tags'); // comma-separated tag names or ids
   const tagMode = c.req.query('tagMode') || 'all'; // 'all' (AND) or 'any' (OR)
+  const sortByParam = c.req.query('sortBy') || 'updated_at';
+  const sortOrderParam = c.req.query('sortOrder') || 'desc';
+
+  // Validate sort parameters to prevent SQL injection
+  const validSortFields = ['created_at', 'updated_at', 'last_accessed_at', 'title'];
+  const sortBy = validSortFields.includes(sortByParam) ? sortByParam : 'updated_at';
+  const sortOrder = sortOrderParam.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   try {
     let query = `
       SELECT DISTINCT r.id, r.title, r.description, r.image_path, r.prep_time_minutes,
-             r.cook_time_minutes, r.servings, r.created_at
+             r.cook_time_minutes, r.servings, r.created_at, r.updated_at
       FROM recipes r
     `;
     let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
@@ -60,11 +67,7 @@ recipes.get('/', async (c) => {
     }
 
     // Add ordering and pagination
-    if (!tagsParam || tagMode !== 'all') {
-      query += ' ORDER BY r.created_at DESC';
-    } else {
-      query += ' ORDER BY r.created_at DESC';
-    }
+    query += ` ORDER BY r.${sortBy} ${sortOrder}`;
     query += ' LIMIT ? OFFSET ?';
     bindings.push(limit, offset);
 
@@ -633,6 +636,13 @@ recipes.get('/:id', async (c) => {
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
     }
+
+    // Update last_accessed_at (fire and forget - don't wait)
+    c.executionCtx.waitUntil(
+      c.env.DB.prepare("UPDATE recipes SET last_accessed_at = datetime('now') WHERE id = ?")
+        .bind(id)
+        .run()
+    );
 
     // Get tags for this recipe
     const tags = await c.env.DB.prepare(

@@ -378,6 +378,15 @@ mealPlans.post('/:id/meals', async (c) => {
       )
       .run();
 
+    // Update last_accessed_at for the recipe (fire and forget)
+    if (body.recipe_id) {
+      c.executionCtx.waitUntil(
+        c.env.DB.prepare("UPDATE recipes SET last_accessed_at = datetime('now') WHERE id = ?")
+          .bind(body.recipe_id)
+          .run()
+      );
+    }
+
     // Return the new meal with recipe info
     const newMeal = await c.env.DB.prepare(`
       SELECT pm.*,

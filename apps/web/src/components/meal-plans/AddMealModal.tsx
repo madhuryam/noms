@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSearchSuggestions, useRecipes, type Recipe } from '../../hooks';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchSuggestions, useInfiniteRecipes, type Recipe } from '../../hooks';
 import { RecipeImage } from '../common/RecipeImage';
 
 export interface MealSelection {
@@ -24,12 +24,35 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
   // Search suggestions (faster than full search)
   const { data: suggestionsData, isLoading: isSearching } = useSearchSuggestions(searchQuery);
 
-  // Recent recipes (when no search query)
-  const { data: recentRecipes, isLoading: isLoadingRecent } = useRecipes({
-    limit: 12,
-    sortBy: 'created_at',
+  // Infinite scroll recipes (when no search query), sorted by most recently accessed
+  const {
+    data: recipesData,
+    isLoading: isLoadingRecipes,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteRecipes({
+    sortBy: 'last_accessed_at',
     sortOrder: 'desc',
   });
+
+  // Scroll container ref for infinite scroll detection
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Handle scroll to load more
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !hasNextPage || isFetchingNextPage || searchQuery.length >= 2) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    // Load more when within 200px of the bottom
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, searchQuery]);
+
+  // Flatten pages into single array
+  const recentRecipes = recipesData?.pages.flatMap((page) => page.recipes) ?? [];
 
   // Reset state when modal closes
   useEffect(() => {
@@ -51,7 +74,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
         cook_time_minutes: null,
         servings: 1,
       })) ?? []
-    : recentRecipes?.recipes ?? [];
+    : recentRecipes;
 
   const hasSearchQuery = searchQuery.trim().length > 0;
   const hasResults = displayedRecipes.length > 0;
@@ -152,8 +175,12 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
         </div>
 
         {/* Recipe list */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {(isSearching || (searchQuery.length < 2 && isLoadingRecent)) ? (
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4"
+        >
+          {(isSearching || (searchQuery.length < 2 && isLoadingRecipes)) ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
             </div>
@@ -185,53 +212,67 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
 
               {/* Recipe grid */}
               {hasResults ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {displayedRecipes.map((recipe) => {
-                    const isSelected = selectedRecipes.some((r) => r.id === recipe.id);
-                    const totalTime =
-                      (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {displayedRecipes.map((recipe) => {
+                      const isSelected = selectedRecipes.some((r) => r.id === recipe.id);
+                      const totalTime =
+                        (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
 
-                    return (
-                      <button
-                        key={recipe.id}
-                        onClick={() => toggleRecipeSelection(recipe as Recipe)}
-                        className={`text-left rounded-lg border overflow-hidden transition-all ${
-                          isSelected
-                            ? 'border-blue-500 dark:border-onedark-blue ring-2 ring-blue-500/20 dark:ring-onedark-blue/20'
-                            : 'border-gray-200 dark:border-onedark-bg-highlight hover:border-gray-300 dark:hover:border-onedark-fg-muted'
-                        }`}
-                      >
-                        <div className="aspect-video relative">
-                          <RecipeImage
-                            imagePath={recipe.image_path}
-                            title={recipe.title}
-                            recipeId={recipe.id}
-                            aspectRatio="video"
-                          />
-                          {isSelected && (
-                            <div className="absolute inset-0 bg-blue-500/20 dark:bg-onedark-blue/20 flex items-center justify-center">
-                              <div className="w-8 h-8 rounded-full bg-blue-500 dark:bg-onedark-blue flex items-center justify-center">
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
+                      return (
+                        <button
+                          key={recipe.id}
+                          onClick={() => toggleRecipeSelection(recipe as Recipe)}
+                          className={`text-left rounded-lg border overflow-hidden transition-all ${
+                            isSelected
+                              ? 'border-blue-500 dark:border-onedark-blue ring-2 ring-blue-500/20 dark:ring-onedark-blue/20'
+                              : 'border-gray-200 dark:border-onedark-bg-highlight hover:border-gray-300 dark:hover:border-onedark-fg-muted'
+                          }`}
+                        >
+                          <div className="aspect-video relative">
+                            <RecipeImage
+                              imagePath={recipe.image_path}
+                              title={recipe.title}
+                              recipeId={recipe.id}
+                              aspectRatio="video"
+                            />
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-blue-500/20 dark:bg-onedark-blue/20 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-blue-500 dark:bg-onedark-blue flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <p className="text-sm font-medium text-gray-900 dark:text-onedark-fg line-clamp-2">
-                            {recipe.title}
-                          </p>
-                          {totalTime > 0 && (
-                            <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mt-1">
-                              {totalTime} min
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <p className="text-sm font-medium text-gray-900 dark:text-onedark-fg line-clamp-2">
+                              {recipe.title}
                             </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                            {totalTime > 0 && (
+                              <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mt-1">
+                                {totalTime} min
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Loading indicator for infinite scroll */}
+                  {isFetchingNextPage && (
+                    <div className="flex items-center justify-center py-4 mt-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
+                    </div>
+                  )}
+                  {/* End of list indicator */}
+                  {!hasNextPage && searchQuery.length < 2 && displayedRecipes.length > 0 && (
+                    <p className="text-center text-sm text-gray-400 dark:text-onedark-fg-muted py-4 mt-2">
+                      End of recipes
+                    </p>
+                  )}
+                </>
               ) : searchQuery.length >= 2 ? (
                 <div className="text-center py-8 text-gray-500 dark:text-onedark-fg-muted">
                   No matching recipes found

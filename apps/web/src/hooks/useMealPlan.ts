@@ -185,6 +185,8 @@ export function useAddPlannedMeal() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['meal-plans', variables.planId] });
       queryClient.invalidateQueries({ queryKey: ['meal-plans', 'current'] });
+      // Invalidate shopping list since meals changed
+      queryClient.invalidateQueries({ queryKey: ['shopping-list', variables.planId] });
     },
   });
 }
@@ -213,6 +215,8 @@ export function useUpdatePlannedMeal() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['meal-plans', variables.planId] });
       queryClient.invalidateQueries({ queryKey: ['meal-plans', 'current'] });
+      // Invalidate shopping list since meals changed
+      queryClient.invalidateQueries({ queryKey: ['shopping-list', variables.planId] });
     },
   });
 }
@@ -233,6 +237,8 @@ export function useDeletePlannedMeal() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['meal-plans', variables.planId] });
       queryClient.invalidateQueries({ queryKey: ['meal-plans', 'current'] });
+      // Invalidate shopping list since meals changed
+      queryClient.invalidateQueries({ queryKey: ['shopping-list', variables.planId] });
     },
   });
 }

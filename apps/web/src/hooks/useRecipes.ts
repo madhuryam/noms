@@ -65,17 +65,21 @@ const RECIPES_PER_PAGE = 24;
 interface UseInfiniteRecipesOptions {
   tags?: number[];
   tagMode?: 'all' | 'any';
+  sortBy?: 'created_at' | 'updated_at' | 'last_accessed_at' | 'title';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export function useInfiniteRecipes(options: UseInfiniteRecipesOptions = {}) {
-  const { tags = [], tagMode = 'all' } = options;
+  const { tags = [], tagMode = 'all', sortBy = 'last_accessed_at', sortOrder = 'desc' } = options;
 
   return useInfiniteQuery({
-    queryKey: ['recipes', { tags, tagMode }],
+    queryKey: ['recipes', { tags, tagMode, sortBy, sortOrder }],
     queryFn: async ({ pageParam = 0 }): Promise<RecipesResponse> => {
       const params = new URLSearchParams();
       params.set('limit', String(RECIPES_PER_PAGE));
       params.set('offset', String(pageParam));
+      params.set('sortBy', sortBy);
+      params.set('sortOrder', sortOrder);
 
       if (tags.length > 0) {
         params.set('tags', tags.join(','));
