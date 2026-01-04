@@ -50,8 +50,9 @@ interface ExportedRecipe {
   }[];
   pairings: {
     id: number;
-    paired_recipe_id: number;
-    paired_recipe_title: string;
+    paired_recipe_id: number | null;
+    paired_recipe_title: string | null;
+    pairing_text: string | null;
     pairing_type: string;
     notes: string | null;
   }[];
@@ -299,9 +300,16 @@ function generateRecipeMarkdown(recipe: ExportedRecipe): string {
   if (recipe.pairings.length > 0) {
     lines.push('pairs_with:');
     for (const pairing of recipe.pairings) {
-      const pairedSlug = generateSlug(pairing.paired_recipe_title);
-      lines.push(`  - slug: "${pairedSlug}"`);
-      lines.push(`    type: "${pairing.pairing_type}"`);
+      if (pairing.paired_recipe_title) {
+        // Recipe pairing
+        const pairedSlug = generateSlug(pairing.paired_recipe_title);
+        lines.push(`  - slug: "${pairedSlug}"`);
+        lines.push(`    type: "${pairing.pairing_type}"`);
+      } else if (pairing.pairing_text) {
+        // Text pairing
+        lines.push(`  - text: "${pairing.pairing_text.replace(/"/g, '\\"')}"`);
+        lines.push(`    type: "${pairing.pairing_type}"`);
+      }
       if (pairing.notes) {
         lines.push(`    notes: "${pairing.notes.replace(/"/g, '\\"')}"`);
       }
@@ -441,12 +449,12 @@ async function getFullRecipe(db: D1Database, recipeId: number): Promise<Exported
     .all();
   recipe.ingredients = (ingredientsResult.results || []) as ExportedRecipe['ingredients'];
 
-  // Get pairings
+  // Get pairings (including text-only pairings where paired_recipe_id is null)
   const pairingsResult = await db
     .prepare(`
-      SELECT rp.id, rp.paired_recipe_id, r.title as paired_recipe_title, rp.pairing_type, rp.notes
+      SELECT rp.id, rp.paired_recipe_id, r.title as paired_recipe_title, rp.pairing_text, rp.pairing_type, rp.notes
       FROM recipe_pairings rp
-      JOIN recipes r ON rp.paired_recipe_id = r.id
+      LEFT JOIN recipes r ON rp.paired_recipe_id = r.id
       WHERE rp.recipe_id = ?
     `)
     .bind(recipeId)
@@ -884,8 +892,8 @@ exportRoutes.post('/import', async (c) => {
           // Skip pairings with undefined/null required fields
           if (pairing.id === undefined || pairing.id === null) continue;
           pairingStmts.push(
-            db.prepare('INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_type, notes) VALUES (?, ?, ?, ?, ?)')
-              .bind(pairing.id, recipe.id, n(pairing.paired_recipe_id), n(pairing.pairing_type) ?? 'side', n(pairing.notes))
+            db.prepare('INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_text, pairing_type, notes) VALUES (?, ?, ?, ?, ?, ?)')
+              .bind(pairing.id, recipe.id, n(pairing.paired_recipe_id), n(pairing.pairing_text), n(pairing.pairing_type) ?? 'side', n(pairing.notes))
           );
         }
       }
