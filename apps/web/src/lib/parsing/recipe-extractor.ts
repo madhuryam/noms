@@ -45,6 +45,48 @@ function nodesToMarkdown(nodes: RootContent[]): string {
 }
 
 /**
+ * Normalize instructions to use numbered steps, restarting at 1 for each section
+ */
+function normalizeInstructions(markdown: string): string {
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let stepNumber = 1;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Section headers restart numbering
+    if (trimmed.startsWith('###') || trimmed.startsWith('## ') ||
+        (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':')))) {
+      stepNumber = 1;
+      result.push(line);
+      continue;
+    }
+
+    // Empty lines
+    if (!trimmed) {
+      result.push('');
+      continue;
+    }
+
+    // Convert bullets or existing numbers to sequential numbers
+    let stepText = trimmed;
+    // Remove leading bullet, dash, asterisk, or existing number
+    stepText = stepText.replace(/^[-*•]\s*/, '');
+    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+
+    if (stepText) {
+      result.push(`${stepNumber}. ${stepText}`);
+      stepNumber++;
+    } else {
+      result.push(line);
+    }
+  }
+
+  return result.join('\n');
+}
+
+/**
  * Convert a single mdast node back to markdown-ish text
  */
 function nodeToMarkdown(node: RootContent): string {
@@ -369,7 +411,8 @@ export function extractRecipe(content: string, filename: string): ParsedRecipe {
   const ingredients = parseIngredientSection(sections.ingredients);
 
   // Keep raw markdown for instructions (we display markdown)
-  const instructions = nodesToMarkdown(sections.instructions);
+  // Normalize to numbered steps, restarting at 1 for each section
+  const instructions = normalizeInstructions(nodesToMarkdown(sections.instructions));
 
   // Extract other sections as markdown
   const pairings = sections.pairings.length > 0 ? nodesToMarkdown(sections.pairings) : null;

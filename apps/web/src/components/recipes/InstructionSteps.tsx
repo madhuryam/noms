@@ -8,6 +8,11 @@ interface InstructionStepsProps {
   checkedItems: Set<number>;
 }
 
+interface ParsedInstruction {
+  text: string;
+  isSection: boolean;
+}
+
 function stripCheckbox(line: string): string {
   return line
     .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
@@ -15,23 +20,99 @@ function stripCheckbox(line: string): string {
     .trim();
 }
 
-function parseInstructions(raw: string): string[] {
+function isSectionHeader(line: string): boolean {
+  const trimmed = line.trim();
+  // ### Header style
+  if (trimmed.startsWith('###') || trimmed.startsWith('## ')) {
+    return true;
+  }
+  // **Bold:** or **Bold** style (typically section headers)
+  if (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':'))) {
+    return true;
+  }
+  // ALL CAPS section header (like "FOR THE CAKE:")
+  if (/^[A-Z][A-Z\s]+:?$/.test(trimmed) && trimmed.length > 3) {
+    return true;
+  }
+  return false;
+}
+
+function extractSectionTitle(line: string): string {
+  let title = line.trim();
+  // Remove ### prefix
+  title = title.replace(/^#{2,}\s*/, '');
+  // Remove ** wrapper
+  title = title.replace(/^\*\*/, '').replace(/\*\*:?$/, '');
+  // Remove trailing colon
+  title = title.replace(/:$/, '');
+  return title.trim();
+}
+
+function parseInstructions(raw: string): ParsedInstruction[] {
   try {
     if (!raw || typeof raw !== 'string') {
       return [];
     }
-    return raw
-      .split('\n')
-      .map((line) => stripCheckbox(line))
-      .filter((line) => line.length > 0)
-      .map((line) => {
+
+    const result: ParsedInstruction[] = [];
+    const lines = raw.split('\n');
+
+    for (const line of lines) {
+      const stripped = stripCheckbox(line);
+      if (!stripped) continue;
+
+      if (isSectionHeader(stripped)) {
+        result.push({
+          text: extractSectionTitle(stripped),
+          isSection: true,
+        });
+      } else {
         // Remove leading numbers like "1.", "1)", "1:", "Step 1:", etc.
-        return line.replace(/^(?:step\s*)?\d+[.):]\s*/i, '');
-      });
+        const text = stripped.replace(/^(?:step\s*)?\d+[.):]\s*/i, '');
+        if (text) {
+          result.push({
+            text,
+            isSection: false,
+          });
+        }
+      }
+    }
+
+    return result;
   } catch {
     console.error('Failed to parse instructions');
     return [];
   }
+}
+
+interface InstructionSection {
+  title: string | null;
+  steps: { text: string; originalIndex: number }[];
+}
+
+function groupIntoSections(instructions: ParsedInstruction[]): InstructionSection[] {
+  const sections: InstructionSection[] = [];
+  let currentSection: InstructionSection = { title: null, steps: [] };
+
+  instructions.forEach((instruction, index) => {
+    if (instruction.isSection) {
+      // Save current section if it has steps
+      if (currentSection.steps.length > 0 || currentSection.title) {
+        sections.push(currentSection);
+      }
+      // Start new section
+      currentSection = { title: instruction.text, steps: [] };
+    } else {
+      currentSection.steps.push({ text: instruction.text, originalIndex: index });
+    }
+  });
+
+  // Don't forget the last section
+  if (currentSection.steps.length > 0 || currentSection.title) {
+    sections.push(currentSection);
+  }
+
+  return sections;
 }
 
 export function InstructionSteps({
@@ -41,6 +122,7 @@ export function InstructionSteps({
   checkedItems,
 }: InstructionStepsProps) {
   const instructions = parseInstructions(instructionsRaw);
+  const sections = groupIntoSections(instructions);
 
   const toggleItem = useCallback(
     (index: number) => {
@@ -59,8 +141,10 @@ export function InstructionSteps({
     onProgressChange?.(new Set());
   }, [onProgressChange]);
 
+  // Count only non-section items for progress
+  const stepItems = instructions.filter(i => !i.isSection);
   const checkedCount = checkedItems.size;
-  const totalCount = instructions.length;
+  const totalCount = stepItems.length;
 
   if (instructions.length === 0) {
     return (
@@ -72,6 +156,9 @@ export function InstructionSteps({
       </div>
     );
   }
+
+  // If there's only one section with no title, render without cards
+  const hasSections = sections.length > 1 || sections[0]?.title;
 
   return (
     <div className="space-y-4">
@@ -95,58 +182,72 @@ export function InstructionSteps({
         )}
       </div>
 
-      {/* Instructions */}
-      <ol className="space-y-4">
-        {instructions.map((instruction, index) => {
-          const isChecked = checkedItems.has(index);
-          return (
-            <li key={`${recipeId}-step-${index}`}>
-              <div className="flex gap-4 group">
-                <div className="flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleItem(index)}
-                    aria-pressed={isChecked}
-                    aria-label={isChecked ? `Uncheck step ${index + 1}` : `Check step ${index + 1}`}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                      isChecked
-                        ? 'bg-green-500 dark:bg-onedark-green text-white'
-                        : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
-                    }`}
-                  >
-                    {isChecked ? (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+      {/* Sections */}
+      <div className="space-y-4">
+        {sections.map((section, sectionIndex) => (
+          <div
+            key={`${recipeId}-section-${sectionIndex}`}
+            className={hasSections ? 'bg-gray-50 dark:bg-onedark-bg rounded-lg p-4' : ''}
+          >
+            {section.title && (
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-onedark-fg uppercase tracking-wide mb-3">
+                {section.title}
+              </h3>
+            )}
+            <div className="space-y-3">
+              {section.steps.map((step, stepIndex) => {
+                const isChecked = checkedItems.has(step.originalIndex);
+                const stepNumber = stepIndex + 1;
+
+                return (
+                  <div key={`${recipeId}-step-${step.originalIndex}`} className="flex gap-4 group">
+                    <div className="flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleItem(step.originalIndex)}
+                        aria-pressed={isChecked}
+                        aria-label={isChecked ? `Uncheck step ${stepNumber}` : `Check step ${stepNumber}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
+                          isChecked
+                            ? 'bg-green-500 dark:bg-onedark-green text-white'
+                            : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
+                        }`}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2.5}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    ) : (
-                      index + 1
-                    )}
-                  </button>
-                </div>
-                <p
-                  className={`pt-1 transition-all ${
-                    isChecked
-                      ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
-                      : 'text-gray-700 dark:text-onedark-fg'
-                  }`}
-                >
-                  {instruction}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+                        {isChecked ? (
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        ) : (
+                          stepNumber
+                        )}
+                      </button>
+                    </div>
+                    <p
+                      className={`pt-1 transition-all ${
+                        isChecked
+                          ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
+                          : 'text-gray-700 dark:text-onedark-fg'
+                      }`}
+                    >
+                      {step.text}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

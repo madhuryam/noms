@@ -1,8 +1,91 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemoveTagFromRecipe, useCreateTag } from '../../hooks';
 import { DEFAULT_SERVINGS } from '../../lib/constants';
 import { TagSelector } from '../tags';
+
+// Section for the editor (used by both ingredients and instructions)
+interface EditorSection {
+  id: string;
+  title: string;
+  content: string;
+}
+
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 9);
+}
+
+// Parse raw text into sections
+function parseToSections(raw: string): EditorSection[] {
+  if (!raw || !raw.trim()) {
+    return [{ id: generateId(), title: '', content: '' }];
+  }
+
+  const sections: EditorSection[] = [];
+  let currentTitle = '';
+  let currentLines: string[] = [];
+
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+
+    // Check for section header
+    if (
+      trimmed.startsWith('###') ||
+      trimmed.startsWith('## ') ||
+      (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':')))
+    ) {
+      // Save previous section
+      if (currentLines.length > 0 || currentTitle) {
+        sections.push({
+          id: generateId(),
+          title: currentTitle,
+          content: currentLines.join('\n').trim(),
+        });
+      }
+      // Extract new title
+      let title = trimmed.replace(/^#{2,}\s*/, '');
+      title = title.replace(/^\*\*/, '').replace(/\*\*:?$/, '');
+      title = title.replace(/:$/, '').trim();
+      currentTitle = title;
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+
+  // Don't forget last section
+  if (currentLines.length > 0 || currentTitle) {
+    sections.push({
+      id: generateId(),
+      title: currentTitle,
+      content: currentLines.join('\n').trim(),
+    });
+  }
+
+  if (sections.length === 0) {
+    sections.push({ id: generateId(), title: '', content: '' });
+  }
+
+  return sections;
+}
+
+// Convert sections back to raw format
+function sectionsToRaw(sections: EditorSection[]): string {
+  return sections
+    .map((section) => {
+      const lines: string[] = [];
+      if (section.title) {
+        lines.push(`### ${section.title}`);
+        lines.push('');
+      }
+      if (section.content.trim()) {
+        lines.push(section.content.trim());
+      }
+      return lines.join('\n');
+    })
+    .filter((s) => s.trim())
+    .join('\n\n');
+}
 
 // Detect if a line is a group/section header
 function isGroupHeader(line: string): boolean {
@@ -124,6 +207,25 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     source_url: '',
   });
 
+  // Section-based editors state
+  const [ingredientSections, setIngredientSections] = useState<EditorSection[]>(() =>
+    parseToSections('')
+  );
+  const [instructionSections, setInstructionSections] = useState<EditorSection[]>(() =>
+    parseToSections('')
+  );
+
+  // Update formData when sections change
+  const updateIngredientsFromSections = useCallback((sections: EditorSection[]) => {
+    setIngredientSections(sections);
+    setFormData((prev) => ({ ...prev, ingredients_raw: sectionsToRaw(sections) }));
+  }, []);
+
+  const updateInstructionsFromSections = useCallback((sections: EditorSection[]) => {
+    setInstructionSections(sections);
+    setFormData((prev) => ({ ...prev, instructions_raw: sectionsToRaw(sections) }));
+  }, []);
+
   // Populate form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData) {
@@ -139,6 +241,8 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         source_url: initialData.source_url ?? '',
       });
       setSelectedTags(initialData.tags ?? []);
+      setIngredientSections(parseToSections(initialData.ingredients_raw ?? ''));
+      setInstructionSections(parseToSections(initialData.instructions_raw ?? ''));
     }
   }, [initialData]);
 
@@ -284,7 +388,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
             errors.title
               ? 'border-red-500 dark:border-onedark-red'
               : 'border-gray-200 dark:border-onedark-bg-highlight'
-          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg`}
+          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight`}
         />
         {errors.title && (
           <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">{errors.title}</p>
@@ -306,70 +410,180 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           onChange={handleChange}
           rows={2}
           placeholder="A brief description of the recipe..."
-          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none"
+          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
         />
       </div>
 
       {/* Ingredients */}
-      <div>
-        <label
-          htmlFor="ingredients_raw"
-          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
-        >
-          Ingredients <span className="text-red-500">*</span>
-        </label>
-        <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mb-2">
-          One ingredient per line (e.g., "2 cups flour" or "1 lb chicken breast")
-        </p>
-        <textarea
-          id="ingredients_raw"
-          name="ingredients_raw"
-          value={formData.ingredients_raw}
-          onChange={handleChange}
-          rows={6}
-          placeholder="2 cups all-purpose flour&#10;1 tsp salt&#10;1 cup milk&#10;2 eggs"
-          className={`w-full px-4 py-2 rounded-lg border ${
-            errors.ingredients_raw
-              ? 'border-red-500 dark:border-onedark-red'
-              : 'border-gray-200 dark:border-onedark-bg-highlight'
-          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg font-mono text-sm`}
-        />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg">
+            Ingredients <span className="text-red-500">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              updateIngredientsFromSections([
+                ...ingredientSections,
+                { id: generateId(), title: '', content: '' },
+              ]);
+            }}
+            className="text-sm text-blue-600 dark:text-onedark-blue hover:text-blue-700 dark:hover:text-onedark-blue/80 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Section
+          </button>
+        </div>
+
         {errors.ingredients_raw && (
-          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">
-            {errors.ingredients_raw}
-          </p>
+          <p className="text-sm text-red-500 dark:text-onedark-red">{errors.ingredients_raw}</p>
         )}
+
+        <div className="space-y-4">
+          {ingredientSections.map((section) => (
+            <div
+              key={section.id}
+              className="bg-gray-50 dark:bg-onedark-bg rounded-lg p-4 space-y-3"
+            >
+              {/* Section Header */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={section.title}
+                  onChange={(e) => {
+                    const updated = ingredientSections.map((s) =>
+                      s.id === section.id ? { ...s, title: e.target.value } : s
+                    );
+                    updateIngredientsFromSections(updated);
+                  }}
+                  placeholder="Section name (optional, e.g., For the Cake)"
+                  className="flex-1 px-3 py-1.5 text-sm font-medium rounded border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
+                />
+                {ingredientSections.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateIngredientsFromSections(
+                        ingredientSections.filter((s) => s.id !== section.id)
+                      );
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-onedark-red transition-colors"
+                    title="Remove section"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Ingredients Content */}
+              <textarea
+                value={section.content}
+                onChange={(e) => {
+                  const updated = ingredientSections.map((s) =>
+                    s.id === section.id ? { ...s, content: e.target.value } : s
+                  );
+                  updateIngredientsFromSections(updated);
+                  if (errors.ingredients_raw) {
+                    setErrors((prev) => ({ ...prev, ingredients_raw: undefined }));
+                  }
+                }}
+                rows={4}
+                placeholder="One ingredient per line, e.g.&#10;2 cups flour&#10;1 tsp salt"
+                className="w-full px-3 py-2 text-sm font-mono rounded border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Instructions */}
-      <div>
-        <label
-          htmlFor="instructions_raw"
-          className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-1"
-        >
-          Instructions <span className="text-red-500">*</span>
-        </label>
-        <p className="text-xs text-gray-500 dark:text-onedark-fg-muted mb-2">
-          Write each step on a new line, or use numbered steps
-        </p>
-        <textarea
-          id="instructions_raw"
-          name="instructions_raw"
-          value={formData.instructions_raw}
-          onChange={handleChange}
-          rows={8}
-          placeholder="1. Preheat oven to 350°F&#10;2. Mix dry ingredients in a large bowl&#10;3. Add wet ingredients and stir until combined&#10;4. Pour into greased pan and bake for 25 minutes"
-          className={`w-full px-4 py-2 rounded-lg border ${
-            errors.instructions_raw
-              ? 'border-red-500 dark:border-onedark-red'
-              : 'border-gray-200 dark:border-onedark-bg-highlight'
-          } bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg`}
-        />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg">
+            Instructions <span className="text-red-500">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              updateInstructionsFromSections([
+                ...instructionSections,
+                { id: generateId(), title: '', content: '' },
+              ]);
+            }}
+            className="text-sm text-blue-600 dark:text-onedark-blue hover:text-blue-700 dark:hover:text-onedark-blue/80 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Section
+          </button>
+        </div>
+
         {errors.instructions_raw && (
-          <p className="mt-1 text-sm text-red-500 dark:text-onedark-red">
-            {errors.instructions_raw}
-          </p>
+          <p className="text-sm text-red-500 dark:text-onedark-red">{errors.instructions_raw}</p>
         )}
+
+        <div className="space-y-4">
+          {instructionSections.map((section) => (
+            <div
+              key={section.id}
+              className="bg-gray-50 dark:bg-onedark-bg rounded-lg p-4 space-y-3"
+            >
+              {/* Section Header */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={section.title}
+                  onChange={(e) => {
+                    const updated = instructionSections.map((s) =>
+                      s.id === section.id ? { ...s, title: e.target.value } : s
+                    );
+                    updateInstructionsFromSections(updated);
+                  }}
+                  placeholder="Section name (optional, e.g., For the Sauce)"
+                  className="flex-1 px-3 py-1.5 text-sm font-medium rounded border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
+                />
+                {instructionSections.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateInstructionsFromSections(
+                        instructionSections.filter((s) => s.id !== section.id)
+                      );
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-onedark-red transition-colors"
+                    title="Remove section"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Instructions Content */}
+              <textarea
+                value={section.content}
+                onChange={(e) => {
+                  const updated = instructionSections.map((s) =>
+                    s.id === section.id ? { ...s, content: e.target.value } : s
+                  );
+                  updateInstructionsFromSections(updated);
+                  if (errors.instructions_raw) {
+                    setErrors((prev) => ({ ...prev, instructions_raw: undefined }));
+                  }
+                }}
+                rows={4}
+                placeholder="Enter instructions, one step per line..."
+                className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Time and Servings Row */}
@@ -449,7 +663,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           onChange={handleChange}
           rows={3}
           placeholder="Any additional notes, tips, or variations..."
-          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none"
+          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
         />
       </div>
 
@@ -468,7 +682,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           value={formData.source_url}
           onChange={handleChange}
           placeholder="https://example.com/recipe"
-          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+          className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
         />
         <p className="mt-1 text-xs text-gray-500 dark:text-onedark-fg-muted">
           Link to the original recipe source

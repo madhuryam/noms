@@ -85,16 +85,24 @@ function cleanIngredientLine(line: string): string {
 /**
  * Format ingredients as raw text for storage and FTS
  * Cleans checkbox markers and list prefixes for cleaner storage
+ * Uses markdown section headers for groups
  */
 function formatIngredientsRaw(ingredients: ParsedIngredient[]): string {
-  return ingredients
-    .map((ing) => {
-      if (ing.isGroupHeader) return `\n${ing.name}:`;
+  const lines: string[] = [];
+
+  for (const ing of ingredients) {
+    if (ing.isGroupHeader) {
+      // Add section header with markdown format
+      lines.push('');
+      lines.push(`### ${ing.name}`);
+      lines.push('');
+    } else {
       // Clean the line to remove checkbox markers before storing
-      return cleanIngredientLine(ing.original);
-    })
-    .join('\n')
-    .trim();
+      lines.push(cleanIngredientLine(ing.original));
+    }
+  }
+
+  return lines.join('\n').trim();
 }
 
 /**
@@ -226,6 +234,52 @@ function cleanText(text: string | null): string | null {
     .trim();
 
   return cleaned || null;
+}
+
+/**
+ * Normalize instructions to use numbered steps, restarting at 1 for each section
+ */
+function normalizeInstructions(text: string | null): string | null {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let stepNumber = 1;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Section headers restart numbering (### Header, **Bold:** or **Bold**)
+    if (
+      trimmed.startsWith('###') ||
+      trimmed.startsWith('## ') ||
+      (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':')))
+    ) {
+      stepNumber = 1;
+      result.push('');
+      result.push(trimmed);
+      result.push('');
+      continue;
+    }
+
+    // Empty lines - preserve but don't number
+    if (!trimmed) {
+      continue;
+    }
+
+    // Convert bullets or existing numbers to sequential numbers
+    let stepText = trimmed;
+    // Remove leading bullet, dash, asterisk, or existing number
+    stepText = stepText.replace(/^[-*•]\s*/, '');
+    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+
+    if (stepText) {
+      result.push(`${stepNumber}. ${stepText}`);
+      stepNumber++;
+    }
+  }
+
+  return result.join('\n').trim() || null;
 }
 
 /**
@@ -406,7 +460,8 @@ importRoutes.post('/vault', async (c) => {
 
       // Clean text fields (remove images and URLs)
       const cleanedDescription = cleanText(recipe.description);
-      const cleanedInstructions = cleanText(recipe.instructions);
+      // Clean and normalize instructions to numbered steps with section support
+      const cleanedInstructions = normalizeInstructions(cleanText(recipe.instructions));
       const cleanedNotes = cleanText(recipe.notes);
 
       // Insert the recipe first to get the ID

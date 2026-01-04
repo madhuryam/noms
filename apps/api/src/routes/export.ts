@@ -169,6 +169,82 @@ function buildCategoryPath(categories: { name: string; path: string }[]): string
 }
 
 /**
+ * Format instructions with numbered steps, preserving section headers
+ */
+function formatInstructions(raw: string): string {
+  const lines = raw.split('\n');
+  const result: string[] = [];
+  let stepNumber = 1;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Preserve section headers (### For the Cake, **Frosting:**, etc.)
+    if (trimmed.startsWith('###') || trimmed.startsWith('**') || trimmed.startsWith('## ')) {
+      // Reset step number for each new section
+      stepNumber = 1;
+      result.push('');
+      result.push(trimmed);
+      result.push('');
+      continue;
+    }
+
+    // Skip empty lines
+    if (!trimmed) {
+      continue;
+    }
+
+    // Convert bullet points or existing numbers to numbered steps
+    let stepText = trimmed;
+    // Remove leading bullet, dash, asterisk, or existing number
+    stepText = stepText.replace(/^[-*•]\s*/, '');
+    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+
+    if (stepText) {
+      result.push(`${stepNumber}. ${stepText}`);
+      stepNumber++;
+    }
+  }
+
+  return result.join('\n').trim();
+}
+
+/**
+ * Format ingredients preserving section headers
+ */
+function formatIngredients(raw: string): string {
+  const lines = raw.split('\n');
+  const result: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Preserve section headers (### For the Cake, **Frosting:**, etc.)
+    if (trimmed.startsWith('###') || (trimmed.startsWith('**') && trimmed.endsWith('**')) || (trimmed.startsWith('**') && trimmed.endsWith(':'))) {
+      result.push('');
+      result.push(trimmed);
+      result.push('');
+      continue;
+    }
+
+    // Skip empty lines between items
+    if (!trimmed) {
+      continue;
+    }
+
+    // Ensure it's a bullet point
+    if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('•')) {
+      result.push(trimmed);
+    } else {
+      // Add bullet if missing
+      result.push(`- ${trimmed}`);
+    }
+  }
+
+  return result.join('\n').trim();
+}
+
+/**
  * Generate Obsidian-compatible markdown for a recipe
  */
 function generateRecipeMarkdown(recipe: ExportedRecipe): string {
@@ -268,14 +344,15 @@ function generateRecipeMarkdown(recipe: ExportedRecipe): string {
   lines.push('## Ingredients');
   lines.push('');
   if (recipe.ingredients_raw) {
-    lines.push(recipe.ingredients_raw);
+    lines.push(formatIngredients(recipe.ingredients_raw));
   } else if (recipe.ingredients.length > 0) {
     let currentGroup: string | null = null;
     for (const ing of recipe.ingredients) {
       if (ing.group_name !== currentGroup) {
         if (ing.group_name) {
           lines.push('');
-          lines.push(`**${ing.group_name}:**`);
+          lines.push(`### ${ing.group_name}`);
+          lines.push('');
         }
         currentGroup = ing.group_name;
       }
@@ -288,7 +365,7 @@ function generateRecipeMarkdown(recipe: ExportedRecipe): string {
   lines.push('## Instructions');
   lines.push('');
   if (recipe.instructions_raw) {
-    lines.push(recipe.instructions_raw);
+    lines.push(formatInstructions(recipe.instructions_raw));
     lines.push('');
   }
 
@@ -650,6 +727,9 @@ exportRoutes.post('/import', async (c) => {
       db.prepare('DELETE FROM categories'),
     ]);
 
+    // Helper to convert undefined to null (D1 doesn't accept undefined)
+    const n = <T>(value: T | undefined): T | null => value === undefined ? null : value;
+
     // Import categories (order by depth to ensure parents exist first)
     if (importData.categories?.length) {
       const sortedCategories = [...importData.categories].sort((a, b) => a.depth - b.depth);
@@ -658,7 +738,7 @@ exportRoutes.post('/import', async (c) => {
           .prepare(
             'INSERT INTO categories (id, name, slug, parent_id, path, depth, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
           )
-          .bind(cat.id, cat.name, cat.slug, cat.parent_id, cat.path, cat.depth, cat.sort_order)
+          .bind(cat.id, cat.name, cat.slug, n(cat.parent_id), n(cat.path), cat.depth, cat.sort_order)
           .run();
         stats.categories++;
       }
@@ -671,7 +751,7 @@ exportRoutes.post('/import', async (c) => {
           .prepare(
             'INSERT INTO tags (id, name, display_name, color, usage_count) VALUES (?, ?, ?, ?, ?)'
           )
-          .bind(tag.id, tag.name, tag.display_name, tag.color, tag.usage_count)
+          .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0)
           .run();
         stats.tags++;
       }
@@ -684,7 +764,7 @@ exportRoutes.post('/import', async (c) => {
           .prepare(
             'INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)'
           )
-          .bind(ing.id, ing.name, ing.name_plural, ing.normalized_name, ing.category)
+          .bind(ing.id, ing.name, n(ing.name_plural), ing.normalized_name, n(ing.category))
           .run();
         stats.ingredients++;
       }
@@ -706,23 +786,23 @@ exportRoutes.post('/import', async (c) => {
           .bind(
             recipe.id,
             recipe.title,
-            recipe.source_path,
-            recipe.source_url,
-            recipe.markdown_content,
-            recipe.description,
-            recipe.ingredients_raw,
-            recipe.instructions_raw,
-            recipe.notes,
-            recipe.prep_time_minutes,
-            recipe.cook_time_minutes,
-            recipe.servings,
-            recipe.servings_unit,
-            recipe.image_path,
-            recipe.created_at,
-            recipe.updated_at,
-            recipe.last_cooked_at,
-            recipe.last_accessed_at,
-            recipe.cook_count
+            n(recipe.source_path),
+            n(recipe.source_url),
+            n(recipe.markdown_content),
+            n(recipe.description),
+            n(recipe.ingredients_raw),
+            recipe.instructions_raw ? formatInstructions(recipe.instructions_raw) : null,
+            n(recipe.notes),
+            n(recipe.prep_time_minutes),
+            n(recipe.cook_time_minutes),
+            n(recipe.servings),
+            n(recipe.servings_unit),
+            n(recipe.image_path),
+            n(recipe.created_at),
+            n(recipe.updated_at),
+            n(recipe.last_cooked_at),
+            n(recipe.last_accessed_at),
+            recipe.cook_count ?? 0
           )
           .run();
         stats.recipes++;
@@ -731,7 +811,7 @@ exportRoutes.post('/import', async (c) => {
         for (const cat of recipe.categories || []) {
           await db
             .prepare('INSERT INTO recipe_categories (recipe_id, category_id, is_primary) VALUES (?, ?, ?)')
-            .bind(recipe.id, cat.id, cat.is_primary)
+            .bind(recipe.id, cat.id, cat.is_primary ?? 0)
             .run();
         }
 
@@ -747,7 +827,7 @@ exportRoutes.post('/import', async (c) => {
         for (const img of recipe.images || []) {
           await db
             .prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?, ?)')
-            .bind(img.id, recipe.id, img.path, img.alt, img.sort_order)
+            .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order ?? 0)
             .run();
         }
 
@@ -763,15 +843,15 @@ exportRoutes.post('/import', async (c) => {
             .bind(
               ing.id,
               recipe.id,
-              ing.ingredient_id,
-              ing.quantity,
-              ing.unit,
+              n(ing.ingredient_id),
+              n(ing.quantity),
+              n(ing.unit),
               ing.raw_text,
-              ing.preparation,
-              ing.notes,
-              ing.is_optional,
-              ing.group_name,
-              ing.sort_order
+              n(ing.preparation),
+              n(ing.notes),
+              ing.is_optional ?? 0,
+              n(ing.group_name),
+              ing.sort_order ?? 0
             )
             .run();
         }
@@ -784,7 +864,7 @@ exportRoutes.post('/import', async (c) => {
             .prepare(
               'INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_type, notes) VALUES (?, ?, ?, ?, ?)'
             )
-            .bind(pairing.id, recipe.id, pairing.paired_recipe_id, pairing.pairing_type, pairing.notes)
+            .bind(pairing.id, recipe.id, pairing.paired_recipe_id, pairing.pairing_type, n(pairing.notes))
             .run();
         }
       }
@@ -801,14 +881,14 @@ exportRoutes.post('/import', async (c) => {
           `)
           .bind(
             item.id,
-            item.ingredient_id,
+            n(item.ingredient_id),
             item.name,
             item.normalized_name,
-            item.quantity,
-            item.unit,
-            item.location,
-            item.expiration_date,
-            item.is_staple
+            n(item.quantity),
+            n(item.unit),
+            n(item.location),
+            n(item.expiration_date),
+            item.is_staple ?? 0
           )
           .run();
         stats.pantryItems++;
@@ -823,7 +903,7 @@ exportRoutes.post('/import', async (c) => {
           .prepare(
             'INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)'
           )
-          .bind(slot.id, slot.name, slot.display_name, slot.sort_order, slot.default_servings)
+          .bind(slot.id, slot.name, slot.display_name, slot.sort_order, slot.default_servings ?? 1)
           .run();
         stats.mealSlots++;
       }
@@ -836,7 +916,7 @@ exportRoutes.post('/import', async (c) => {
           .prepare(
             'INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)'
           )
-          .bind(plan.id, plan.name, plan.start_date, plan.end_date, plan.is_template, plan.created_at)
+          .bind(plan.id, n(plan.name), plan.start_date, plan.end_date, plan.is_template ?? 0, n(plan.created_at))
           .run();
         stats.mealPlans++;
       }
@@ -855,13 +935,13 @@ exportRoutes.post('/import', async (c) => {
           .bind(
             meal.id,
             meal.meal_plan_id,
-            meal.recipe_id,
-            meal.custom_title,
+            n(meal.recipe_id),
+            n(meal.custom_title),
             meal.meal_slot_id,
             meal.planned_date,
-            meal.scaling_factor,
-            meal.notes,
-            meal.is_completed
+            meal.scaling_factor ?? 1,
+            n(meal.notes),
+            meal.is_completed ?? 0
           )
           .run();
         stats.plannedMeals++;
@@ -873,7 +953,7 @@ exportRoutes.post('/import', async (c) => {
       for (const group of importData.foodAssociationGroups) {
         await db
           .prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
-          .bind(group.id, group.name, group.created_at)
+          .bind(group.id, group.name, n(group.created_at))
           .run();
         stats.foodGroups++;
       }
@@ -884,7 +964,7 @@ exportRoutes.post('/import', async (c) => {
       for (const term of importData.foodAssociationTerms) {
         await db
           .prepare('INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)')
-          .bind(term.id, term.group_id, term.term, term.created_at)
+          .bind(term.id, term.group_id, term.term, n(term.created_at))
           .run();
         stats.foodTerms++;
       }
@@ -900,10 +980,10 @@ exportRoutes.post('/import', async (c) => {
           .bind(
             entry.id,
             entry.ingredient_name,
-            entry.fridge_days,
-            entry.freezer_days,
-            entry.created_at,
-            entry.updated_at
+            n(entry.fridge_days),
+            n(entry.freezer_days),
+            n(entry.created_at),
+            n(entry.updated_at)
           )
           .run();
         stats.shelfLife++;

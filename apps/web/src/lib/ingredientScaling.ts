@@ -40,19 +40,29 @@ interface ParsedIngredient {
   shouldScale: boolean;
 }
 
-interface ScaledIngredient {
+export interface ScaledIngredient {
   display: string;
   original: string;
   wasScaled: boolean;
   isGroupHeader: boolean;
 }
 
-// Detect if a line is a group/section header (e.g., "GARLIC HERB SAUCE", "TOPPINGS optional", "For the sauce:")
+// Detect if a line is a group/section header (e.g., "### For the Cake", "GARLIC HERB SAUCE", "For the sauce:")
 function isGroupHeader(line: string): boolean {
   const trimmed = line.trim();
 
   // Empty lines are not headers
   if (!trimmed) return false;
+
+  // Markdown header style: ### Header or ## Header
+  if (trimmed.startsWith('###') || trimmed.startsWith('## ')) {
+    return true;
+  }
+
+  // Bold style: **Header** or **Header:**
+  if (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':'))) {
+    return true;
+  }
 
   // Lines ending with colon are headers (e.g., "For the sauce:")
   if (trimmed.endsWith(':')) return true;
@@ -77,6 +87,18 @@ function isGroupHeader(line: string): boolean {
   }
 
   return false;
+}
+
+// Extract clean section title from header line
+function extractHeaderTitle(line: string): string {
+  let title = line.trim();
+  // Remove ### prefix
+  title = title.replace(/^#{2,}\s*/, '');
+  // Remove ** wrapper
+  title = title.replace(/^\*\*/, '').replace(/\*\*:?$/, '');
+  // Remove trailing colon
+  title = title.replace(/:$/, '');
+  return title.trim();
 }
 
 // Parse a fraction string like "1/2" to a number
@@ -271,11 +293,8 @@ function formatAmount(num: number): string {
 export function scaleIngredient(line: string, scaleFactor: number): ScaledIngredient {
   // Check if this is a group header first
   if (isGroupHeader(line)) {
-    // Clean up the header (remove trailing colon for display if present)
-    let display = line.trim();
-    if (display.endsWith(':')) {
-      display = display.slice(0, -1).trim();
-    }
+    // Clean up the header (remove markdown formatting, trailing colon, etc.)
+    const display = extractHeaderTitle(line);
     return { display, original: line, wasScaled: false, isGroupHeader: true };
   }
 

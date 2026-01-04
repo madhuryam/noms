@@ -5,6 +5,52 @@ type Bindings = {
   IMAGES_BUCKET: R2Bucket;
 };
 
+/**
+ * Normalize instructions to use numbered steps, restarting at 1 for each section
+ */
+function normalizeInstructions(text: string | null): string | null {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let stepNumber = 1;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Section headers restart numbering (### Header, **Bold:** or **Bold**)
+    if (
+      trimmed.startsWith('###') ||
+      trimmed.startsWith('## ') ||
+      (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':')))
+    ) {
+      stepNumber = 1;
+      result.push('');
+      result.push(trimmed);
+      result.push('');
+      continue;
+    }
+
+    // Empty lines - skip
+    if (!trimmed) {
+      continue;
+    }
+
+    // Convert bullets or existing numbers to sequential numbers
+    let stepText = trimmed;
+    // Remove leading bullet, dash, asterisk, or existing number
+    stepText = stepText.replace(/^[-*•]\s*/, '');
+    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+
+    if (stepText) {
+      result.push(`${stepNumber}. ${stepText}`);
+      stepNumber++;
+    }
+  }
+
+  return result.join('\n').trim() || null;
+}
+
 const recipes = new Hono<{ Bindings: Bindings }>();
 
 // GET /api/recipes - List all recipes with pagination and tag filtering
@@ -730,7 +776,7 @@ recipes.post('/', async (c) => {
         markdown_content ?? null,
         description ?? null,
         ingredients_raw ?? null,
-        instructions_raw ?? null,
+        normalizeInstructions(instructions_raw),
         servings ?? null,
         servings_unit ?? 'servings',
         prep_time_minutes ?? null,
@@ -791,7 +837,12 @@ recipes.put('/:id', async (c) => {
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updates.push(`${field} = ?`);
-        values.push(body[field]);
+        // Normalize instructions when saving
+        if (field === 'instructions_raw') {
+          values.push(normalizeInstructions(body[field]));
+        } else {
+          values.push(body[field]);
+        }
       }
     }
 

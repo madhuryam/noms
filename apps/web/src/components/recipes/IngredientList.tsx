@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../../lib/recipeProgress';
-import { scaleIngredients } from '../../lib/ingredientScaling';
+import { scaleIngredients, type ScaledIngredient } from '../../lib/ingredientScaling';
 
 interface IngredientListProps {
   recipeId: number;
@@ -8,6 +8,36 @@ interface IngredientListProps {
   scaleFactor?: number;
   onProgressChange?: (checked: Set<number>) => void;
   checkedItems: Set<number>;
+}
+
+interface IngredientSection {
+  title: string | null;
+  items: { ingredient: ScaledIngredient; originalIndex: number }[];
+}
+
+function groupIntoSections(ingredients: ScaledIngredient[]): IngredientSection[] {
+  const sections: IngredientSection[] = [];
+  let currentSection: IngredientSection = { title: null, items: [] };
+
+  ingredients.forEach((ingredient, index) => {
+    if (ingredient.isGroupHeader) {
+      // Save current section if it has items
+      if (currentSection.items.length > 0 || currentSection.title) {
+        sections.push(currentSection);
+      }
+      // Start new section
+      currentSection = { title: ingredient.display, items: [] };
+    } else {
+      currentSection.items.push({ ingredient, originalIndex: index });
+    }
+  });
+
+  // Don't forget the last section
+  if (currentSection.items.length > 0 || currentSection.title) {
+    sections.push(currentSection);
+  }
+
+  return sections;
 }
 
 export function IngredientList({
@@ -26,6 +56,8 @@ export function IngredientList({
       return [];
     }
   }, [ingredientsRaw, scaleFactor]);
+
+  const sections = useMemo(() => groupIntoSections(ingredients), [ingredients]);
 
   const toggleItem = useCallback(
     (index: number) => {
@@ -48,6 +80,9 @@ export function IngredientList({
   const nonHeaderIngredients = ingredients.filter(ing => !ing.isGroupHeader);
   const checkedCount = checkedItems.size;
   const totalCount = nonHeaderIngredients.length;
+
+  // Check if there are actual sections (more than one, or first one has a title)
+  const hasSections = sections.length > 1 || sections[0]?.title;
 
   if (ingredients.length === 0) {
     return (
@@ -87,69 +122,72 @@ export function IngredientList({
         <p className="text-sm text-blue-600 dark:text-onedark-blue">Scaled to {scaleFactor}x</p>
       )}
 
-      {/* Ingredient List */}
-      <ul className="space-y-3">
-        {ingredients.map((ingredient, index) => {
-          // Render group headers as section titles
-          if (ingredient.isGroupHeader) {
-            return (
-              <li key={`${recipeId}-ingredient-${index}`} className="pt-4 first:pt-0">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-onedark-fg uppercase tracking-wide">
-                  {ingredient.display}
-                </h3>
-              </li>
-            );
-          }
-
-          const isChecked = checkedItems.has(index);
-          return (
-            <li key={`${recipeId}-ingredient-${index}`}>
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <button
-                  type="button"
-                  onClick={() => toggleItem(index)}
-                  aria-pressed={isChecked}
-                  aria-label={
-                    isChecked ? `Uncheck ${ingredient.original}` : `Check ${ingredient.original}`
-                  }
-                  className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                    isChecked
-                      ? 'bg-green-500 dark:bg-onedark-green text-white'
-                      : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-400 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
-                  }`}
-                >
-                  {isChecked ? (
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2.5}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <span className="w-2 h-2 rounded-full bg-current" />
-                  )}
-                </button>
-                <span
-                  className={`pt-0.5 transition-all ${
-                    isChecked
-                      ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
-                      : 'text-gray-700 dark:text-onedark-fg group-hover:text-gray-900 dark:group-hover:text-onedark-fg'
-                  }`}
-                >
-                  {ingredient.display}
-                </span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+      {/* Sections */}
+      <div className="space-y-4">
+        {sections.map((section, sectionIndex) => (
+          <div
+            key={`${recipeId}-section-${sectionIndex}`}
+            className={hasSections ? 'bg-gray-50 dark:bg-onedark-bg rounded-lg p-4' : ''}
+          >
+            {section.title && (
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-onedark-fg uppercase tracking-wide mb-3">
+                {section.title}
+              </h3>
+            )}
+            <ul className="space-y-3">
+              {section.items.map(({ ingredient, originalIndex }) => {
+                const isChecked = checkedItems.has(originalIndex);
+                return (
+                  <li key={`${recipeId}-ingredient-${originalIndex}`}>
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <button
+                        type="button"
+                        onClick={() => toggleItem(originalIndex)}
+                        aria-pressed={isChecked}
+                        aria-label={
+                          isChecked ? `Uncheck ${ingredient.original}` : `Check ${ingredient.original}`
+                        }
+                        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                          isChecked
+                            ? 'bg-green-500 dark:bg-onedark-green text-white'
+                            : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-400 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
+                        }`}
+                      >
+                        {isChecked ? (
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-current" />
+                        )}
+                      </button>
+                      <span
+                        className={`pt-0.5 transition-all ${
+                          isChecked
+                            ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
+                            : 'text-gray-700 dark:text-onedark-fg group-hover:text-gray-900 dark:group-hover:text-onedark-fg'
+                        }`}
+                      >
+                        {ingredient.display}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
