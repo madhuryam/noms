@@ -24,6 +24,7 @@ function getExpirationStatus(expirationDate: string | null): 'ok' | 'soon' | 'ex
 export function PantryItemRow({ item }: PantryItemRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [name, setName] = useState(item.name);
   const [quantity, setQuantity] = useState(item.quantity?.toString() ?? '');
   const [unit, setUnit] = useState(item.unit ?? '');
   const [expirationDate, setExpirationDate] = useState(item.expiration_date ?? '');
@@ -34,8 +35,12 @@ export function PantryItemRow({ item }: PantryItemRowProps) {
   const expirationStatus = getExpirationStatus(item.expiration_date);
 
   const handleSave = async () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
     await updateItem.mutateAsync({
       id: item.id,
+      name: trimmedName !== item.name ? trimmedName : undefined,
       quantity: quantity ? parseFloat(quantity) : null,
       unit: unit || null,
       expiration_date: expirationDate || null,
@@ -87,45 +92,72 @@ export function PantryItemRow({ item }: PantryItemRowProps) {
     );
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+    }
+  };
+
   if (isEditing) {
     return (
-      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-onedark-bg rounded-lg">
-        <span className="font-medium text-gray-900 dark:text-onedark-fg flex-shrink-0">
-          {item.name}
-        </span>
-        <input
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          placeholder="Qty"
-          step="any"
-          className="w-20 px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
-        />
-        <input
-          type="text"
-          value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          placeholder="Unit"
-          className="w-20 px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
-        />
-        <input
-          type="date"
-          value={expirationDate}
-          onChange={(e) => setExpirationDate(e.target.value)}
-          placeholder="Expires"
-          title="Expiration date (optional)"
-          className="px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
-        />
-        <div className="flex gap-2 ml-auto">
+      <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-onedark-bg rounded-lg w-full">
+        {/* Inputs and buttons */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Name"
+            className="flex-1 min-w-0 px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm font-medium text-gray-900 dark:text-onedark-fg"
+            autoFocus
+          />
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Qty"
+            step="any"
+            className="w-20 px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
+          />
+          <input
+            type="text"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Unit"
+            className="w-20 px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
+          />
+          <input
+            type="date"
+            value={expirationDate}
+            onChange={(e) => setExpirationDate(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Expires"
+            title="Expiration date (optional)"
+            className="px-2 py-1 border border-gray-300 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={handleSave}
-            disabled={updateItem.isPending}
+            disabled={updateItem.isPending || !name.trim()}
             className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
           >
             Save
           </button>
           <button
-            onClick={() => setIsEditing(false)}
+            onClick={() => {
+              setName(item.name);
+              setQuantity(item.quantity?.toString() ?? '');
+              setUnit(item.unit ?? '');
+              setExpirationDate(item.expiration_date ?? '');
+              setIsEditing(false);
+            }}
             className="px-3 py-1 bg-gray-200 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg text-sm rounded hover:bg-gray-300 dark:hover:bg-onedark-bg"
           >
             Cancel

@@ -519,4 +519,230 @@ mealPlans.delete('/:id/meals/:mealId', async (c) => {
   }
 });
 
+// Helper to parse ingredient line for shopping list
+function parseIngredientLine(line: string): { name: string; quantity: number | null; unit: string | null } | null {
+  const trimmed = line.trim()
+    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
+    .replace(/^[-*]\s+/, '')
+    .trim();
+
+  if (!trimmed) return null;
+
+  // Skip group headers (all caps or ending with colon)
+  if (trimmed.endsWith(':')) return null;
+  const words = trimmed.split(/\s+/);
+  const upperWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+  if (upperWords.length >= 1 && upperWords.length === words.filter(w => /[A-Z]/i.test(w)).length) {
+    return null;
+  }
+
+  // Try to parse quantity at start
+  const fractionMap: Record<string, number> = {
+    '½': 0.5, '⅓': 1/3, '⅔': 2/3, '¼': 0.25, '¾': 0.75,
+    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
+  };
+
+  const amountPattern = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅛⅜⅝⅞]?|[½⅓⅔¼¾⅛⅜⅝⅞])\s*/;
+  const amountMatch = trimmed.match(amountPattern);
+
+  let quantity: number | null = null;
+  let rest = trimmed;
+
+  if (amountMatch) {
+    const amountStr = amountMatch[1].trim();
+    rest = trimmed.slice(amountMatch[0].length).trim();
+
+    // Parse amount
+    for (const [frac, value] of Object.entries(fractionMap)) {
+      if (amountStr.includes(frac)) {
+        const parts = amountStr.split(frac);
+        const whole = parts[0].trim();
+        quantity = whole ? parseInt(whole, 10) + value : value;
+        break;
+      }
+    }
+    if (quantity === null) {
+      const mixedMatch = amountStr.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+      if (mixedMatch) {
+        quantity = parseInt(mixedMatch[1]) + parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]);
+      } else if (/^\d+\/\d+$/.test(amountStr)) {
+        const [num, den] = amountStr.split('/').map(Number);
+        quantity = num / den;
+      } else {
+        quantity = parseFloat(amountStr) || null;
+      }
+    }
+  }
+
+  // Try to extract unit
+  const unitPattern = /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kg\.?|ml\.?|liters?|l\.?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|sticks?|large|medium|small|whole)\s+/i;
+  const unitMatch = rest.match(unitPattern);
+
+  let unit: string | null = null;
+  let name = rest;
+
+  if (unitMatch) {
+    unit = unitMatch[1].toLowerCase();
+    name = rest.slice(unitMatch[0].length).trim();
+  }
+
+  // Clean up name - remove trailing commas, parenthetical notes
+  name = name.replace(/,.*$/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+  if (!name) return null;
+
+  return { name, quantity, unit };
+}
+
+// GET /api/meal-plans/:id/shopping-list - Generate shopping list for a meal plan
+mealPlans.get('/:id/shopping-list', async (c) => {
+  const id = parseInt(c.req.param('id'));
+
+  if (isNaN(id)) {
+    return c.json({ error: 'Invalid meal plan ID' }, 400);
+  }
+
+  // Get optional date filters from query params
+  const startDateFilter = c.req.query('startDate');
+  const endDateFilter = c.req.query('endDate');
+
+  try {
+    // Verify plan exists
+    const plan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ?')
+      .bind(id)
+      .first<MealPlan>();
+
+    if (!plan) {
+      return c.json({ error: 'Meal plan not found' }, 404);
+    }
+
+    // Use query params for date range, or fall back to plan dates
+    const startDate = startDateFilter || plan.start_date;
+    const endDate = endDateFilter || plan.end_date;
+
+    // Get all planned meals with their recipes' ingredients_raw
+    const mealsResult = await c.env.DB.prepare(`
+      SELECT
+        pm.recipe_id,
+        pm.scaling_factor,
+        pm.planned_date,
+        r.title as recipe_title,
+        r.ingredients_raw
+      FROM planned_meals pm
+      JOIN recipes r ON pm.recipe_id = r.id
+      WHERE pm.meal_plan_id = ?
+        AND pm.planned_date >= ?
+        AND pm.planned_date <= ?
+      ORDER BY pm.planned_date
+    `)
+      .bind(id, startDate, endDate)
+      .all();
+
+    // Get pantry items for comparison
+    const pantryResult = await c.env.DB.prepare(`
+      SELECT normalized_name, quantity, unit
+      FROM pantry_items
+    `).all();
+
+    const pantryItems = new Set<string>();
+    for (const item of pantryResult.results ?? []) {
+      const pi = item as { normalized_name: string };
+      pantryItems.add(pi.normalized_name.toLowerCase());
+    }
+
+    // Group and aggregate ingredients
+    interface AggregatedItem {
+      name: string;
+      normalizedName: string;
+      category: string;
+      totalQuantity: number | null;
+      unit: string | null;
+      inPantry: boolean;
+      recipes: Array<{
+        recipeId: number;
+        recipeTitle: string;
+        quantity: number | null;
+        scaledQuantity: number | null;
+        plannedDate: string;
+      }>;
+    }
+
+    const grouped = new Map<string, AggregatedItem>();
+
+    for (const row of mealsResult.results ?? []) {
+      const meal = row as {
+        recipe_id: number;
+        scaling_factor: number;
+        planned_date: string;
+        recipe_title: string;
+        ingredients_raw: string | null;
+      };
+
+      if (!meal.ingredients_raw) continue;
+
+      // Parse each ingredient line
+      const lines = meal.ingredients_raw.split('\n');
+      for (const line of lines) {
+        const parsed = parseIngredientLine(line);
+        if (!parsed) continue;
+
+        const key = parsed.name.toLowerCase();
+        const scaledQty = parsed.quantity != null ? parsed.quantity * meal.scaling_factor : null;
+
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            name: parsed.name,
+            normalizedName: key,
+            category: 'Other', // Could be enhanced with ingredient category lookup
+            totalQuantity: scaledQty,
+            unit: parsed.unit,
+            inPantry: pantryItems.has(key),
+            recipes: [],
+          });
+        } else {
+          const existing = grouped.get(key)!;
+          // Only sum quantities if units match and both have quantities
+          if (scaledQty != null && existing.totalQuantity != null && existing.unit === parsed.unit) {
+            existing.totalQuantity += scaledQty;
+          } else if (scaledQty != null && existing.totalQuantity == null) {
+            existing.totalQuantity = scaledQty;
+            existing.unit = parsed.unit;
+          }
+        }
+
+        // Add recipe reference
+        grouped.get(key)!.recipes.push({
+          recipeId: meal.recipe_id,
+          recipeTitle: meal.recipe_title,
+          quantity: parsed.quantity,
+          scaledQuantity: scaledQty,
+          plannedDate: meal.planned_date,
+        });
+      }
+    }
+
+    // Convert to array and sort alphabetically
+    const items = Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    // For now, put all items in a single "Shopping List" category
+    // (could be enhanced with ingredient category detection later)
+    const sortedCategories = items.length > 0 ? [{ category: 'Shopping List', items }] : [];
+
+    return c.json({
+      planId: id,
+      planName: plan.name,
+      startDate,
+      endDate,
+      categories: sortedCategories,
+      totalItems: items.length,
+      itemsInPantry: items.filter((i) => i.inPantry).length,
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to generate shopping list' },
+      500
+    );
+  }
+});
+
 export default mealPlans;

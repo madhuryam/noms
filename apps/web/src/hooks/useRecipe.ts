@@ -79,6 +79,8 @@ export function useUpdateRecipe(id: number) {
     onSuccess: (updatedRecipe) => {
       queryClient.setQueryData(['recipe', id], updatedRecipe);
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      // Invalidate recipe match data since ingredients may have changed
+      queryClient.invalidateQueries({ queryKey: ['recipe-match', id] });
     },
   });
 }

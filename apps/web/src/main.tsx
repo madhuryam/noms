@@ -15,6 +15,7 @@ import {
   CategoriesPage,
   TagsPage,
   MealPlansPage,
+  ShoppingListPage,
   PantryPage,
   ImportPage,
   SearchPage,
@@ -76,6 +77,7 @@ function AppWithDnd() {
           <Route path="/categories/:id" element={<CategoriesPage />} />
           <Route path="/tags" element={<TagsPage />} />
           <Route path="/meal-plans" element={<MealPlansPage />} />
+          <Route path="/meal-plans/:id/shopping-list" element={<ShoppingListPage />} />
           <Route path="/pantry" element={<PantryPage />} />
           <Route path="/inventory" element={<PantryPage />} />
           <Route path="/what-can-i-make" element={<WhatCanIMakePage />} />

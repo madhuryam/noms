@@ -9,11 +9,11 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core';
 
-export type DragItemType = 'recipe' | 'category';
+export type DragItemType = 'recipe' | 'category' | 'shopping-item';
 
 export interface DragItem {
   type: DragItemType;
-  id: number;
+  id: number | string;
   data: {
     title: string;
     imageUrl?: string | null;

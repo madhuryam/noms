@@ -44,8 +44,10 @@ export function IngredientList({
     onProgressChange?.(new Set());
   }, [onProgressChange]);
 
+  // Count only non-header items
+  const nonHeaderIngredients = ingredients.filter(ing => !ing.isGroupHeader);
   const checkedCount = checkedItems.size;
-  const totalCount = ingredients.length;
+  const totalCount = nonHeaderIngredients.length;
 
   if (ingredients.length === 0) {
     return (
@@ -88,6 +90,17 @@ export function IngredientList({
       {/* Ingredient List */}
       <ul className="space-y-3">
         {ingredients.map((ingredient, index) => {
+          // Render group headers as section titles
+          if (ingredient.isGroupHeader) {
+            return (
+              <li key={`${recipeId}-ingredient-${index}`} className="pt-4 first:pt-0">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-onedark-fg uppercase tracking-wide">
+                  {ingredient.display}
+                </h3>
+              </li>
+            );
+          }
+
           const isChecked = checkedItems.has(index);
           return (
             <li key={`${recipeId}-ingredient-${index}`}>

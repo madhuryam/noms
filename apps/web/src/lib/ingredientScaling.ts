@@ -44,6 +44,39 @@ interface ScaledIngredient {
   display: string;
   original: string;
   wasScaled: boolean;
+  isGroupHeader: boolean;
+}
+
+// Detect if a line is a group/section header (e.g., "GARLIC HERB SAUCE", "TOPPINGS optional", "For the sauce:")
+function isGroupHeader(line: string): boolean {
+  const trimmed = line.trim();
+
+  // Empty lines are not headers
+  if (!trimmed) return false;
+
+  // Lines ending with colon are headers (e.g., "For the sauce:")
+  if (trimmed.endsWith(':')) return true;
+
+  // Check if line is predominantly uppercase (section headers like "GARLIC HERB SAUCE")
+  // Allow some lowercase words like "optional", "for the"
+  const words = trimmed.split(/\s+/);
+  const upperWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+
+  // If all words with letters are uppercase, it's a header
+  if (upperWords.length >= 1 && upperWords.length === words.filter(w => /[A-Z]/i.test(w)).length) {
+    return true;
+  }
+
+  // If first word is all caps and line has no numbers (no quantity), likely a header
+  // e.g., "TOPPINGS optional" or "SAUCE"
+  if (words.length > 0 && words[0] === words[0].toUpperCase() && /[A-Z]/.test(words[0]) && !/\d/.test(trimmed)) {
+    // Must have at least 2 uppercase letters to avoid matching single letters
+    if (words[0].replace(/[^A-Z]/g, '').length >= 2) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // Parse a fraction string like "1/2" to a number
@@ -236,10 +269,20 @@ function formatAmount(num: number): string {
 
 // Scale an ingredient and return the display string
 export function scaleIngredient(line: string, scaleFactor: number): ScaledIngredient {
+  // Check if this is a group header first
+  if (isGroupHeader(line)) {
+    // Clean up the header (remove trailing colon for display if present)
+    let display = line.trim();
+    if (display.endsWith(':')) {
+      display = display.slice(0, -1).trim();
+    }
+    return { display, original: line, wasScaled: false, isGroupHeader: true };
+  }
+
   const parsed = parseIngredient(line);
 
   if (!parsed.shouldScale || parsed.amount === null || scaleFactor === 1) {
-    return { display: parsed.original, original: parsed.original, wasScaled: false };
+    return { display: parsed.original, original: parsed.original, wasScaled: false, isGroupHeader: false };
   }
 
   const scaledAmount = parsed.amount * scaleFactor;
@@ -254,7 +297,7 @@ export function scaleIngredient(line: string, scaleFactor: number): ScaledIngred
     display += ` ${parsed.ingredient}`;
   }
 
-  return { display: display.trim(), original: parsed.original, wasScaled: true };
+  return { display: display.trim(), original: parsed.original, wasScaled: true, isGroupHeader: false };
 }
 
 function stripCheckbox(line: string): string {

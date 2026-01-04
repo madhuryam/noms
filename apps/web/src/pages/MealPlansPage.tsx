@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   useMealSlots,
   useMealPlan,
@@ -9,9 +9,20 @@ import {
   useDeletePlannedMeal,
   getWeekDates,
   formatDateKey,
+  useShoppingList,
+  useCheckedItems,
+  useQuantityOverrides,
+  useDeletedItems,
+  useCustomCategories,
+  useItemCategories,
+  useItemOrder,
+  usePantryOverrides,
+  exportAsText,
+  exportAsMarkdown,
   type PlannedMeal,
 } from '../hooks';
 import { WeekCalendar, AddMealModal, MealPlanControls, type MealSelection } from '../components/meal-plans';
+import { ShoppingList } from '../components/shopping-list';
 
 // Get the start of the week (Monday) for a given date
 function getWeekStart(date: Date): Date {
@@ -25,6 +36,9 @@ function getWeekStart(date: Date): Date {
 }
 
 export function MealPlansPage() {
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'calendar' | 'shopping'>('calendar');
+
   // Current week state
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
@@ -68,6 +82,26 @@ export function MealPlansPage() {
   const addMeal = useAddPlannedMeal();
   const updateMeal = useUpdatePlannedMeal();
   const deleteMeal = useDeletePlannedMeal();
+
+  // Shopping list hooks
+  const { data: shoppingData, isLoading: isShoppingLoading } = useShoppingList(
+    activePlanId ?? undefined,
+    startDateKey,
+    endDateKey
+  );
+  const { checkedItems, toggleItem, clearAll: clearAllChecked, checkAll, checkedCount } =
+    useCheckedItems(activePlanId ?? undefined);
+  const { overrides, setOverride, clearOverride } = useQuantityOverrides(activePlanId ?? undefined);
+  const { deletedItems, deleteItem, restoreItem } = useDeletedItems(activePlanId ?? undefined);
+  const { categories: customCategories, addCategory, updateCategory, deleteCategory } =
+    useCustomCategories(activePlanId ?? undefined);
+  const { itemCategories, assignItem, assignItems } = useItemCategories(activePlanId ?? undefined);
+  const { itemOrder, reorderItems } = useItemOrder(activePlanId ?? undefined);
+  const { togglePantryStatus, getEffectivePantryStatus } = usePantryOverrides(activePlanId ?? undefined);
+
+  // Shopping list UI state
+  const [hidePantry, setHidePantry] = useState(true);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Navigation handlers
   const handlePreviousWeek = useCallback(() => {
@@ -156,6 +190,26 @@ export function MealPlansPage() {
     }
   };
 
+  // Clear all meals for the current week
+  const handleClearWeek = async () => {
+    if (!activePlanId || weekMeals.length === 0) return;
+
+    if (!confirm(`Are you sure you want to remove all ${weekMeals.length} meals from this week?`)) {
+      return;
+    }
+
+    for (const meal of weekMeals) {
+      try {
+        await deleteMeal.mutateAsync({
+          planId: activePlanId,
+          mealId: meal.id,
+        });
+      } catch (error) {
+        console.error('Failed to remove meal:', error);
+      }
+    }
+  };
+
   // Toggle meal completion
   const handleToggleComplete = async (meal: PlannedMeal) => {
     if (!activePlanId) return;
@@ -197,6 +251,24 @@ export function MealPlansPage() {
 
   const isLoading = isPlansLoading || isPlanLoading || createPlan.isPending;
 
+  // Export handlers for shopping list
+  const handleExport = (format: 'text' | 'markdown') => {
+    if (!shoppingData) return;
+    const content =
+      format === 'text'
+        ? exportAsText(shoppingData.categories, checkedItems, hidePantry)
+        : exportAsMarkdown(shoppingData.categories, checkedItems, hidePantry);
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shopping-list.${format === 'text' ? 'txt' : 'md'}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -206,40 +278,176 @@ export function MealPlansPage() {
         onPreviousWeek={handlePreviousWeek}
         onNextWeek={handleNextWeek}
         onToday={handleToday}
+        onClearPlan={handleClearWeek}
+        planId={activePlanId}
         planName={planData?.name}
         isLoading={isLoading}
+        mealCount={weekMeals.length}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        shoppingItemCount={shoppingData ? shoppingData.totalItems - checkedCount : 0}
       />
 
-      {/* Calendar or Empty State */}
-      {slots.length === 0 && isPlansLoading ? (
-        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
-          <p className="text-gray-500 dark:text-onedark-fg-muted mt-4">Loading...</p>
-        </div>
+      {/* Tab content */}
+      {activeTab === 'calendar' ? (
+        <>
+          {/* Calendar or Empty State */}
+          {slots.length === 0 && isPlansLoading ? (
+            <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
+              <p className="text-gray-500 dark:text-onedark-fg-muted mt-4">Loading...</p>
+            </div>
+          ) : (
+            <>
+              <WeekCalendar
+                weekDates={weekDates}
+                slots={slots}
+                meals={weekMeals}
+                onAddMeal={handleAddMeal}
+                onRemoveMeal={handleRemoveMeal}
+                onToggleComplete={handleToggleComplete}
+                onMoveMeal={handleMoveMeal}
+              />
+
+              {/* Quick stats */}
+              {weekMeals.length > 0 && (
+                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-onedark-fg-muted">
+                  <span>
+                    {weekMeals.length} meal{weekMeals.length !== 1 ? 's' : ''} planned
+                  </span>
+                  <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
+                  <span>
+                    {weekMeals.filter((m) => m.is_completed).length} completed
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </>
       ) : (
         <>
-          <WeekCalendar
-            weekDates={weekDates}
-            slots={slots}
-            meals={weekMeals}
-            onAddMeal={handleAddMeal}
-            onRemoveMeal={handleRemoveMeal}
-            onToggleComplete={handleToggleComplete}
-            onMoveMeal={handleMoveMeal}
-          />
+          {/* Shopping list controls */}
+          {shoppingData && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight p-4">
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Progress */}
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-2 bg-gray-200 dark:bg-onedark-bg-highlight rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 transition-all"
+                      style={{
+                        width: `${shoppingData.totalItems > 0 ? (checkedCount / shoppingData.totalItems) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-sm text-gray-500 dark:text-onedark-fg-muted">
+                    {checkedCount}/{shoppingData.totalItems}
+                  </span>
+                </div>
 
-          {/* Quick stats */}
-          {weekMeals.length > 0 && (
-            <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-onedark-fg-muted">
-              <span>
-                {weekMeals.length} meal{weekMeals.length !== 1 ? 's' : ''} planned
-              </span>
-              <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
-              <span>
-                {weekMeals.filter((m) => m.is_completed).length} completed
-              </span>
+                {/* Clear/Check all buttons */}
+                {checkedCount > 0 ? (
+                  <button
+                    onClick={clearAllChecked}
+                    className="text-sm text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg"
+                  >
+                    Clear all
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const allItems = shoppingData.categories.flatMap((c) => c.items);
+                      checkAll(allItems);
+                    }}
+                    className="text-sm text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg"
+                  >
+                    Check all
+                  </button>
+                )}
+
+                {/* Export dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="text-sm text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg"
+                  >
+                    Export
+                  </button>
+                  {showExportMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                      <div className="absolute left-0 mt-1 w-40 bg-white dark:bg-onedark-bg-lighter rounded-lg shadow-lg border border-gray-200 dark:border-onedark-bg-highlight py-1 z-20">
+                        <button
+                          onClick={() => handleExport('text')}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-onedark-fg hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight"
+                        >
+                          Export as Text
+                        </button>
+                        <button
+                          onClick={() => handleExport('markdown')}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-onedark-fg hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight"
+                        >
+                          Export as Markdown
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Hide pantry toggle */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hidePantry}
+                  onChange={() => setHidePantry(!hidePantry)}
+                  className="w-4 h-4 rounded border-gray-300 dark:border-onedark-bg-highlight text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600 dark:text-onedark-fg-muted">
+                  Hide items in pantry ({shoppingData.itemsInPantry})
+                </span>
+              </label>
             </div>
           )}
+
+          {/* Shopping list content */}
+          {isShoppingLoading ? (
+            <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
+              <p className="text-gray-500 dark:text-onedark-fg-muted mt-4">Loading shopping list...</p>
+            </div>
+          ) : !activePlanId ? (
+            <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
+              <p className="text-gray-500 dark:text-onedark-fg-muted">
+                Add some meals to your plan to generate a shopping list
+              </p>
+            </div>
+          ) : shoppingData ? (
+            <ShoppingList
+              categories={shoppingData.categories}
+              checkedItems={checkedItems}
+              onToggleItem={toggleItem}
+              hidePantry={hidePantry}
+              onToggleHidePantry={() => setHidePantry(false)}
+              overrides={overrides}
+              onSetOverride={setOverride}
+              onClearOverride={clearOverride}
+              deletedItems={deletedItems}
+              onDeleteItem={deleteItem}
+              onRestoreItem={restoreItem}
+              customCategories={customCategories}
+              onAddCategory={addCategory}
+              onUpdateCategory={updateCategory}
+              onDeleteCategory={deleteCategory}
+              itemCategories={itemCategories}
+              onAssignItem={assignItem}
+              onAssignItems={assignItems}
+              itemOrder={itemOrder}
+              onReorderItems={reorderItems}
+              onToggleBuyStatus={togglePantryStatus}
+              getEffectiveBuyStatus={getEffectivePantryStatus}
+            />
+          ) : null}
         </>
       )}
 

@@ -309,6 +309,7 @@ pantry.put('/:id', async (c) => {
 
   try {
     const body = await c.req.json<{
+      name?: string;
       quantity?: number | null;
       unit?: string | null;
       location?: string;
@@ -328,6 +329,16 @@ pantry.put('/:id', async (c) => {
     const updates: string[] = [];
     const values: unknown[] = [];
 
+    if (body.name !== undefined) {
+      const trimmedName = body.name.trim();
+      if (!trimmedName) {
+        return c.json({ error: 'Name cannot be empty' }, 400);
+      }
+      updates.push('name = ?');
+      values.push(trimmedName);
+      updates.push('normalized_name = ?');
+      values.push(normalizeIngredientName(trimmedName));
+    }
     if (body.quantity !== undefined) {
       updates.push('quantity = ?');
       values.push(body.quantity);

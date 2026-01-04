@@ -6,6 +6,7 @@ export { EditRecipePage } from './EditRecipePage';
 export { CategoriesPage } from './CategoriesPage';
 export { TagsPage } from './TagsPage';
 export { MealPlansPage } from './MealPlansPage';
+export { ShoppingListPage } from './ShoppingListPage';
 export { PantryPage } from './PantryPage';
 export { ImportPage } from './ImportPage';
 export { SearchPage } from './SearchPage';

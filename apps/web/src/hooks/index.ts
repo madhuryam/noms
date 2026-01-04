@@ -51,3 +51,23 @@ export {
   groupMealsByDateAndSlot,
 } from './useMealPlan';
 export type { MealSlot, PlannedMeal, MealPlan } from './useMealPlan';
+export {
+  useShoppingList,
+  useCheckedItems,
+  useQuantityOverrides,
+  useDeletedItems,
+  useCustomCategories,
+  useItemCategories,
+  useItemOrder,
+  usePantryOverrides,
+  useMultiSelect,
+  formatQuantity,
+  exportAsText,
+  exportAsMarkdown,
+} from './useShoppingList';
+export type {
+  ShoppingListItem,
+  ShoppingListCategory,
+  ShoppingListResponse,
+  CustomCategory,
+} from './useShoppingList';

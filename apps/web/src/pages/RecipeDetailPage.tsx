@@ -304,10 +304,10 @@ export function RecipeDetailPage() {
 
           {/* Notes */}
           {recipe.notes && (
-            <div className="bg-yellow-50 dark:bg-onedark-yellow/10 rounded-xl border border-yellow-200 dark:border-onedark-yellow/30 p-6">
+            <div className="bg-slate-100 dark:bg-slate-800/40 rounded-xl border border-slate-300 dark:border-slate-600/50 p-6">
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-yellow-600 dark:text-onedark-yellow flex-shrink-0 mt-0.5"
+                  className="w-5 h-5 text-slate-600 dark:text-slate-400 flex-shrink-0 mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -320,10 +320,10 @@ export function RecipeDetailPage() {
                   />
                 </svg>
                 <div>
-                  <h2 className="text-lg font-semibold text-yellow-800 dark:text-onedark-yellow mb-2">
+                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
                     Notes
                   </h2>
-                  <p className="text-yellow-700 dark:text-onedark-yellow/90 whitespace-pre-wrap">
+                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                     {recipe.notes}
                   </p>
                 </div>

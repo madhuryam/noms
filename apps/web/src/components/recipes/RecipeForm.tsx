@@ -4,6 +4,59 @@ import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemove
 import { DEFAULT_SERVINGS } from '../../lib/constants';
 import { TagSelector } from '../tags';
 
+// Detect if a line is a group/section header
+function isGroupHeader(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (trimmed.endsWith(':')) return true;
+
+  const words = trimmed.split(/\s+/);
+  const upperWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+  if (upperWords.length >= 1 && upperWords.length === words.filter(w => /[A-Z]/i.test(w)).length) {
+    return true;
+  }
+  if (words.length > 0 && words[0] === words[0].toUpperCase() && /[A-Z]/.test(words[0]) && !/\d/.test(trimmed)) {
+    if (words[0].replace(/[^A-Z]/g, '').length >= 2) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Clean up and deduplicate ingredients while preserving group headers
+function deduplicateIngredients(ingredientsRaw: string): string {
+  const lines = ingredientsRaw.split('\n');
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const line of lines) {
+    // Trim whitespace and trailing commas
+    const trimmed = line.trim().replace(/,+$/, '').trim();
+
+    // Keep empty lines as separators
+    if (!trimmed) {
+      result.push('');
+      continue;
+    }
+
+    // Always keep group headers
+    if (isGroupHeader(trimmed)) {
+      result.push(trimmed);
+      continue;
+    }
+
+    // Normalize for comparison (lowercase, collapse whitespace)
+    const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
+
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(trimmed);
+    }
+  }
+
+  return result.join('\n');
+}
+
 interface FormData {
   title: string;
   description: string;
@@ -122,7 +175,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     const payload = {
       title: formData.title.trim(),
       description: formData.description.trim() || null,
-      ingredients_raw: formData.ingredients_raw.trim(),
+      ingredients_raw: deduplicateIngredients(formData.ingredients_raw.trim()),
       instructions_raw: formData.instructions_raw.trim(),
       servings: formData.servings ? Number(formData.servings) : DEFAULT_SERVINGS,
       prep_time_minutes: formData.prep_time_minutes

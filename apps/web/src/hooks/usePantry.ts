@@ -104,6 +104,7 @@ export function useAddPantryItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pantry'] });
+      queryClient.invalidateQueries({ queryKey: ['shopping-list'] });
     },
   });
 }
@@ -123,6 +124,7 @@ export function useBulkAddPantryItems() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pantry'] });
+      queryClient.invalidateQueries({ queryKey: ['shopping-list'] });
     },
   });
 }
@@ -136,6 +138,7 @@ export function useUpdatePantryItem() {
       ...updates
     }: {
       id: number;
+      name?: string;
       quantity?: number | null;
       unit?: string | null;
       location?: PantryLocation;
@@ -159,6 +162,7 @@ export function useDeletePantryItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pantry'] });
+      queryClient.invalidateQueries({ queryKey: ['shopping-list'] });
     },
   });
 }
