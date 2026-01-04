@@ -19,7 +19,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
   const { data: suggestionsData, isLoading: isSearching } = useSearchSuggestions(searchQuery);
 
   // Recent recipes (when no search query)
-  const { data: recentRecipes } = useRecipes({
+  const { data: recentRecipes, isLoading: isLoadingRecent } = useRecipes({
     limit: 12,
     sortBy: 'created_at',
     sortOrder: 'desc',
@@ -136,7 +136,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
 
         {/* Recipe list */}
         <div className="flex-1 overflow-y-auto p-4">
-          {isSearching ? (
+          {(isSearching || (searchQuery.length < 2 && isLoadingRecent)) ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
             </div>
@@ -221,7 +221,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500 dark:text-onedark-fg-muted">
-                  Start typing to search recipes
+                  No recipes yet. Type a meal name to add as free text.
                 </div>
               )}
             </>
