@@ -11,7 +11,7 @@ import {
   formatDateKey,
   type PlannedMeal,
 } from '../hooks';
-import { WeekCalendar, AddMealModal, MealPlanControls } from '../components/meal-plans';
+import { WeekCalendar, AddMealModal, MealPlanControls, type MealSelection } from '../components/meal-plans';
 
 // Get the start of the week (Monday) for a given date
 function getWeekStart(date: Date): Date {
@@ -104,12 +104,8 @@ export function MealPlansPage() {
     [slots]
   );
 
-  // Confirm adding a meal
-  const handleConfirmAddMeal = async (
-    recipeId: number | null,
-    scalingFactor: number,
-    customTitle?: string
-  ) => {
+  // Confirm adding meals (supports multi-select)
+  const handleConfirmAddMeals = async (selections: MealSelection[]) => {
     let planId = activePlanId;
 
     // Create a plan if one doesn't exist for this week
@@ -127,18 +123,20 @@ export function MealPlansPage() {
       }
     }
 
-    // Add the meal
-    try {
-      await addMeal.mutateAsync({
-        planId,
-        recipe_id: recipeId ?? undefined,
-        custom_title: customTitle,
-        meal_slot_id: addMealModal.slotId,
-        planned_date: addMealModal.date,
-        scaling_factor: scalingFactor,
-      });
-    } catch (error) {
-      console.error('Failed to add meal:', error);
+    // Add all selected meals
+    for (const selection of selections) {
+      try {
+        await addMeal.mutateAsync({
+          planId,
+          recipe_id: selection.recipeId ?? undefined,
+          custom_title: selection.customTitle,
+          meal_slot_id: addMealModal.slotId,
+          planned_date: addMealModal.date,
+          scaling_factor: selection.scalingFactor,
+        });
+      } catch (error) {
+        console.error('Failed to add meal:', error);
+      }
     }
 
     setAddMealModal({ isOpen: false, slotId: 0, slotName: '', date: '' });
@@ -170,6 +168,22 @@ export function MealPlansPage() {
       });
     } catch (error) {
       console.error('Failed to update meal:', error);
+    }
+  };
+
+  // Move meal to a different date/slot (drag and drop)
+  const handleMoveMeal = async (meal: PlannedMeal, newDate: string, newSlotId: number) => {
+    if (!activePlanId) return;
+
+    try {
+      await updateMeal.mutateAsync({
+        planId: activePlanId,
+        mealId: meal.id,
+        planned_date: newDate,
+        meal_slot_id: newSlotId,
+      });
+    } catch (error) {
+      console.error('Failed to move meal:', error);
     }
   };
 
@@ -211,6 +225,7 @@ export function MealPlansPage() {
             onAddMeal={handleAddMeal}
             onRemoveMeal={handleRemoveMeal}
             onToggleComplete={handleToggleComplete}
+            onMoveMeal={handleMoveMeal}
           />
 
           {/* Quick stats */}
@@ -232,7 +247,7 @@ export function MealPlansPage() {
       <AddMealModal
         isOpen={addMealModal.isOpen}
         onClose={() => setAddMealModal({ isOpen: false, slotId: 0, slotName: '', date: '' })}
-        onSelect={handleConfirmAddMeal}
+        onSelect={handleConfirmAddMeals}
         slotName={addMealModal.slotName}
         date={addMealModal.date}
       />

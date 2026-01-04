@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { PlannedMeal, MealSlot } from '../../hooks';
 import { RecipeImage } from '../common/RecipeImage';
@@ -9,6 +10,7 @@ interface MealSlotCellProps {
   onAddMeal: (slotId: number, date: string) => void;
   onRemoveMeal: (meal: PlannedMeal) => void;
   onToggleComplete: (meal: PlannedMeal) => void;
+  onMoveMeal?: (meal: PlannedMeal, newDate: string, newSlotId: number) => void;
 }
 
 export function MealSlotCell({
@@ -18,15 +20,52 @@ export function MealSlotCell({
   onAddMeal,
   onRemoveMeal,
   onToggleComplete,
+  onMoveMeal,
 }: MealSlotCellProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
   const isToday = new Date().toISOString().split('T')[0] === date;
   const isPast = new Date(date) < new Date(new Date().toISOString().split('T')[0]);
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const mealData = e.dataTransfer.getData('application/json');
+    if (mealData && onMoveMeal) {
+      try {
+        const meal: PlannedMeal = JSON.parse(mealData);
+        // Only move if destination is different
+        if (meal.planned_date !== date || meal.meal_slot_id !== slot.id) {
+          onMoveMeal(meal, date, slot.id);
+        }
+      } catch (err) {
+        console.error('Failed to parse dragged meal:', err);
+      }
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, meal: PlannedMeal) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(meal));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <div
-      className={`min-h-[80px] p-2 border-b border-r border-gray-200 dark:border-onedark-bg-highlight last:border-r-0 ${
+      className={`min-h-[80px] p-2 border-b border-r border-gray-200 dark:border-onedark-bg-highlight last:border-r-0 transition-colors ${
         isToday ? 'bg-blue-50/50 dark:bg-onedark-blue/10' : ''
-      } ${isPast ? 'opacity-60' : ''}`}
+      } ${isPast ? 'opacity-60' : ''} ${isDragOver ? 'bg-blue-100 dark:bg-onedark-blue/20' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {meals.length === 0 ? (
         <button
@@ -88,7 +127,9 @@ export function MealSlotCell({
             return (
               <div
                 key={meal.id}
-                className={`group relative bg-white dark:bg-onedark-bg rounded border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden ${
+                draggable
+                onDragStart={(e) => handleDragStart(e, meal)}
+                className={`group relative bg-white dark:bg-onedark-bg rounded border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden cursor-grab active:cursor-grabbing ${
                   meal.is_completed ? 'opacity-60' : ''
                 }`}
               >

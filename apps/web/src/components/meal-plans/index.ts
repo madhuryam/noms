@@ -1,4 +1,4 @@
 export { MealSlotCell } from './MealSlotCell';
 export { WeekCalendar } from './WeekCalendar';
-export { AddMealModal } from './AddMealModal';
+export { AddMealModal, type MealSelection } from './AddMealModal';
 export { MealPlanControls } from './MealPlanControls';

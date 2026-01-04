@@ -9,6 +9,7 @@ interface WeekCalendarProps {
   onAddMeal: (slotId: number, date: string) => void;
   onRemoveMeal: (meal: PlannedMeal) => void;
   onToggleComplete: (meal: PlannedMeal) => void;
+  onMoveMeal?: (meal: PlannedMeal, newDate: string, newSlotId: number) => void;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -21,6 +22,7 @@ export function WeekCalendar({
   onAddMeal,
   onRemoveMeal,
   onToggleComplete,
+  onMoveMeal,
 }: WeekCalendarProps) {
   const mealsByDateAndSlot = groupMealsByDateAndSlot(meals);
   const today = new Date().toISOString().split('T')[0];
@@ -104,6 +106,7 @@ export function WeekCalendar({
                     onAddMeal={onAddMeal}
                     onRemoveMeal={onRemoveMeal}
                     onToggleComplete={onToggleComplete}
+                    onMoveMeal={onMoveMeal}
                   />
                 );
               })}

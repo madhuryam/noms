@@ -2,17 +2,23 @@ import { useState, useEffect } from 'react';
 import { useSearchSuggestions, useRecipes, type Recipe } from '../../hooks';
 import { RecipeImage } from '../common/RecipeImage';
 
+export interface MealSelection {
+  recipeId: number | null;
+  scalingFactor: number;
+  customTitle?: string;
+}
+
 interface AddMealModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (recipeId: number | null, scalingFactor: number, customTitle?: string) => void;
+  onSelect: (selections: MealSelection[]) => void;
   slotName: string;
   date: string;
 }
 
 export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddMealModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [selectedRecipes, setSelectedRecipes] = useState<Recipe[]>([]);
   const [scalingFactor, setScalingFactor] = useState(1);
 
   // Search suggestions (faster than full search)
@@ -29,7 +35,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
-      setSelectedRecipe(null);
+      setSelectedRecipes([]);
       setScalingFactor(1);
     }
   }, [isOpen]);
@@ -60,15 +66,27 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
     });
   };
 
-  const handleConfirmRecipe = () => {
-    if (selectedRecipe) {
-      onSelect(selectedRecipe.id, scalingFactor);
-    }
+  const toggleRecipeSelection = (recipe: Recipe) => {
+    setSelectedRecipes((prev) => {
+      const isSelected = prev.some((r) => r.id === recipe.id);
+      if (isSelected) {
+        return prev.filter((r) => r.id !== recipe.id);
+      }
+      return [...prev, recipe];
+    });
+  };
+
+  const handleConfirmRecipes = () => {
+    const selections: MealSelection[] = selectedRecipes.map((recipe) => ({
+      recipeId: recipe.id,
+      scalingFactor,
+    }));
+    onSelect(selections);
   };
 
   const handleAddAsFreeText = () => {
     if (searchQuery.trim()) {
-      onSelect(null, 1, searchQuery.trim());
+      onSelect([{ recipeId: null, scalingFactor: 1, customTitle: searchQuery.trim() }]);
     }
   };
 
@@ -126,7 +144,6 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setSelectedRecipe(null); // Clear selection when typing
               }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-onedark-bg-highlight rounded-lg bg-white dark:bg-onedark-bg text-gray-900 dark:text-onedark-fg placeholder-gray-400 dark:placeholder-onedark-fg-muted focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue focus:border-transparent"
               autoFocus
@@ -170,14 +187,14 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
               {hasResults ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {displayedRecipes.map((recipe) => {
-                    const isSelected = selectedRecipe?.id === recipe.id;
+                    const isSelected = selectedRecipes.some((r) => r.id === recipe.id);
                     const totalTime =
                       (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
 
                     return (
                       <button
                         key={recipe.id}
-                        onClick={() => setSelectedRecipe(recipe as Recipe)}
+                        onClick={() => toggleRecipeSelection(recipe as Recipe)}
                         className={`text-left rounded-lg border overflow-hidden transition-all ${
                           isSelected
                             ? 'border-blue-500 dark:border-onedark-blue ring-2 ring-blue-500/20 dark:ring-onedark-blue/20'
@@ -228,13 +245,13 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
           )}
         </div>
 
-        {/* Footer with scaling and confirm - only show when recipe selected */}
-        {selectedRecipe && (
+        {/* Footer with scaling and confirm - only show when recipes selected */}
+        {selectedRecipes.length > 0 && (
           <div className="px-6 py-4 border-t border-gray-200 dark:border-onedark-bg-highlight bg-gray-50 dark:bg-onedark-bg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600 dark:text-onedark-fg-muted">
-                  Servings:
+                  {selectedRecipes.length} selected
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -264,10 +281,10 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
                   Cancel
                 </button>
                 <button
-                  onClick={handleConfirmRecipe}
+                  onClick={handleConfirmRecipes}
                   className="px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white text-sm font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
                 >
-                  Add to Plan
+                  Add {selectedRecipes.length} to Plan
                 </button>
               </div>
             </div>
