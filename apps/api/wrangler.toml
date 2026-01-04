@@ -1,26 +1,88 @@
+# =============================================================================
+# Noms - Recipe Management Application
+# Cloudflare Workers Configuration
+# =============================================================================
+#
+# This configuration deploys a unified Worker that serves both:
+# - API endpoints (/api/*, /health)
+# - Static frontend assets (from apps/web/dist)
+#
+# Deployment: npm run deploy (from project root)
+# Local dev:  npm run dev (runs both API and frontend dev servers)
+# =============================================================================
+
 name = "noms"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Static assets from web build
+# =============================================================================
+# Static Assets Configuration
+# =============================================================================
+# Serves the built frontend from the same Worker (no separate Pages deployment)
+# This eliminates CORS issues since API and frontend share the same origin
+
 [assets]
 directory = "../web/dist"
 binding = "ASSETS"
 html_handling = "force-trailing-slash"
 not_found_handling = "single-page-application"
 
+# =============================================================================
+# Local Development
+# =============================================================================
+
 [dev]
 port = 8787
 
-# D1 Database
+# =============================================================================
+# D1 Database (SQLite)
+# =============================================================================
+# Production database for recipe storage
+# Migrations are in ./migrations directory
+
 [[d1_databases]]
 binding = "DB"
 database_name = "noms-db"
 database_id = "6a6ae1f3-8d4c-4260-af1f-f0a95788a99c"
 migrations_dir = "migrations"
 
-# R2 Bucket for recipe images (enable R2 in Cloudflare Dashboard first)
+# =============================================================================
+# R2 Object Storage
+# =============================================================================
+# Bucket for recipe images
+
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
 bucket_name = "noms-images"
+
+# =============================================================================
+# Staging Environment (Optional)
+# =============================================================================
+# Uncomment and configure to enable a staging environment
+# Deploy with: npx wrangler deploy --env staging
+#
+# [env.staging]
+# name = "noms-staging"
+#
+# [[env.staging.d1_databases]]
+# binding = "DB"
+# database_name = "noms-db-staging"
+# database_id = "your-staging-database-id"
+# migrations_dir = "migrations"
+#
+# [[env.staging.r2_buckets]]
+# binding = "IMAGES_BUCKET"
+# bucket_name = "noms-images-staging"
+
+# =============================================================================
+# Custom Domain (Optional)
+# =============================================================================
+# Configure in Cloudflare Dashboard:
+# 1. Go to Workers & Pages > noms > Settings > Domains & Routes
+# 2. Add custom domain (e.g., noms.yourdomain.com)
+# 3. Cloudflare will automatically provision SSL certificate
+#
+# [routes]
+# pattern = "noms.yourdomain.com/*"
+# custom_domain = true

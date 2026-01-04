@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, Suspense, lazy, useEffect } from 'react';
+import { StrictMode, useCallback, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
@@ -6,7 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './lib/queryClient';
 import { AppShell } from './components/layout';
 import { DndProvider } from './components/DndProvider';
-import { ErrorBoundary, RecipeDetailSkeleton, RecipeGridSkeleton } from './components/common';
+import { ErrorBoundary, RecipeGridSkeleton } from './components/common';
 import { api } from './lib/api';
 import { initWebVitals } from './lib/vitals';
 import './index.css';
