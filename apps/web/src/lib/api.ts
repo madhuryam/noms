@@ -1,6 +1,10 @@
 // In production, API is served from the same origin (empty string)
 // In development, use the separate API server
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
+
+export function getApiUrl(endpoint: string): string {
+  return `${API_URL}${endpoint}`;
+}
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
 
 export class ApiError extends Error {

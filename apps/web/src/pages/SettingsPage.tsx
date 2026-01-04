@@ -1,4 +1,4 @@
-import { FoodAssociations, SuggestionsSettings, ShelfLifeSettings } from '../components/settings';
+import { FoodAssociations, SuggestionsSettings, ShelfLifeSettings, DataManagement } from '../components/settings';
 
 export function SettingsPage() {
   return (
@@ -19,6 +19,9 @@ export function SettingsPage() {
 
       {/* Food Associations Section */}
       <FoodAssociations />
+
+      {/* Data Management Section */}
+      <DataManagement />
     </div>
   );
 }

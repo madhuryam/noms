@@ -3,3 +3,4 @@ export { AssociationGroupModal } from './AssociationGroupModal';
 export { SuggestionsSettings, loadSuggestionsConfig, saveSuggestionsConfig } from './SuggestionsSettings';
 export type { SuggestionsConfig } from './SuggestionsSettings';
 export { ShelfLifeSettings } from './ShelfLifeSettings';
+export { DataManagement } from './DataManagement';
