@@ -20,9 +20,9 @@ export function SuggestionCard({ recipe }: SuggestionCardProps) {
   return (
     <Link
       to={`/recipes/${recipe.id}`}
-      className="flex-shrink-0 w-44 snap-start group"
+      className="flex-shrink-0 w-52 snap-start group"
     >
-      <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-400 dark:hover:border-onedark-blue transition-colors">
+      <div className="h-full bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-400 dark:hover:border-onedark-blue transition-colors">
         {/* Image */}
         <div className="relative overflow-hidden">
           <RecipeImage
@@ -34,24 +34,28 @@ export function SuggestionCard({ recipe }: SuggestionCardProps) {
           />
         </div>
 
-        {/* Content */}
-        <div className="p-3">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-onedark-fg line-clamp-2 leading-tight">
+        {/* Content - fixed height for uniformity */}
+        <div className="p-3 h-20 flex flex-col">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-onedark-fg line-clamp-2 leading-tight flex-1">
             {recipe.title}
           </h3>
-          {totalTime > 0 && (
-            <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-500 dark:text-onedark-fg-muted">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span>{totalTime} min</span>
-            </div>
-          )}
+          <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-500 dark:text-onedark-fg-muted">
+            {totalTime > 0 ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>{totalTime} min</span>
+              </>
+            ) : (
+              <span>&nbsp;</span>
+            )}
+          </div>
         </div>
       </div>
     </Link>
