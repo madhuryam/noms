@@ -1,19 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTags, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags } from '../hooks';
-import { TagManager } from '../components/tags';
+import { useTags, useCreateTag, useDeleteTag, useMergeTags } from '../hooks';
+import { TagManager, RecipeTagSelector } from '../components/tags';
+import type { Tag } from '../components/tags';
+
+interface TagWithUsage extends Tag {
+  usage_count: number;
+}
 
 export function TagsPage() {
   const navigate = useNavigate();
   const { data: tags = [], isLoading } = useTags();
   const createTag = useCreateTag();
-  const updateTag = useUpdateTag();
   const deleteTag = useDeleteTag();
   const mergeTags = useMergeTags();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [createError, setCreateError] = useState('');
+  const [selectedTag, setSelectedTag] = useState<TagWithUsage | null>(null);
 
   const handleCreateTag = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +37,6 @@ export function TagsPage() {
     }
   };
 
-  const handleUpdateTag = async (
-    id: number,
-    data: { name?: string; display_name?: string; color?: string }
-  ) => {
-    await updateTag.mutateAsync({ id, data });
-  };
-
   const handleDeleteTag = async (id: number) => {
     await deleteTag.mutateAsync(id);
   };
@@ -47,12 +45,24 @@ export function TagsPage() {
     await mergeTags.mutateAsync({ targetId, sourceId });
   };
 
+  const handleEditTag = (tag: TagWithUsage) => {
+    setSelectedTag(tag);
+  };
+
   const handleTagClick = (tagName: string) => {
     navigate(`/recipes?tags=${encodeURIComponent(tagName)}`);
   };
 
   return (
     <div className="space-y-6">
+      {/* Recipe Tag Selector Modal */}
+      {selectedTag && (
+        <RecipeTagSelector
+          tag={selectedTag}
+          onClose={() => setSelectedTag(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -129,16 +139,16 @@ export function TagsPage() {
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6">
         <div className="mb-4">
           <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
-            Click a tag to view recipes with that tag. Use the buttons to edit, merge, or delete tags.
+            Click a tag to view its recipes. Use edit to modify and manage recipes, merge to combine tags, or delete to remove.
           </p>
         </div>
         <TagManager
           tags={tags}
-          onUpdateTag={handleUpdateTag}
           onDeleteTag={handleDeleteTag}
           onMergeTags={handleMergeTags}
-          isLoading={isLoading}
+          onEditTag={handleEditTag}
           onTagClick={handleTagClick}
+          isLoading={isLoading}
         />
       </div>
     </div>

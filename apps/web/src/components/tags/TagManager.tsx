@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TagPill, getDefaultColor, type Tag } from './TagPill';
+import { TagPill, type Tag } from './TagPill';
 
 interface ManagedTag extends Tag {
   usage_count: number;
@@ -7,66 +7,25 @@ interface ManagedTag extends Tag {
 
 interface TagManagerProps {
   tags: ManagedTag[];
-  onUpdateTag: (id: number, data: { name?: string; display_name?: string; color?: string }) => Promise<void>;
   onDeleteTag: (id: number) => Promise<void>;
   onMergeTags: (targetId: number, sourceId: number) => Promise<void>;
   onTagClick?: (tagName: string) => void;
+  onEditTag?: (tag: ManagedTag) => void;
   isLoading?: boolean;
 }
 
-const COLOR_PRESETS = [
-  '#3B82F6', // blue
-  '#10B981', // green
-  '#F59E0B', // amber
-  '#EF4444', // red
-  '#8B5CF6', // purple
-  '#EC4899', // pink
-  '#06B6D4', // cyan
-  '#F97316', // orange
-  '#6366F1', // indigo
-  '#84CC16', // lime
-];
-
 export function TagManager({
   tags,
-  onUpdateTag,
   onDeleteTag,
   onMergeTags,
   onTagClick,
+  onEditTag,
   isLoading,
 }: TagManagerProps) {
-  const [editingTag, setEditingTag] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', display_name: '', color: '' });
   const [mergeMode, setMergeMode] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   const sortedTags = [...tags].sort((a, b) => b.usage_count - a.usage_count);
-
-  const startEdit = (tag: ManagedTag) => {
-    setEditingTag(tag.id);
-    setEditForm({
-      name: tag.name,
-      display_name: tag.display_name,
-      color: tag.color || getDefaultColor(tag.name),
-    });
-    setMergeMode(null);
-    setDeleteConfirm(null);
-  };
-
-  const cancelEdit = () => {
-    setEditingTag(null);
-    setEditForm({ name: '', display_name: '', color: '' });
-  };
-
-  const saveEdit = async () => {
-    if (!editingTag) return;
-    await onUpdateTag(editingTag, {
-      name: editForm.name,
-      display_name: editForm.display_name,
-      color: editForm.color,
-    });
-    cancelEdit();
-  };
 
   const handleMerge = async (sourceId: number) => {
     if (!mergeMode) return;
@@ -136,85 +95,7 @@ export function TagManager({
             }
           }}
         >
-          {editingTag === tag.id ? (
-            // Edit mode
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
-                    Display Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.display_name}
-                    onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
-                    className="w-full px-2 py-1 text-sm border border-gray-200 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
-                    Slug (lowercase)
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value.toLowerCase() })}
-                    className="w-full px-2 py-1 text-sm border border-gray-200 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
-                  Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={editForm.color}
-                    onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                    className="w-8 h-8 rounded border border-gray-200 dark:border-onedark-bg-highlight cursor-pointer"
-                  />
-                  <div className="flex gap-1">
-                    {COLOR_PRESETS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setEditForm({ ...editForm, color })}
-                        className={`w-6 h-6 rounded-full ${
-                          editForm.color === color ? 'ring-2 ring-offset-1 ring-gray-400' : ''
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-onedark-bg-highlight">
-                <div>
-                  <TagPill
-                    tag={{ ...tag, name: editForm.name, display_name: editForm.display_name, color: editForm.color }}
-                    size="md"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={cancelEdit}
-                    className="px-3 py-1 text-sm text-gray-600 dark:text-onedark-fg-muted hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight rounded"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={saveEdit}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : deleteConfirm === tag.id ? (
+          {deleteConfirm === tag.id ? (
             // Delete confirmation
             <div className="flex items-center justify-between">
               <p className="text-sm text-red-600 dark:text-onedark-red">
@@ -252,7 +133,7 @@ export function TagManager({
               {!mergeMode && (
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => startEdit(tag)}
+                    onClick={() => onEditTag?.(tag)}
                     className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg rounded hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight"
                     title="Edit tag"
                   >

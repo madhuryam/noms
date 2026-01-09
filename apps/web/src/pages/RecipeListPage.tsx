@@ -152,15 +152,13 @@ export function RecipeListPage() {
       </div>
 
       {/* Tag Filter */}
-      {allTags.length > 0 && (
-        <TagFilter
-          tags={allTags}
-          selectedTags={selectedTagNames}
-          onTagsChange={handleTagsChange}
-          tagMode={tagMode}
-          onModeChange={handleModeChange}
-        />
-      )}
+      <TagFilter
+        tags={allTags}
+        selectedTags={selectedTagNames}
+        onTagsChange={handleTagsChange}
+        tagMode={tagMode}
+        onModeChange={handleModeChange}
+      />
 
       {/* Error State */}
       {isError && (
