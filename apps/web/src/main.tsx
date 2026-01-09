@@ -1,13 +1,12 @@
-import { StrictMode, useCallback, Suspense, lazy } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './lib/queryClient';
 import { AppShell } from './components/layout';
 import { DndProvider } from './components/DndProvider';
 import { ErrorBoundary, RecipeGridSkeleton } from './components/common';
-import { api } from './lib/api';
 import { initWebVitals } from './lib/vitals';
 import '@fontsource/open-sans/400.css';
 import '@fontsource/open-sans/500.css';
@@ -33,9 +32,6 @@ const NewRecipePage = lazy(() =>
 );
 const EditRecipePage = lazy(() =>
   import('./pages/EditRecipePage').then((m) => ({ default: m.EditRecipePage }))
-);
-const CategoriesPage = lazy(() =>
-  import('./pages/CategoriesPage').then((m) => ({ default: m.CategoriesPage }))
 );
 const TagsPage = lazy(() => import('./pages/TagsPage').then((m) => ({ default: m.TagsPage })));
 const MealPlansPage = lazy(() =>
@@ -74,47 +70,9 @@ function PageLoader() {
 }
 
 function AppWithDnd() {
-  const qc = useQueryClient();
-
-  const handleRecipeDrop = useCallback(
-    async (recipeId: number, categoryId: number) => {
-      try {
-        await api.put(`/api/recipes/${recipeId}/categories`, {
-          categoryIds: [categoryId],
-          primaryCategoryId: categoryId,
-        });
-        // Invalidate queries to refresh data
-        qc.invalidateQueries({ queryKey: ['recipes'] });
-        qc.invalidateQueries({ queryKey: ['recipe', recipeId] });
-        qc.invalidateQueries({ queryKey: ['categories'] });
-        // Invalidate all category queries (includes category details and recipes)
-        qc.invalidateQueries({ queryKey: ['category'] });
-      } catch (error) {
-        console.error('Failed to move recipe to category:', error);
-      }
-    },
-    [qc]
-  );
-
-  const handleCategoryDrop = useCallback(
-    async (categoryId: number, newParentId: number | null) => {
-      try {
-        await api.put(`/api/categories/${categoryId}`, {
-          parentId: newParentId,
-        });
-        // Invalidate queries to refresh data
-        qc.invalidateQueries({ queryKey: ['categories'] });
-        qc.invalidateQueries({ queryKey: ['category'] });
-      } catch (error) {
-        console.error('Failed to move category:', error);
-      }
-    },
-    [qc]
-  );
-
   return (
     <ErrorBoundary>
-      <DndProvider onRecipeDrop={handleRecipeDrop} onCategoryDrop={handleCategoryDrop}>
+      <DndProvider>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route element={<AppShell />}>
@@ -123,8 +81,6 @@ function AppWithDnd() {
               <Route path="/recipes/new" element={<NewRecipePage />} />
               <Route path="/recipes/:id/edit" element={<EditRecipePage />} />
               <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-              <Route path="/categories" element={<CategoriesPage />} />
-              <Route path="/categories/:id" element={<CategoriesPage />} />
               <Route path="/tags" element={<TagsPage />} />
               <Route path="/meal-plans" element={<MealPlansPage />} />
               <Route path="/meal-plans/:id/shopping-list" element={<ShoppingListPage />} />

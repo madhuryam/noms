@@ -3,6 +3,7 @@ interface Tag {
   name: string;
   display_name: string;
   color?: string | null;
+  is_category?: boolean | number;
 }
 
 interface TagPillProps {
@@ -46,8 +47,11 @@ function getContrastColor(hexColor: string): string {
 }
 
 export function TagPill({ tag, onClick, onRemove, size = 'sm', className = '' }: TagPillProps) {
-  const bgColor = tag.color || getDefaultColor(tag.name);
-  const textColor = getContrastColor(bgColor);
+  const isCategory = Boolean(tag.is_category);
+  // Category tags use gray styling, regular tags use colors
+  const bgColor = isCategory ? '#E5E7EB' : (tag.color || getDefaultColor(tag.name));
+  const textColor = isCategory ? '#374151' : getContrastColor(bgColor);
+  const borderStyle = isCategory ? '2px solid #9CA3AF' : 'none';
 
   const sizeClasses = {
     sm: 'text-xs px-2 py-0.5',
@@ -56,8 +60,8 @@ export function TagPill({ tag, onClick, onRemove, size = 'sm', className = '' }:
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-medium transition-opacity ${sizeClasses[size]} ${onClick ? 'cursor-pointer hover:opacity-80' : ''} ${className}`}
-      style={{ backgroundColor: bgColor, color: textColor }}
+      className={`inline-flex items-center gap-1 rounded-full font-medium transition-opacity ${sizeClasses[size]} ${onClick ? 'cursor-pointer hover:opacity-80' : ''} ${isCategory ? 'font-semibold' : ''} ${className}`}
+      style={{ backgroundColor: bgColor, color: textColor, border: borderStyle }}
       onClick={onClick}
     >
       {tag.display_name || tag.name}

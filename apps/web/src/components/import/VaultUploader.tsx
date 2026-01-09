@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { extractRecipe, validateRecipe } from '../../lib/parsing';
-import type { VaultFile, ParsedVaultRecipe, CategoryNode, VaultParseResult } from './types';
+import type { VaultFile, ParsedVaultRecipe, VaultParseResult } from './types';
 
 interface VaultUploaderProps {
   onParseComplete: (result: VaultParseResult) => void;
@@ -24,53 +24,40 @@ function shouldIgnoreFile(filename: string): boolean {
   return IGNORED_FILES.some((ignored) => nameWithoutExt === ignored.toLowerCase());
 }
 
-function getCategoryFromPath(filePath: string): string | null {
+/**
+ * Extract category tag and folder tags from file path
+ * Skip the root folder (the imported folder itself), use first subfolder as category tag,
+ * remaining segments become regular tags
+ *
+ * Also skips common container folder names like "Recipes" that are used in exports
+ *
+ * Example: "Noms/Breakfast/Indian/recipe.md" -> category: "Breakfast", tags: ["Indian"]
+ * Example: "export/Recipes/Breakfast/Indian/recipe.md" -> category: "Breakfast", tags: ["Indian"]
+ */
+function extractCategoryAndTags(filePath: string): { categoryTag: string | null; folderTags: string[] } {
   const parts = filePath.split('/');
-  if (parts.length <= 1) return null;
-  // Remove filename, return the directory path
-  return parts.slice(0, -1).join('/');
-}
+  if (parts.length <= 1) return { categoryTag: null, folderTags: [] };
 
-function buildCategoryTree(recipes: ParsedVaultRecipe[]): CategoryNode[] {
-  const categoryMap = new Map<string, CategoryNode>();
+  // Remove filename, get folder segments
+  let folders = parts.slice(0, -1);
 
-  for (const recipe of recipes) {
-    if (!recipe.category) continue;
+  // Skip first folder (root/imported folder)
+  if (folders.length <= 1) return { categoryTag: null, folderTags: [] };
+  folders = folders.slice(1);
 
-    const parts = recipe.category.split('/');
-    let currentPath = '';
-
-    for (let i = 0; i < parts.length; i++) {
-      const parentPath = currentPath;
-      currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
-
-      if (!categoryMap.has(currentPath)) {
-        categoryMap.set(currentPath, {
-          name: parts[i],
-          path: currentPath,
-          recipeCount: 0,
-          children: [],
-        });
-
-        // Add to parent's children
-        if (parentPath && categoryMap.has(parentPath)) {
-          const parent = categoryMap.get(parentPath)!;
-          if (!parent.children.find((c) => c.path === currentPath)) {
-            parent.children.push(categoryMap.get(currentPath)!);
-          }
-        }
-      }
-    }
-
-    // Increment count for the direct category
-    const node = categoryMap.get(recipe.category);
-    if (node) {
-      node.recipeCount++;
-    }
+  // Skip common container folder names used in exports (case-insensitive)
+  const containerFolders = ['recipes', 'recipe'];
+  while (folders.length > 0 && containerFolders.includes(folders[0].toLowerCase())) {
+    folders = folders.slice(1);
   }
 
-  // Return only root categories
-  return Array.from(categoryMap.values()).filter((node) => !node.path.includes('/'));
+  if (folders.length === 0) return { categoryTag: null, folderTags: [] };
+
+  // First remaining folder is category, rest are regular tags
+  const categoryTag = folders[0] || null;
+  const folderTags = folders.slice(1);
+
+  return { categoryTag, folderTags };
 }
 
 export function VaultUploader({ onParseComplete }: VaultUploaderProps) {
@@ -131,11 +118,15 @@ export function VaultUploader({ onParseComplete }: VaultUploaderProps) {
           // For unparseable recipes, put the raw content into instructions
           const finalInstructions = needsFormatting ? file.content : parsed.instructions;
 
+          // Extract category tag and folder tags from path
+          const { categoryTag, folderTags } = extractCategoryAndTags(file.path);
+
           recipes.push({
             ...parsed,
             instructions: finalInstructions,
             filePath: file.path,
-            category: getCategoryFromPath(file.path),
+            categoryTag,
+            folderTags,
             selected: true,
             parseErrors: validation.errors,
             parseWarnings: validation.warnings,
@@ -147,11 +138,8 @@ export function VaultUploader({ onParseComplete }: VaultUploaderProps) {
         }
       }
 
-      // Build category tree
-      const categories = buildCategoryTree(recipes);
-
       setIsProcessing(false);
-      onParseComplete({ recipes, categories, images, errors });
+      onParseComplete({ recipes, images, errors });
     },
     [onParseComplete]
   );

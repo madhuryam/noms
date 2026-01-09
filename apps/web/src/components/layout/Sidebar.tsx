@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom';
-import { CategoryNav } from '../categories';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -141,11 +140,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {item.label}
             </NavLink>
           ))}
-
-          {/* Category Tree */}
-          <div className="pt-4 mt-4 border-t border-gray-200 dark:border-onedark-bg-highlight">
-            <CategoryNav collapsible={true} defaultExpanded={true} />
-          </div>
         </nav>
 
         {/* Bottom section */}

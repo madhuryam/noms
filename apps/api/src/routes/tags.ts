@@ -18,11 +18,12 @@ tags.get('/', async (c) => {
         t.name,
         t.display_name,
         t.color,
+        t.is_category,
         COUNT(rt.recipe_id) as usage_count
       FROM tags t
       LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
       GROUP BY t.id
-      ORDER BY usage_count DESC, t.name
+      ORDER BY t.is_category DESC, usage_count DESC, t.name
     `
     ).all();
 
@@ -95,6 +96,7 @@ tags.get('/:id', async (c) => {
         t.name,
         t.display_name,
         t.color,
+        t.is_category,
         COUNT(rt.recipe_id) as usage_count
       FROM tags t
       LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
@@ -179,6 +181,7 @@ tags.put('/:id', async (c) => {
         t.name,
         t.display_name,
         t.color,
+        t.is_category,
         COUNT(rt.recipe_id) as usage_count
       FROM tags t
       LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
@@ -281,6 +284,7 @@ tags.post('/:id/merge', async (c) => {
         t.name,
         t.display_name,
         t.color,
+        t.is_category,
         COUNT(rt.recipe_id) as usage_count
       FROM tags t
       LEFT JOIN recipe_tags rt ON t.id = rt.tag_id

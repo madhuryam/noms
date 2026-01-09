@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useCategoryTree, useTags } from '../../hooks';
+import { useTags } from '../../hooks';
 
 const STORAGE_KEY = 'suggestions-settings';
 
 export interface SuggestionsConfig {
-  categoryIds: number[];
   tagIds: number[];
 }
 
@@ -12,12 +11,14 @@ export function loadSuggestionsConfig(): SuggestionsConfig {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Handle legacy format that had categoryIds
+      return { tagIds: parsed.tagIds || [] };
     }
   } catch {
     // Ignore parse errors
   }
-  return { categoryIds: [], tagIds: [] };
+  return { tagIds: [] };
 }
 
 export function saveSuggestionsConfig(config: SuggestionsConfig): void {
@@ -25,38 +26,14 @@ export function saveSuggestionsConfig(config: SuggestionsConfig): void {
 }
 
 export function SuggestionsSettings() {
-  const { data: categoryTree = [] } = useCategoryTree();
   const { data: tags = [] } = useTags();
 
   const [config, setConfig] = useState<SuggestionsConfig>(() => loadSuggestionsConfig());
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Flatten category tree for display
-  const flattenCategories = (
-    categories: typeof categoryTree,
-    depth = 0
-  ): Array<{ id: number; name: string; depth: number }> => {
-    const result: Array<{ id: number; name: string; depth: number }> = [];
-    for (const cat of categories) {
-      result.push({ id: cat.id, name: cat.name, depth });
-      if (cat.children?.length) {
-        result.push(...flattenCategories(cat.children, depth + 1));
-      }
-    }
-    return result;
-  };
-
-  const flatCategories = flattenCategories(categoryTree);
-
-  const toggleCategory = (id: number) => {
-    setConfig((prev) => {
-      const newIds = prev.categoryIds.includes(id)
-        ? prev.categoryIds.filter((cid) => cid !== id)
-        : [...prev.categoryIds, id];
-      return { ...prev, categoryIds: newIds };
-    });
-    setHasChanges(true);
-  };
+  // Separate category tags from regular tags
+  const categoryTags = tags.filter((tag) => tag.is_category);
+  const regularTags = tags.filter((tag) => !tag.is_category);
 
   const toggleTag = (id: number) => {
     setConfig((prev) => {
@@ -76,11 +53,11 @@ export function SuggestionsSettings() {
   };
 
   const handleClear = () => {
-    setConfig({ categoryIds: [], tagIds: [] });
+    setConfig({ tagIds: [] });
     setHasChanges(true);
   };
 
-  const selectedCount = config.categoryIds.length + config.tagIds.length;
+  const selectedCount = config.tagIds.length;
 
   return (
     <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6">
@@ -92,7 +69,7 @@ export function SuggestionsSettings() {
           <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
             {selectedCount === 0
               ? 'Showing random recipes from your collection'
-              : `Filtering by ${config.categoryIds.length} categories and ${config.tagIds.length} tags`}
+              : `Filtering by ${selectedCount} tag${selectedCount !== 1 ? 's' : ''}`}
           </p>
         </div>
         {hasChanges && (
@@ -106,16 +83,21 @@ export function SuggestionsSettings() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Categories */}
+        {/* Category Tags */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-gray-700 dark:text-onedark-fg">
               Categories
             </h3>
-            {config.categoryIds.length > 0 && (
+            {categoryTags.some((tag) => config.tagIds.includes(tag.id)) && (
               <button
                 onClick={() => {
-                  setConfig((prev) => ({ ...prev, categoryIds: [] }));
+                  setConfig((prev) => ({
+                    ...prev,
+                    tagIds: prev.tagIds.filter(
+                      (id) => !categoryTags.some((cat) => cat.id === id)
+                    ),
+                  }));
                   setHasChanges(true);
                 }}
                 className="text-xs text-gray-500 hover:text-gray-700 dark:text-onedark-fg-muted dark:hover:text-onedark-fg"
@@ -125,26 +107,25 @@ export function SuggestionsSettings() {
             )}
           </div>
           <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-onedark-bg-highlight rounded-lg">
-            {flatCategories.length === 0 ? (
+            {categoryTags.length === 0 ? (
               <p className="p-3 text-sm text-gray-500 dark:text-onedark-fg-muted">
                 No categories available
               </p>
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-onedark-bg-highlight">
-                {flatCategories.map((cat) => (
+                {categoryTags.map((tag) => (
                   <label
-                    key={cat.id}
+                    key={tag.id}
                     className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight cursor-pointer"
-                    style={{ paddingLeft: `${12 + cat.depth * 16}px` }}
                   >
                     <input
                       type="checkbox"
-                      checked={config.categoryIds.includes(cat.id)}
-                      onChange={() => toggleCategory(cat.id)}
+                      checked={config.tagIds.includes(tag.id)}
+                      onChange={() => toggleTag(tag.id)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-onedark-bg-highlight dark:bg-onedark-bg"
                     />
-                    <span className="text-sm text-gray-700 dark:text-onedark-fg">
-                      {cat.name}
+                    <span className="text-sm font-medium text-gray-700 dark:text-onedark-fg">
+                      {tag.display_name}
                     </span>
                   </label>
                 ))}
@@ -153,16 +134,21 @@ export function SuggestionsSettings() {
           </div>
         </div>
 
-        {/* Tags */}
+        {/* Regular Tags */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-gray-700 dark:text-onedark-fg">
               Tags
             </h3>
-            {config.tagIds.length > 0 && (
+            {regularTags.some((tag) => config.tagIds.includes(tag.id)) && (
               <button
                 onClick={() => {
-                  setConfig((prev) => ({ ...prev, tagIds: [] }));
+                  setConfig((prev) => ({
+                    ...prev,
+                    tagIds: prev.tagIds.filter(
+                      (id) => !regularTags.some((t) => t.id === id)
+                    ),
+                  }));
                   setHasChanges(true);
                 }}
                 className="text-xs text-gray-500 hover:text-gray-700 dark:text-onedark-fg-muted dark:hover:text-onedark-fg"
@@ -172,13 +158,13 @@ export function SuggestionsSettings() {
             )}
           </div>
           <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-onedark-bg-highlight rounded-lg">
-            {tags.length === 0 ? (
+            {regularTags.length === 0 ? (
               <p className="p-3 text-sm text-gray-500 dark:text-onedark-fg-muted">
                 No tags available
               </p>
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-onedark-bg-highlight">
-                {tags.map((tag) => (
+                {regularTags.map((tag) => (
                   <label
                     key={tag.id}
                     className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight cursor-pointer"

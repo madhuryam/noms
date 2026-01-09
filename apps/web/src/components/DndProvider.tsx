@@ -9,7 +9,7 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core';
 
-export type DragItemType = 'recipe' | 'category' | 'shopping-item';
+export type DragItemType = 'recipe' | 'shopping-item';
 
 export interface DragItem {
   type: DragItemType;
@@ -36,11 +36,9 @@ export function useDndState() {
 
 interface DndProviderProps {
   children: ReactNode;
-  onRecipeDrop?: (recipeId: number, categoryId: number) => void;
-  onCategoryDrop?: (categoryId: number, newParentId: number | null) => void;
 }
 
-export function DndProvider({ children, onRecipeDrop, onCategoryDrop }: DndProviderProps) {
+export function DndProvider({ children }: DndProviderProps) {
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
@@ -66,38 +64,12 @@ export function DndProvider({ children, onRecipeDrop, onCategoryDrop }: DndProvi
   }, []);
 
   const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active: _active, over } = event;
-
-      if (over && activeItem) {
-        const overId = over.id.toString();
-
-        // Handle recipe drop onto category
-        if (activeItem.type === 'recipe' && overId.startsWith('category-')) {
-          const categoryId = parseInt(overId.replace('category-', ''), 10);
-          if (!isNaN(categoryId)) {
-            onRecipeDrop?.(activeItem.id as number, categoryId);
-          }
-        }
-
-        // Handle category drop onto category (reparent)
-        if (activeItem.type === 'category' && overId.startsWith('category-')) {
-          const newParentId = parseInt(overId.replace('category-', ''), 10);
-          if (!isNaN(newParentId) && newParentId !== activeItem.id) {
-            onCategoryDrop?.(activeItem.id as number, newParentId);
-          }
-        }
-
-        // Handle category drop to root
-        if (activeItem.type === 'category' && overId === 'category-root') {
-          onCategoryDrop?.(activeItem.id as number, null);
-        }
-      }
-
+    (_event: DragEndEvent) => {
+      // Shopping items are handled by their own component via useSortable
       setActiveItem(null);
       setOverId(null);
     },
-    [activeItem, onRecipeDrop, onCategoryDrop]
+    []
   );
 
   const handleDragCancel = useCallback(() => {

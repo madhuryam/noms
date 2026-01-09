@@ -26,13 +26,10 @@ export function useDailySuggestions() {
   }, []);
 
   const query = useQuery({
-    queryKey: ['suggestions', 'daily', config.categoryIds, config.tagIds],
+    queryKey: ['suggestions', 'daily', config.tagIds],
     queryFn: async (): Promise<SuggestionRecipe[]> => {
       const params = new URLSearchParams();
 
-      if (config.categoryIds.length > 0) {
-        params.set('categories', config.categoryIds.join(','));
-      }
       if (config.tagIds.length > 0) {
         params.set('tags', config.tagIds.join(','));
       }

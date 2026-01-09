@@ -169,7 +169,8 @@ export function ImportPreview({
         ...parsed,
         title: newTitle,
         filePath: selectedRecipe.filePath,
-        category: selectedRecipe.category,
+        categoryTag: selectedRecipe.categoryTag,
+        folderTags: selectedRecipe.folderTags,
         selected: titleChanged ? true : selectedRecipe.selected, // Auto-select if title was changed
         parseErrors: validation.errors,
         parseWarnings: validation.warnings,

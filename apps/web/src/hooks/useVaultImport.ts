@@ -54,7 +54,8 @@ interface ImportRecipe {
   images: Array<{ path: string; alt: string | null }>;
   rawContent: string;
   filePath: string;
-  category: string | null;
+  categoryTag: string | null; // Top-level folder becomes category tag
+  folderTags: string[]; // Remaining folder segments become regular tags
   metadata: {
     prepTime: number | null;
     cookTime: number | null;
@@ -174,7 +175,8 @@ export function useVaultImport() {
           images: recipe.images,
           rawContent: recipe.rawContent,
           filePath: recipe.filePath,
-          category: recipe.category,
+          categoryTag: recipe.categoryTag,
+          folderTags: recipe.folderTags,
           metadata: recipe.metadata,
         }));
 

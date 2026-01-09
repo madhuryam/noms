@@ -9,7 +9,8 @@ export interface VaultFile {
 
 export interface ParsedVaultRecipe extends ParsedRecipe {
   filePath: string;
-  category: string | null;
+  categoryTag: string | null; // Top-level folder becomes category tag
+  folderTags: string[]; // Remaining folder segments become regular tags
   selected: boolean;
   parseErrors: string[];
   parseWarnings: string[];
@@ -19,16 +20,8 @@ export interface ParsedVaultRecipe extends ParsedRecipe {
   existingId?: number; // ID of existing recipe if duplicate
 }
 
-export interface CategoryNode {
-  name: string;
-  path: string;
-  recipeCount: number;
-  children: CategoryNode[];
-}
-
 export interface VaultParseResult {
   recipes: ParsedVaultRecipe[];
-  categories: CategoryNode[];
   images: Map<string, File>;
   errors: string[];
 }

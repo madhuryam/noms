@@ -33,8 +33,7 @@ interface ExportedRecipe {
   last_accessed_at: string | null;
   cook_count: number;
   // Related data
-  categories: { id: number; name: string; path: string; is_primary: number }[];
-  tags: { id: number; name: string; display_name: string | null; color: string | null }[];
+  tags: { id: number; name: string; display_name: string | null; color: string | null; is_category: number }[];
   images: { id: number; path: string; alt: string | null; sort_order: number }[];
   ingredients: {
     id: number;
@@ -63,21 +62,13 @@ interface FullExportData {
   exportedAt: string;
   // Core tables
   recipes: ExportedRecipe[];
-  categories: {
-    id: number;
-    name: string;
-    slug: string;
-    parent_id: number | null;
-    path: string;
-    depth: number;
-    sort_order: number;
-  }[];
   tags: {
     id: number;
     name: string;
     display_name: string | null;
     color: string | null;
     usage_count: number;
+    is_category: number;
   }[];
   // Ingredients
   ingredients: {
@@ -162,11 +153,13 @@ function generateSlug(title: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function buildCategoryPath(categories: { name: string; path: string }[]): string {
-  if (categories.length === 0) return '';
-  // Find primary category or use first one
-  const primary = categories[0];
-  return primary.path ? `${primary.path}/${primary.name}` : primary.name;
+function buildCategoryPath(tags: { name: string; display_name: string | null; is_category: number }[]): string {
+  // Find category tags (is_category = 1)
+  const categoryTags = tags.filter(t => t.is_category);
+  if (categoryTags.length === 0) return '';
+  // Use the first category tag as the folder name
+  const primary = categoryTags[0];
+  return primary.display_name || primary.name;
 }
 
 /**
@@ -274,8 +267,8 @@ function generateRecipeMarkdown(recipe: ExportedRecipe): string {
   }
 
   // Category as path string
-  if (recipe.categories.length > 0) {
-    const categoryPath = buildCategoryPath(recipe.categories);
+  if (recipe.tags.some(t => t.is_category)) {
+    const categoryPath = buildCategoryPath(recipe.tags);
     if (categoryPath) {
       lines.push(`category: "${categoryPath}"`);
     }
@@ -400,23 +393,10 @@ async function getFullRecipe(db: D1Database, recipeId: number): Promise<Exported
 
   if (!recipe) return null;
 
-  // Get categories
-  const categoriesResult = await db
-    .prepare(`
-      SELECT c.id, c.name, c.path, rc.is_primary
-      FROM categories c
-      JOIN recipe_categories rc ON c.id = rc.category_id
-      WHERE rc.recipe_id = ?
-      ORDER BY rc.is_primary DESC, c.depth ASC
-    `)
-    .bind(recipeId)
-    .all();
-  recipe.categories = (categoriesResult.results || []) as ExportedRecipe['categories'];
-
-  // Get tags
+  // Get tags (includes category tags with is_category=1)
   const tagsResult = await db
     .prepare(`
-      SELECT t.id, t.name, t.display_name, t.color
+      SELECT t.id, t.name, t.display_name, t.color, t.is_category
       FROM tags t
       JOIN recipe_tags rt ON t.id = rt.tag_id
       WHERE rt.recipe_id = ?
@@ -533,14 +513,9 @@ exportRoutes.get('/data', async (c) => {
       }
     }
 
-    // Get all categories
-    const categoriesResult = await db
-      .prepare('SELECT id, name, slug, parent_id, path, depth, sort_order FROM categories ORDER BY depth, sort_order')
-      .all();
-
-    // Get all tags
+    // Get all tags (includes category tags with is_category=1)
     const tagsResult = await db
-      .prepare('SELECT id, name, display_name, color, usage_count FROM tags ORDER BY name')
+      .prepare('SELECT id, name, display_name, color, usage_count, is_category FROM tags ORDER BY name')
       .all();
 
     // Get all ingredients
@@ -600,7 +575,6 @@ exportRoutes.get('/data', async (c) => {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
       recipes,
-      categories: (categoriesResult.results || []) as FullExportData['categories'],
       tags: (tagsResult.results || []) as FullExportData['tags'],
       ingredients: (ingredientsResult.results || []) as FullExportData['ingredients'],
       pantryItems: (pantryResult.results || []) as FullExportData['pantryItems'],
@@ -639,7 +613,6 @@ exportRoutes.get('/data/preview', async (c) => {
       .prepare(`
         SELECT
           (SELECT COUNT(*) FROM recipes) as recipes,
-          (SELECT COUNT(*) FROM categories) as categories,
           (SELECT COUNT(*) FROM tags) as tags,
           (SELECT COUNT(*) FROM ingredients) as ingredients,
           (SELECT COUNT(*) FROM pantry_items) as pantry_items,
@@ -703,7 +676,6 @@ exportRoutes.post('/import', async (c) => {
     }
 
     const stats = {
-      categories: 0,
       tags: 0,
       ingredients: 0,
       recipes: 0,
@@ -738,7 +710,6 @@ exportRoutes.post('/import', async (c) => {
       db.prepare('DELETE FROM recipe_images'),
       db.prepare('DELETE FROM recipe_ingredients'),
       db.prepare('DELETE FROM recipe_tags'),
-      db.prepare('DELETE FROM recipe_categories'),
       db.prepare('DELETE FROM recipes'),
       db.prepare('DELETE FROM pantry_items'),
       db.prepare('DELETE FROM food_association_terms'),
@@ -746,27 +717,14 @@ exportRoutes.post('/import', async (c) => {
       db.prepare('DELETE FROM shelf_life'),
       db.prepare('DELETE FROM ingredients'),
       db.prepare('DELETE FROM tags'),
-      db.prepare('DELETE FROM categories'),
     ]);
 
-    // Import categories (order by depth to ensure parents exist first)
-    if (importData.categories?.length) {
-      const sortedCategories = [...importData.categories].sort((a, b) => a.depth - b.depth);
-      const categoryStmts = sortedCategories.map((cat) =>
-        db
-          .prepare('INSERT INTO categories (id, name, slug, parent_id, path, depth, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .bind(cat.id, cat.name, cat.slug, n(cat.parent_id), n(cat.path), cat.depth, cat.sort_order)
-      );
-      await runBatched(categoryStmts);
-      stats.categories = sortedCategories.length;
-    }
-
-    // Import tags
+    // Import tags (categories are now just tags with is_category=1)
     if (importData.tags?.length) {
       const tagStmts = importData.tags.map((tag) =>
         db
-          .prepare('INSERT INTO tags (id, name, display_name, color, usage_count) VALUES (?, ?, ?, ?, ?)')
-          .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0)
+          .prepare('INSERT INTO tags (id, name, display_name, color, usage_count, is_category) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0, (tag as { is_category?: number }).is_category ?? 0)
       );
       await runBatched(tagStmts);
       stats.tags = importData.tags.length;
@@ -819,18 +777,6 @@ exportRoutes.post('/import', async (c) => {
       );
       await runBatched(recipeStmts);
       stats.recipes = importData.recipes.length;
-
-      // Batch recipe categories
-      const recipeCatStmts: D1PreparedStatement[] = [];
-      for (const recipe of importData.recipes) {
-        for (const cat of recipe.categories || []) {
-          recipeCatStmts.push(
-            db.prepare('INSERT INTO recipe_categories (recipe_id, category_id, is_primary) VALUES (?, ?, ?)')
-              .bind(recipe.id, cat.id, cat.is_primary ?? 0)
-          );
-        }
-      }
-      await runBatched(recipeCatStmts);
 
       // Batch recipe tags
       const recipeTagStmts: D1PreparedStatement[] = [];
@@ -1034,7 +980,6 @@ exportRoutes.delete('/clear', async (c) => {
       db.prepare('DELETE FROM recipe_images'),
       db.prepare('DELETE FROM recipe_ingredients'),
       db.prepare('DELETE FROM recipe_tags'),
-      db.prepare('DELETE FROM recipe_categories'),
       db.prepare('DELETE FROM recipes'),
       db.prepare('DELETE FROM pantry_items'),
       db.prepare('DELETE FROM food_association_terms'),
@@ -1042,7 +987,6 @@ exportRoutes.delete('/clear', async (c) => {
       db.prepare('DELETE FROM shelf_life'),
       db.prepare('DELETE FROM ingredients'),
       db.prepare('DELETE FROM tags'),
-      db.prepare('DELETE FROM categories'),
     ]);
 
     return c.json({
@@ -1231,7 +1175,7 @@ function generateMealPlanMarkdown(
       lines.push(`### ${slot?.display_name || 'Meal'}`);
       if (recipe) {
         const recipeSlug = generateSlug(recipe.title);
-        const categoryPath = buildCategoryPath(recipe.categories);
+        const categoryPath = buildCategoryPath(recipe.tags);
         const recipePath = categoryPath
           ? `Recipes/${categoryPath}/${recipeSlug}.md`
           : `Recipes/${recipeSlug}.md`;
@@ -1269,11 +1213,6 @@ exportRoutes.get('/vault', async (c) => {
       }
     }
 
-    const categoriesResult = await db
-      .prepare('SELECT id, name, slug, parent_id, path, depth, sort_order FROM categories ORDER BY depth, sort_order')
-      .all();
-    const categories = (categoriesResult.results || []) as FullExportData['categories'];
-
     const pantryResult = await db
       .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple FROM pantry_items ORDER BY name')
       .all();
@@ -1310,7 +1249,7 @@ exportRoutes.get('/vault', async (c) => {
     const shelfLife = (shelfLifeResult.results || []) as FullExportData['shelfLife'];
 
     const tagsResult = await db
-      .prepare('SELECT id, name, display_name, color, usage_count FROM tags ORDER BY name')
+      .prepare('SELECT id, name, display_name, color, usage_count, is_category FROM tags ORDER BY name')
       .all();
     const tags = (tagsResult.results || []) as FullExportData['tags'];
 
@@ -1326,7 +1265,7 @@ exportRoutes.get('/vault', async (c) => {
     for (const recipe of recipes) {
       const markdown = generateRecipeMarkdown(recipe);
       const slug = generateSlug(recipe.title);
-      const categoryPath = buildCategoryPath(recipe.categories);
+      const categoryPath = buildCategoryPath(recipe.tags);
 
       // Build file path
       let filePath: string;
@@ -1382,7 +1321,6 @@ exportRoutes.get('/vault', async (c) => {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
       recipes,
-      categories,
       tags,
       ingredients,
       pantryItems,

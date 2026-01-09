@@ -124,28 +124,37 @@ function DraggableRecipeCard({ recipe }: DraggableRecipeCardProps) {
             )}
           </div>
 
-          {/* Tags */}
-          {((recipe.categories && recipe.categories.length > 0) ||
-            (recipe.tags && recipe.tags.length > 0)) && (
+          {/* Tags - category tags first with distinct styling */}
+          {recipe.tags && recipe.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1">
-              {recipe.categories?.slice(0, 2).map((category) => (
-                <span
-                  key={category}
-                  className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-onedark-blue/10 text-blue-600 dark:text-onedark-blue rounded-full"
-                >
-                  {category}
-                </span>
-              ))}
-              {recipe.tags?.slice(0, 2).map((tag) => (
-                <Link
-                  key={tag.id}
-                  to={`/recipes?tags=${encodeURIComponent(tag.name)}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted rounded-full hover:bg-gray-200 dark:hover:bg-onedark-bg transition-colors"
-                >
-                  {tag.display_name}
-                </Link>
-              ))}
+              {/* Category tags first */}
+              {recipe.tags
+                .filter((tag) => tag.is_category)
+                .slice(0, 2)
+                .map((tag) => (
+                  <Link
+                    key={tag.id}
+                    to={`/recipes?tags=${encodeURIComponent(tag.name)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-2 py-0.5 text-xs font-semibold bg-gray-100 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-full border-2 border-gray-400 dark:border-gray-500 hover:bg-gray-200 dark:hover:bg-onedark-bg transition-colors"
+                  >
+                    {tag.display_name || tag.name}
+                  </Link>
+                ))}
+              {/* Regular tags */}
+              {recipe.tags
+                .filter((tag) => !tag.is_category)
+                .slice(0, 2)
+                .map((tag) => (
+                  <Link
+                    key={tag.id}
+                    to={`/recipes?tags=${encodeURIComponent(tag.name)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted rounded-full hover:bg-gray-200 dark:hover:bg-onedark-bg transition-colors"
+                  >
+                    {tag.display_name || tag.name}
+                  </Link>
+                ))}
             </div>
           )}
         </div>

@@ -26,7 +26,8 @@ interface ImportRecipe {
   images: { path: string; alt: string | null }[];
   rawContent: string;
   filePath: string;
-  category: string | null;
+  categoryTag: string | null; // Top-level folder becomes category tag
+  folderTags: string[]; // Remaining folder segments become regular tags
   metadata: {
     prepTime: number | null;
     cookTime: number | null;
@@ -52,10 +53,6 @@ interface ImportResult {
   success: boolean;
   error?: string;
   imagePaths?: string[];
-}
-
-interface CategoryMap {
-  [path: string]: number;
 }
 
 const importRoutes = new Hono<{ Bindings: Bindings }>();
@@ -283,78 +280,10 @@ function normalizeInstructions(text: string | null): string | null {
 }
 
 /**
- * Process category paths and create/get category IDs
- * Handles hierarchical paths like "Main Courses/Beef/Steaks"
- */
-async function processCategories(db: D1Database, categoryPaths: string[]): Promise<CategoryMap> {
-  const categoryMap: CategoryMap = {};
-  const uniquePaths = [...new Set(categoryPaths.filter(Boolean))];
-
-  for (const fullPath of uniquePaths) {
-    const parts = fullPath
-      .split('/')
-      .map((p) => p.trim())
-      .filter(Boolean);
-    let parentId: number | null = null;
-    let currentPath = '';
-
-    for (let i = 0; i < parts.length; i++) {
-      const name = parts[i];
-      const pathParts = parts.slice(0, i);
-      currentPath = pathParts.length > 0 ? pathParts.join('/') : '';
-      const depth = i;
-
-      // Generate slug - include parent ID for uniqueness at nested levels
-      const baseSlug = generateSlug(name);
-      const slug: string = depth > 0 && parentId ? `${baseSlug}-${parentId}` : baseSlug;
-
-      // Check if category exists by slug (slug is globally unique)
-      const existing = await db
-        .prepare('SELECT id FROM categories WHERE slug = ?')
-        .bind(slug)
-        .first<{ id: number }>();
-
-      if (existing) {
-        parentId = existing.id;
-      } else {
-        // Also check if a category with this name exists with this parent
-        const byNameAndParent: { id: number } | null = await db
-          .prepare(
-            'SELECT id FROM categories WHERE name = ? AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))'
-          )
-          .bind(name, parentId, parentId)
-          .first();
-
-        if (byNameAndParent) {
-          parentId = byNameAndParent.id;
-        } else {
-          // Create the category
-          const result = await db
-            .prepare(
-              `INSERT INTO categories (name, slug, parent_id, path, depth)
-               VALUES (?, ?, ?, ?, ?)`
-            )
-            .bind(name, slug, parentId, currentPath, depth)
-            .run();
-
-          parentId = result.meta.last_row_id as number;
-        }
-      }
-
-      // Store the full path mapping for leaf categories
-      if (i === parts.length - 1 && parentId !== null) {
-        categoryMap[fullPath] = parentId;
-      }
-    }
-  }
-
-  return categoryMap;
-}
-
-/**
  * Get or create a tag by name
+ * @param isCategory - if true, creates a category tag (is_category = 1)
  */
-async function getOrCreateTag(db: D1Database, tagName: string): Promise<number> {
+async function getOrCreateTag(db: D1Database, tagName: string, isCategory: boolean = false): Promise<number> {
   const normalized = tagName.toLowerCase().trim();
 
   const existing = await db
@@ -367,8 +296,8 @@ async function getOrCreateTag(db: D1Database, tagName: string): Promise<number> 
   }
 
   const result = await db
-    .prepare('INSERT INTO tags (name, display_name, usage_count) VALUES (?, ?, 0)')
-    .bind(normalized, tagName.trim())
+    .prepare('INSERT INTO tags (name, display_name, usage_count, is_category) VALUES (?, ?, 0, ?)')
+    .bind(normalized, tagName.trim(), isCategory ? 1 : 0)
     .run();
 
   return result.meta.last_row_id as number;
@@ -490,61 +419,19 @@ importRoutes.post('/vault', async (c) => {
 
       const recipeId = recipeResult.meta.last_row_id as number;
 
-      // Process category if present
-      if (recipe.category) {
-        const parts = recipe.category
-          .split('/')
-          .map((p) => p.trim())
-          .filter(Boolean);
+      // Process category tag (top-level folder) and folder tags
+      const tagIds: number[] = [];
 
-        let parentId: number | null = null;
+      // Category tag (from top-level folder)
+      if (recipe.categoryTag) {
+        const categoryTagId = await getOrCreateTag(c.env.DB, recipe.categoryTag, true);
+        tagIds.push(categoryTagId);
+      }
 
-        for (let i = 0; i < parts.length; i++) {
-          const name = parts[i];
-          const depth = i;
-          const pathParts = parts.slice(0, i);
-          const currentPath = pathParts.length > 0 ? pathParts.join('/') : '';
-
-          // Generate slug - include parent path for uniqueness at nested levels
-          const baseSlug = generateSlug(name);
-          const slug: string = depth > 0 && parentId ? `${baseSlug}-${parentId}` : baseSlug;
-
-          // Check if category exists by slug (slug is globally unique)
-          const existing = await c.env.DB.prepare('SELECT id FROM categories WHERE slug = ?')
-            .bind(slug)
-            .first<{ id: number }>();
-
-          if (existing) {
-            parentId = existing.id;
-          } else {
-            // Also check if a category with this name exists at this depth with this parent
-            const byNameAndParent: { id: number } | null = await c.env.DB.prepare(
-              'SELECT id FROM categories WHERE name = ? AND (parent_id = ? OR (parent_id IS NULL AND ? IS NULL))'
-            )
-              .bind(name, parentId, parentId)
-              .first();
-
-            if (byNameAndParent) {
-              parentId = byNameAndParent.id;
-            } else {
-              const catResult = await c.env.DB.prepare(
-                `INSERT INTO categories (name, slug, parent_id, path, depth) VALUES (?, ?, ?, ?, ?)`
-              )
-                .bind(name, slug, parentId, currentPath, depth)
-                .run();
-              parentId = catResult.meta.last_row_id as number;
-            }
-          }
-        }
-
-        // Link recipe to leaf category
-        if (parentId) {
-          statements.push(
-            c.env.DB.prepare(
-              `INSERT OR IGNORE INTO recipe_categories (recipe_id, category_id, is_primary) VALUES (?, ?, 1)`
-            ).bind(recipeId, parentId)
-          );
-        }
+      // Folder tags (from subfolders)
+      for (const folderTag of recipe.folderTags || []) {
+        const folderTagId = await getOrCreateTag(c.env.DB, folderTag, false);
+        tagIds.push(folderTagId);
       }
 
       // Add ingredients to batch
@@ -563,10 +450,7 @@ importRoutes.post('/vault', async (c) => {
         );
       }
 
-      // Process tags - first get/create all tags
-      const tagIds: number[] = [];
-
-      // Get tags from metadata
+      // Process tags from metadata (frontmatter)
       const tagsToProcess = [...(recipe.metadata?.tags ?? [])];
 
       // Auto-detect quick-and-easy tag
@@ -574,37 +458,23 @@ importRoutes.post('/vault', async (c) => {
         tagsToProcess.push('quick-and-easy');
       }
 
-      if (tagsToProcess.length > 0) {
-        for (const tagName of tagsToProcess) {
-          const normalized = tagName.toLowerCase().trim();
-          const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ?')
-            .bind(normalized)
-            .first<{ id: number }>();
+      // Add frontmatter tags (as regular tags, not category tags)
+      for (const tagName of tagsToProcess) {
+        const tagId = await getOrCreateTag(c.env.DB, tagName, false);
+        tagIds.push(tagId);
+      }
 
-          if (existing) {
-            tagIds.push(existing.id);
-          } else {
-            const tagResult = await c.env.DB.prepare(
-              'INSERT INTO tags (name, display_name, usage_count) VALUES (?, ?, 1)'
-            )
-              .bind(normalized, tagName.trim())
-              .run();
-            tagIds.push(tagResult.meta.last_row_id as number);
-          }
-        }
-
-        // Add tag links to batch
-        for (const tagId of tagIds) {
-          statements.push(
-            c.env.DB.prepare(`INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)`).bind(
-              recipeId,
-              tagId
-            )
-          );
-          statements.push(
-            c.env.DB.prepare(`UPDATE tags SET usage_count = usage_count + 1 WHERE id = ?`).bind(tagId)
-          );
-        }
+      // Add all tag links to batch (category tags, folder tags, and frontmatter tags)
+      for (const tagId of tagIds) {
+        statements.push(
+          c.env.DB.prepare(`INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)`).bind(
+            recipeId,
+            tagId
+          )
+        );
+        statements.push(
+          c.env.DB.prepare(`UPDATE tags SET usage_count = usage_count + 1 WHERE id = ?`).bind(tagId)
+        );
       }
 
       // Execute all remaining statements in a single batch
@@ -773,14 +643,14 @@ importRoutes.get('/status', async (c) => {
     const stats = await c.env.DB.prepare(
       `SELECT
         (SELECT COUNT(*) FROM recipes) as total_recipes,
-        (SELECT COUNT(*) FROM categories) as total_categories,
         (SELECT COUNT(*) FROM tags) as total_tags,
+        (SELECT COUNT(*) FROM tags WHERE is_category = 1) as total_category_tags,
         (SELECT COUNT(*) FROM recipe_ingredients) as total_ingredients
       `
     ).first<{
       total_recipes: number;
-      total_categories: number;
       total_tags: number;
+      total_category_tags: number;
       total_ingredients: number;
     }>();
 

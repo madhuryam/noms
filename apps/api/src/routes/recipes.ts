@@ -127,13 +127,13 @@ recipes.get('/', async (c) => {
 
     // Get tags for each recipe
     const recipeIds = (results.results ?? []).map((r) => (r as { id: number }).id);
-    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null }>> = {};
+    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; is_category: number }>> = {};
 
     if (recipeIds.length > 0) {
       const placeholders = recipeIds.map(() => '?').join(',');
       const tagsResult = await c.env.DB.prepare(
         `
-        SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color
+        SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color, t.is_category
         FROM recipe_tags rt
         JOIN tags t ON rt.tag_id = t.id
         WHERE rt.recipe_id IN (${placeholders})
@@ -144,7 +144,7 @@ recipes.get('/', async (c) => {
 
       // Group tags by recipe_id
       for (const row of tagsResult.results ?? []) {
-        const r = row as { recipe_id: number; id: number; name: string; display_name: string; color: string | null };
+        const r = row as { recipe_id: number; id: number; name: string; display_name: string; color: string | null; is_category: number };
         if (!recipeTags[r.recipe_id]) {
           recipeTags[r.recipe_id] = [];
         }
@@ -153,6 +153,7 @@ recipes.get('/', async (c) => {
           name: r.name,
           display_name: r.display_name,
           color: r.color,
+          is_category: r.is_category,
         });
       }
     }
@@ -186,17 +187,12 @@ recipes.get('/', async (c) => {
 
 // GET /api/recipes/suggestions/daily - Get random recipe suggestions
 // Query params:
-//   - categories: comma-separated category IDs (optional)
 //   - tags: comma-separated tag IDs (optional)
 // If no filters provided, returns random recipes from all recipes
 recipes.get('/suggestions/daily', async (c) => {
   try {
-    const categoriesParam = c.req.query('categories');
     const tagsParam = c.req.query('tags');
 
-    const categoryIds = categoriesParam
-      ? categoriesParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
-      : [];
     const tagIds = tagsParam
       ? tagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
       : [];
@@ -204,35 +200,8 @@ recipes.get('/suggestions/daily', async (c) => {
     let query: string;
     const bindings: number[] = [];
 
-    if (categoryIds.length > 0 && tagIds.length > 0) {
-      // Filter by both categories AND tags
-      const catPlaceholders = categoryIds.map(() => '?').join(',');
-      const tagPlaceholders = tagIds.map(() => '?').join(',');
-      query = `
-        SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
-        FROM recipes r
-        JOIN recipe_categories rc ON r.id = rc.recipe_id
-        JOIN recipe_tags rt ON r.id = rt.recipe_id
-        WHERE rc.category_id IN (${catPlaceholders})
-          AND rt.tag_id IN (${tagPlaceholders})
-        ORDER BY RANDOM()
-        LIMIT 10
-      `;
-      bindings.push(...categoryIds, ...tagIds);
-    } else if (categoryIds.length > 0) {
-      // Filter by categories only
-      const placeholders = categoryIds.map(() => '?').join(',');
-      query = `
-        SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
-        FROM recipes r
-        JOIN recipe_categories rc ON r.id = rc.recipe_id
-        WHERE rc.category_id IN (${placeholders})
-        ORDER BY RANDOM()
-        LIMIT 10
-      `;
-      bindings.push(...categoryIds);
-    } else if (tagIds.length > 0) {
-      // Filter by tags only
+    if (tagIds.length > 0) {
+      // Filter by tags
       const placeholders = tagIds.map(() => '?').join(',');
       query = `
         SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
@@ -464,12 +433,12 @@ recipes.get('/suggestions/pantry', async (c) => {
 
     // Get tags for the recipes
     const recipeIds = limitedResults.map(r => r.recipe.id);
-    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null }>> = {};
+    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; is_category: number }>> = {};
 
     if (recipeIds.length > 0) {
       const placeholders = recipeIds.map(() => '?').join(',');
       const tagsResult = await c.env.DB.prepare(`
-        SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color
+        SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color, t.is_category
         FROM recipe_tags rt
         JOIN tags t ON rt.tag_id = t.id
         WHERE rt.recipe_id IN (${placeholders})
@@ -477,7 +446,7 @@ recipes.get('/suggestions/pantry', async (c) => {
         .bind(...recipeIds)
         .all();
 
-      for (const row of (tagsResult.results ?? []) as Array<{ recipe_id: number; id: number; name: string; display_name: string; color: string | null }>) {
+      for (const row of (tagsResult.results ?? []) as Array<{ recipe_id: number; id: number; name: string; display_name: string; color: string | null; is_category: number }>) {
         if (!recipeTags[row.recipe_id]) {
           recipeTags[row.recipe_id] = [];
         }
@@ -486,6 +455,7 @@ recipes.get('/suggestions/pantry', async (c) => {
           name: row.name,
           display_name: row.display_name,
           color: row.color,
+          is_category: row.is_category,
         });
       }
     }
@@ -666,7 +636,7 @@ recipes.get('/:id/match', async (c) => {
   }
 });
 
-// GET /api/recipes/:id - Get single recipe with tags and categories
+// GET /api/recipes/:id - Get single recipe with tags
 recipes.get('/:id', async (c) => {
   const id = Number(c.req.param('id'));
 
@@ -690,25 +660,14 @@ recipes.get('/:id', async (c) => {
         .run()
     );
 
-    // Get tags for this recipe
+    // Get tags for this recipe (including is_category flag)
     const tags = await c.env.DB.prepare(
       `
-      SELECT t.id, t.name, t.display_name, t.color
+      SELECT t.id, t.name, t.display_name, t.color, t.is_category
       FROM tags t
       JOIN recipe_tags rt ON t.id = rt.tag_id
       WHERE rt.recipe_id = ?
-    `
-    )
-      .bind(id)
-      .all();
-
-    // Get categories for this recipe
-    const categories = await c.env.DB.prepare(
-      `
-      SELECT c.id, c.name, c.slug, c.path, rc.is_primary
-      FROM categories c
-      JOIN recipe_categories rc ON c.id = rc.category_id
-      WHERE rc.recipe_id = ?
+      ORDER BY t.is_category DESC, t.name
     `
     )
       .bind(id)
@@ -729,7 +688,6 @@ recipes.get('/:id', async (c) => {
     return c.json({
       ...recipe,
       tags: tags.results,
-      categories: categories.results,
       images: images.results,
     });
   } catch (error) {
@@ -875,68 +833,6 @@ recipes.put('/:id', async (c) => {
   }
 });
 
-// PUT /api/recipes/:id/categories - Update recipe's category assignments
-recipes.put('/:id/categories', async (c) => {
-  const id = Number(c.req.param('id'));
-
-  try {
-    const body = await c.req.json<{
-      categoryIds: number[];
-      primaryCategoryId?: number;
-    }>();
-
-    const { categoryIds, primaryCategoryId } = body;
-
-    if (!Array.isArray(categoryIds)) {
-      return c.json({ error: 'categoryIds must be an array' }, 400);
-    }
-
-    // Check if recipe exists
-    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?').bind(id).first();
-
-    if (!existing) {
-      return c.json({ error: 'Recipe not found' }, 404);
-    }
-
-    // Delete existing category associations
-    await c.env.DB.prepare('DELETE FROM recipe_categories WHERE recipe_id = ?').bind(id).run();
-
-    // Insert new category associations
-    const primaryId = primaryCategoryId ?? categoryIds[0];
-    for (const categoryId of categoryIds) {
-      await c.env.DB.prepare(
-        `INSERT INTO recipe_categories (recipe_id, category_id, is_primary)
-         VALUES (?, ?, ?)`
-      )
-        .bind(id, categoryId, categoryId === primaryId ? 1 : 0)
-        .run();
-    }
-
-    // Get updated categories
-    const categories = await c.env.DB.prepare(
-      `SELECT c.id, c.name, c.slug, c.path, rc.is_primary
-       FROM categories c
-       JOIN recipe_categories rc ON c.id = rc.category_id
-       WHERE rc.recipe_id = ?`
-    )
-      .bind(id)
-      .all();
-
-    return c.json({
-      success: true,
-      recipeId: id,
-      categories: categories.results,
-    });
-  } catch (error) {
-    return c.json(
-      {
-        error: error instanceof Error ? error.message : 'Failed to update recipe categories',
-      },
-      500
-    );
-  }
-});
-
 // DELETE /api/recipes/:id - Delete recipe
 recipes.delete('/:id', async (c) => {
   const id = Number(c.req.param('id'));
@@ -967,11 +863,9 @@ recipes.delete('/', async (c) => {
     // Delete in correct order to respect foreign keys
     await c.env.DB.prepare('DELETE FROM recipe_ingredients').run();
     await c.env.DB.prepare('DELETE FROM recipe_tags').run();
-    await c.env.DB.prepare('DELETE FROM recipe_categories').run();
     await c.env.DB.prepare('DELETE FROM recipes').run();
-    // Also clean up orphaned tags and categories
+    // Also clean up orphaned tags
     await c.env.DB.prepare('DELETE FROM tags').run();
-    await c.env.DB.prepare('DELETE FROM categories').run();
 
     return c.json({ success: true, message: 'All recipes deleted' });
   } catch (error) {

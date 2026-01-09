@@ -6,6 +6,7 @@ export interface RecipeTag {
   name: string;
   display_name: string;
   color: string | null;
+  is_category?: boolean | number; // Can be boolean or 0/1 from SQLite
 }
 
 export interface Recipe {
@@ -17,7 +18,6 @@ export interface Recipe {
   cook_time_minutes: number | null;
   servings: number | null;
   created_at: string;
-  categories?: string[];
   tags?: RecipeTag[];
 }
 

@@ -4,7 +4,7 @@ import { TagPill, type Tag } from './TagPill';
 import { useCreateTag } from '../../hooks';
 
 interface TagFilterProps {
-  tags: (Tag & { usage_count: number })[];
+  tags: (Tag & { usage_count: number; is_category?: boolean | number })[];
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
   tagMode: 'all' | 'any';
@@ -24,10 +24,14 @@ export function TagFilter({
   const [createError, setCreateError] = useState('');
   const createTag = useCreateTag();
 
-  // Sort tags by usage count and show top ones
-  const sortedTags = [...tags].sort((a, b) => b.usage_count - a.usage_count);
-  const popularTags = showAll ? sortedTags : sortedTags.slice(0, 8);
-  const hasMoreTags = sortedTags.length > 8;
+  // Separate category tags from regular tags
+  const categoryTags = tags.filter((t) => t.is_category);
+  const regularTags = tags.filter((t) => !t.is_category);
+
+  // Sort regular tags by usage count and show top ones
+  const sortedRegularTags = [...regularTags].sort((a, b) => b.usage_count - a.usage_count);
+  const popularRegularTags = showAll ? sortedRegularTags : sortedRegularTags.slice(0, 8);
+  const hasMoreTags = sortedRegularTags.length > 8;
 
   const toggleTag = (tagName: string) => {
     if (selectedTags.includes(tagName)) {
@@ -179,26 +183,64 @@ export function TagFilter({
           No tags yet. Click "Add Tag" to create your first tag.
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {popularTags.map((tag) => {
-            const isSelected = selectedTags.includes(tag.name);
-            return (
-              <button
-                key={tag.id}
-                onClick={() => toggleTag(tag.name)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 dark:ring-onedark-blue ring-offset-1 dark:ring-offset-onedark-bg-lighter'
-                    : 'opacity-70 hover:opacity-100'
-                }`}
-              >
-                <TagPill tag={tag} size="sm" />
-                <span className="text-gray-500 dark:text-onedark-fg-muted ml-1">
-                  ({tag.usage_count})
-                </span>
-              </button>
-            );
-          })}
+        <div className="space-y-4">
+          {/* Category Tags Section */}
+          {categoryTags.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2">Categories</h4>
+              <div className="flex flex-wrap gap-2">
+                {categoryTags.map((tag) => {
+                  const isSelected = selectedTags.includes(tag.name);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => toggleTag(tag.name)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                        isSelected
+                          ? 'ring-2 ring-blue-500 dark:ring-onedark-blue ring-offset-1 dark:ring-offset-onedark-bg-lighter'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <TagPill tag={tag} size="sm" />
+                      <span className="text-gray-500 dark:text-onedark-fg-muted ml-1">
+                        ({tag.usage_count})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Regular Tags Section */}
+          {regularTags.length > 0 && (
+            <div>
+              {categoryTags.length > 0 && (
+                <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2">Tags</h4>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {popularRegularTags.map((tag) => {
+                  const isSelected = selectedTags.includes(tag.name);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => toggleTag(tag.name)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                        isSelected
+                          ? 'ring-2 ring-blue-500 dark:ring-onedark-blue ring-offset-1 dark:ring-offset-onedark-bg-lighter'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <TagPill tag={tag} size="sm" />
+                      <span className="text-gray-500 dark:text-onedark-fg-muted ml-1">
+                        ({tag.usage_count})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -208,7 +250,7 @@ export function TagFilter({
           onClick={() => setShowAll(!showAll)}
           className="mt-2 text-xs text-blue-600 dark:text-onedark-blue hover:underline"
         >
-          {showAll ? 'Show less' : `Show ${sortedTags.length - 8} more tags`}
+          {showAll ? 'Show less' : `Show ${sortedRegularTags.length - 8} more tags`}
         </button>
       )}
 

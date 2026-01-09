@@ -7,6 +7,7 @@ export interface Tag {
   display_name: string;
   color: string | null;
   usage_count: number;
+  is_category?: boolean | number; // Can be boolean or 0/1 from SQLite
 }
 
 interface TagsResponse {

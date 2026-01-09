@@ -28,7 +28,6 @@ export function RecipeGrid({ recipes, loading = false }: RecipeGridProps) {
           prepTime={recipe.prep_time_minutes}
           cookTime={recipe.cook_time_minutes}
           servings={recipe.servings}
-          categories={recipe.categories}
           tags={recipe.tags}
         />
       ))}

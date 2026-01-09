@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { recipes, categories, tags, search, importRoutes, images, associations, pantry, shelfLife, mealPlans, exportRoutes } from './routes';
+import { recipes, tags, search, importRoutes, images, associations, pantry, shelfLife, mealPlans, exportRoutes } from './routes';
 import { validateAccessJWT } from './middleware';
 
 interface HealthResponse {
@@ -72,8 +72,8 @@ app.get('/api/db-check', async (c) => {
       `
       SELECT
         (SELECT COUNT(*) FROM recipes) as recipes,
-        (SELECT COUNT(*) FROM categories) as categories,
         (SELECT COUNT(*) FROM tags) as tags,
+        (SELECT COUNT(*) FROM tags WHERE is_category = 1) as category_tags,
         (SELECT COUNT(*) FROM ingredients) as ingredients,
         (SELECT COUNT(*) FROM meal_slots) as meal_slots
     `
@@ -133,7 +133,6 @@ app.get('/api/r2-check', async (c) => {
 
 // Mount route groups
 app.route('/api/recipes', recipes);
-app.route('/api/categories', categories);
 app.route('/api/tags', tags);
 app.route('/api/search', search);
 app.route('/api/import', importRoutes);

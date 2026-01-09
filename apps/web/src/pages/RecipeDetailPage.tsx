@@ -151,7 +151,7 @@ export function RecipeDetailPage() {
       />
 
       {/* Tags */}
-      <RecipeTags tags={recipe.tags} categories={recipe.categories} />
+      <RecipeTags tags={recipe.tags} />
 
       {/* Pantry Match Badge */}
       {matchData && matchData.total_count > 0 && (

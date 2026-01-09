@@ -3,7 +3,6 @@ export { RecipeListPage } from './RecipeListPage';
 export { RecipeDetailPage } from './RecipeDetailPage';
 export { NewRecipePage } from './NewRecipePage';
 export { EditRecipePage } from './EditRecipePage';
-export { CategoriesPage } from './CategoriesPage';
 export { TagsPage } from './TagsPage';
 export { MealPlansPage } from './MealPlansPage';
 export { ShoppingListPage } from './ShoppingListPage';
