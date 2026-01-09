@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TagPill, type Tag } from './TagPill';
+import { useUpdateTag } from '../../hooks';
 
 interface ManagedTag extends Tag {
   usage_count: number;
@@ -24,6 +25,7 @@ export function TagManager({
 }: TagManagerProps) {
   const [mergeMode, setMergeMode] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const updateTag = useUpdateTag();
 
   const sortedTags = [...tags].sort((a, b) => b.usage_count - a.usage_count);
 
@@ -36,6 +38,14 @@ export function TagManager({
   const handleDelete = async (id: number) => {
     await onDeleteTag(id);
     setDeleteConfirm(null);
+  };
+
+  const handleToggleCategory = async (tag: ManagedTag) => {
+    const isCurrentlyCategory = Boolean(tag.is_category);
+    await updateTag.mutateAsync({
+      id: tag.id,
+      data: { is_category: !isCurrentlyCategory },
+    });
   };
 
   if (isLoading) {
@@ -132,6 +142,20 @@ export function TagManager({
 
               {!mergeMode && (
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleToggleCategory(tag)}
+                    disabled={updateTag.isPending}
+                    className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 ${
+                      tag.is_category
+                        ? 'text-blue-600 dark:text-onedark-blue'
+                        : 'text-gray-400 hover:text-blue-600 dark:hover:text-onedark-blue'
+                    }`}
+                    title={tag.is_category ? 'Remove from categories' : 'Mark as category'}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  </button>
                   <button
                     onClick={() => onEditTag?.(tag)}
                     className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg rounded hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight"

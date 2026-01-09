@@ -287,11 +287,18 @@ async function getOrCreateTag(db: D1Database, tagName: string, isCategory: boole
   const normalized = tagName.toLowerCase().trim();
 
   const existing = await db
-    .prepare('SELECT id FROM tags WHERE name = ?')
+    .prepare('SELECT id, is_category FROM tags WHERE name = ?')
     .bind(normalized)
-    .first<{ id: number }>();
+    .first<{ id: number; is_category: number }>();
 
   if (existing) {
+    // If this tag should be a category but isn't marked as one, upgrade it
+    if (isCategory && !existing.is_category) {
+      await db
+        .prepare('UPDATE tags SET is_category = 1 WHERE id = ?')
+        .bind(existing.id)
+        .run();
+    }
     return existing.id;
   }
 

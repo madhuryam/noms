@@ -24,6 +24,7 @@ interface UpdateTagInput {
   name?: string;
   display_name?: string;
   color?: string;
+  is_category?: boolean;
 }
 
 export function useTags() {

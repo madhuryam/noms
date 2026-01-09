@@ -128,7 +128,7 @@ tags.put('/:id', async (c) => {
 
   try {
     const body = await c.req.json();
-    const { name, display_name, color } = body;
+    const { name, display_name, color, is_category } = body;
 
     // Check if tag exists
     const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE id = ?').bind(id).first();
@@ -162,6 +162,11 @@ tags.put('/:id', async (c) => {
     if (color !== undefined) {
       updates.push('color = ?');
       values.push(color);
+    }
+
+    if (is_category !== undefined) {
+      updates.push('is_category = ?');
+      values.push(is_category ? 1 : 0);
     }
 
     if (updates.length === 0) {
