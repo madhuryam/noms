@@ -274,6 +274,8 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     e.preventDefault();
 
     if (!validateForm()) {
+      // Scroll to top to show validation errors
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -307,9 +309,17 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         }
       }
 
-      navigate(`/recipes/${recipe.id}`);
-    } catch {
-      // Error is handled by mutation state
+      // Navigate to the recipe detail page - use recipeId prop as fallback
+      const targetId = recipe?.id ?? recipeId;
+      if (targetId) {
+        navigate(`/recipes/${targetId}`);
+      } else {
+        navigate('/recipes');
+      }
+    } catch (error) {
+      // Scroll to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.error('Failed to save recipe:', error);
     }
   };
 
@@ -369,7 +379,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* Title */}
       <div>
         <label
@@ -677,7 +687,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           Source URL
         </label>
         <input
-          type="url"
+          type="text"
           id="source_url"
           name="source_url"
           value={formData.source_url}
