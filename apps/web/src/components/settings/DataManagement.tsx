@@ -23,6 +23,7 @@ export function DataManagement() {
   const [preview, setPreview] = useState<ExportPreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +117,41 @@ export function DataManagement() {
     }
   };
 
+  const handleRestoreFromZip = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsRestoring(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(getApiUrl('/api/export/import-zip'), {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to restore from backup');
+      }
+
+      const result = await response.json();
+      setSuccess(`Restored successfully! ${result.stats.recipes} recipes, ${result.stats.images} images, ${result.stats.tags} tags`);
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries();
+      // Reload preview
+      loadPreview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore from backup');
+    } finally {
+      setIsRestoring(false);
+      // Reset the file input
+      event.target.value = '';
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg shadow-sm border border-gray-200 dark:border-onedark-bg-highlight p-6">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">
@@ -203,20 +239,43 @@ export function DataManagement() {
         <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-3">
           Import recipes from Obsidian vault, markdown files, or restore from a backup.
         </p>
-        <Link
-          to="/import"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/import"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+              />
+            </svg>
+            Import Recipes
+          </Link>
+          <label className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm cursor-pointer">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            {isRestoring ? 'Restoring...' : 'Restore from ZIP'}
+            <input
+              type="file"
+              accept=".zip"
+              onChange={handleRestoreFromZip}
+              disabled={isRestoring}
+              className="hidden"
             />
-          </svg>
-          Import Recipes
-        </Link>
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-gray-400 dark:text-onedark-fg-muted">
+          Restore from ZIP will replace all existing data with the backup, including images.
+        </p>
       </div>
 
       {/* Danger Zone */}

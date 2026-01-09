@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
 type Bindings = {
   DB: D1Database;
@@ -1001,6 +1001,302 @@ exportRoutes.delete('/clear', async (c) => {
   }
 });
 
+// POST /api/export/import-zip - Import from ZIP file (includes images)
+exportRoutes.post('/import-zip', async (c) => {
+  try {
+    const formData = await c.req.formData();
+    const zipFile = formData.get('file') as File | null;
+
+    if (!zipFile) {
+      return c.json({ error: 'No ZIP file provided' }, 400);
+    }
+
+    const db = c.env.DB;
+    const bucket = c.env.IMAGES_BUCKET;
+
+    // Read and unzip the file
+    const zipBuffer = await zipFile.arrayBuffer();
+    const zipData = new Uint8Array(zipBuffer);
+    const unzipped = unzipSync(zipData);
+
+    // Find and parse _backup.json
+    const backupFile = unzipped['_backup.json'];
+    if (!backupFile) {
+      return c.json({ error: 'No _backup.json found in ZIP file' }, 400);
+    }
+
+    const importData = JSON.parse(strFromU8(backupFile)) as FullExportData;
+
+    // Validate version
+    if (!importData.version || !importData.exportedAt) {
+      return c.json({ error: 'Invalid export file format' }, 400);
+    }
+
+    const stats = {
+      tags: 0,
+      ingredients: 0,
+      recipes: 0,
+      pantryItems: 0,
+      mealPlans: 0,
+      mealSlots: 0,
+      plannedMeals: 0,
+      foodGroups: 0,
+      foodTerms: 0,
+      shelfLife: 0,
+      images: 0,
+    };
+
+    // Helper to convert undefined to null
+    const n = <T>(value: T | undefined): T | null => value === undefined ? null : value;
+
+    // Helper to batch statements
+    const BATCH_SIZE = 50;
+    async function runBatched(statements: D1PreparedStatement[]) {
+      for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+        const batch = statements.slice(i, i + BATCH_SIZE);
+        if (batch.length > 0) {
+          await db.batch(batch);
+        }
+      }
+    }
+
+    // Clear existing data
+    await db.batch([
+      db.prepare('DELETE FROM planned_meals'),
+      db.prepare('DELETE FROM meal_plans'),
+      db.prepare('DELETE FROM recipe_pairings'),
+      db.prepare('DELETE FROM recipe_images'),
+      db.prepare('DELETE FROM recipe_ingredients'),
+      db.prepare('DELETE FROM recipe_tags'),
+      db.prepare('DELETE FROM recipes'),
+      db.prepare('DELETE FROM pantry_items'),
+      db.prepare('DELETE FROM food_association_terms'),
+      db.prepare('DELETE FROM food_association_groups'),
+      db.prepare('DELETE FROM shelf_life'),
+      db.prepare('DELETE FROM ingredients'),
+      db.prepare('DELETE FROM tags'),
+    ]);
+
+    // Upload images to R2 first
+    for (const [path, data] of Object.entries(unzipped)) {
+      if (path.startsWith('_images/')) {
+        const r2Path = path.replace('_images/', '');
+        try {
+          // Determine content type from extension
+          const ext = r2Path.split('.').pop()?.toLowerCase() || 'jpg';
+          const contentTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+          };
+          await bucket.put(r2Path, data, {
+            httpMetadata: {
+              contentType: contentTypes[ext] || 'image/jpeg',
+            },
+          });
+          stats.images++;
+        } catch (e) {
+          console.error(`Failed to upload image: ${r2Path}`, e);
+        }
+      }
+    }
+
+    // Import tags
+    if (importData.tags?.length) {
+      const tagStmts = importData.tags.map((tag) =>
+        db.prepare('INSERT INTO tags (id, name, display_name, color, usage_count, is_category) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0, (tag as { is_category?: number }).is_category ?? 0)
+      );
+      await runBatched(tagStmts);
+      stats.tags = importData.tags.length;
+    }
+
+    // Import ingredients
+    if (importData.ingredients?.length) {
+      const ingStmts = importData.ingredients.map((ing) =>
+        db.prepare('INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)')
+          .bind(ing.id, ing.name, n(ing.name_plural), ing.normalized_name, n(ing.category))
+      );
+      await runBatched(ingStmts);
+      stats.ingredients = importData.ingredients.length;
+    }
+
+    // Import recipes
+    if (importData.recipes?.length) {
+      const recipeStmts = importData.recipes.map((recipe) =>
+        db.prepare(`
+          INSERT INTO recipes (
+            id, title, source_path, source_url, markdown_content, description,
+            ingredients_raw, instructions_raw, notes, prep_time_minutes, cook_time_minutes,
+            servings, servings_unit, image_path, created_at, updated_at,
+            last_cooked_at, last_accessed_at, cook_count
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+          .bind(
+            recipe.id, recipe.title, n(recipe.source_path), n(recipe.source_url),
+            n(recipe.markdown_content), n(recipe.description), n(recipe.ingredients_raw),
+            n(recipe.instructions_raw), n(recipe.notes), n(recipe.prep_time_minutes),
+            n(recipe.cook_time_minutes), n(recipe.servings), n(recipe.servings_unit),
+            n(recipe.image_path), n(recipe.created_at), n(recipe.updated_at),
+            n(recipe.last_cooked_at), n(recipe.last_accessed_at), recipe.cook_count ?? 0
+          )
+      );
+      await runBatched(recipeStmts);
+      stats.recipes = importData.recipes.length;
+
+      // Batch recipe tags
+      const recipeTagStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
+        for (const tag of recipe.tags || []) {
+          recipeTagStmts.push(
+            db.prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
+              .bind(recipe.id, tag.id)
+          );
+        }
+      }
+      await runBatched(recipeTagStmts);
+
+      // Batch recipe images
+      const recipeImageStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
+        for (const img of recipe.images || []) {
+          recipeImageStmts.push(
+            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?, ?)')
+              .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order)
+          );
+        }
+      }
+      await runBatched(recipeImageStmts);
+
+      // Batch recipe ingredients
+      const recipeIngStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
+        for (const ing of recipe.ingredients || []) {
+          recipeIngStmts.push(
+            db.prepare(`
+              INSERT INTO recipe_ingredients (
+                id, recipe_id, ingredient_id, quantity, unit, raw_text,
+                preparation, notes, is_optional, group_name, sort_order
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+              .bind(
+                ing.id, recipe.id, n(ing.ingredient_id), n(ing.quantity), n(ing.unit),
+                ing.raw_text, n(ing.preparation), n(ing.notes), ing.is_optional,
+                n(ing.group_name), ing.sort_order
+              )
+          );
+        }
+      }
+      await runBatched(recipeIngStmts);
+
+      // Batch recipe pairings
+      const pairingStmts: D1PreparedStatement[] = [];
+      for (const recipe of importData.recipes) {
+        for (const pairing of recipe.pairings || []) {
+          pairingStmts.push(
+            db.prepare(`
+              INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_text, pairing_type, notes)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `)
+              .bind(pairing.id, recipe.id, n(pairing.paired_recipe_id), n(pairing.pairing_text), pairing.pairing_type, n(pairing.notes))
+          );
+        }
+      }
+      await runBatched(pairingStmts);
+    }
+
+    // Import pantry items
+    if (importData.pantryItems?.length) {
+      const pantryStmts = importData.pantryItems.map((item) =>
+        db.prepare(`
+          INSERT INTO pantry_items (id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+          .bind(item.id, n(item.ingredient_id), item.name, item.normalized_name, n(item.quantity), n(item.unit), n(item.location), n(item.expiration_date), item.is_staple ?? 0)
+      );
+      await runBatched(pantryStmts);
+      stats.pantryItems = importData.pantryItems.length;
+    }
+
+    // Import meal slots
+    if (importData.mealSlots?.length) {
+      await db.prepare('DELETE FROM meal_slots').run();
+      const slotStmts = importData.mealSlots.map((slot) =>
+        db.prepare('INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)')
+          .bind(slot.id, slot.name, slot.display_name, slot.sort_order, slot.default_servings ?? 1)
+      );
+      await runBatched(slotStmts);
+      stats.mealSlots = importData.mealSlots.length;
+    }
+
+    // Import meal plans
+    if (importData.mealPlans?.length) {
+      const planStmts = importData.mealPlans.map((plan) =>
+        db.prepare('INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(plan.id, n(plan.name), plan.start_date, plan.end_date, plan.is_template ?? 0, n(plan.created_at))
+      );
+      await runBatched(planStmts);
+      stats.mealPlans = importData.mealPlans.length;
+    }
+
+    // Import planned meals
+    if (importData.plannedMeals?.length) {
+      const mealStmts = importData.plannedMeals.map((meal) =>
+        db.prepare(`
+          INSERT INTO planned_meals (id, meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes, is_completed)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+          .bind(meal.id, meal.meal_plan_id, n(meal.recipe_id), n(meal.custom_title), meal.meal_slot_id, meal.planned_date, meal.scaling_factor ?? 1, n(meal.notes), meal.is_completed ?? 0)
+      );
+      await runBatched(mealStmts);
+      stats.plannedMeals = importData.plannedMeals.length;
+    }
+
+    // Import food groups
+    if (importData.foodAssociationGroups?.length) {
+      const groupStmts = importData.foodAssociationGroups.map((group) =>
+        db.prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
+          .bind(group.id, group.name, n(group.created_at))
+      );
+      await runBatched(groupStmts);
+      stats.foodGroups = importData.foodAssociationGroups.length;
+    }
+
+    // Import food terms
+    if (importData.foodAssociationTerms?.length) {
+      const termStmts = importData.foodAssociationTerms.map((term) =>
+        db.prepare('INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)')
+          .bind(term.id, term.group_id, term.term, n(term.created_at))
+      );
+      await runBatched(termStmts);
+      stats.foodTerms = importData.foodAssociationTerms.length;
+    }
+
+    // Import shelf life
+    if (importData.shelfLife?.length) {
+      const shelfStmts = importData.shelfLife.map((item) =>
+        db.prepare('INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(item.id, item.ingredient_name, n(item.fridge_days), n(item.freezer_days), n(item.created_at), n(item.updated_at))
+      );
+      await runBatched(shelfStmts);
+      stats.shelfLife = importData.shelfLife.length;
+    }
+
+    return c.json({
+      success: true,
+      stats,
+      importedFrom: importData.exportedAt,
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to import ZIP' },
+      500
+    );
+  }
+});
+
 // ============================================
 // Vault Export (Human-Readable ZIP)
 // ============================================
@@ -1306,7 +1602,7 @@ exportRoutes.get('/vault', async (c) => {
       files[`Meal Plans/${planSlug}.md`] = strToU8(planMd);
     }
 
-    // Add full backup JSON for re-import
+    // Collect all image paths and download from R2
     const imagePaths: string[] = [];
     for (const recipe of recipes) {
       if (recipe.image_path) imagePaths.push(recipe.image_path);
@@ -1314,6 +1610,20 @@ exportRoutes.get('/vault', async (c) => {
         if (img.path && !imagePaths.includes(img.path)) {
           imagePaths.push(img.path);
         }
+      }
+    }
+
+    // Download and include images in the ZIP
+    for (const imagePath of imagePaths) {
+      try {
+        const imageObject = await c.env.IMAGES_BUCKET.get(imagePath);
+        if (imageObject) {
+          const imageData = await imageObject.arrayBuffer();
+          files[`_images/${imagePath}`] = new Uint8Array(imageData);
+        }
+      } catch (e) {
+        // Skip images that can't be downloaded
+        console.error(`Failed to download image: ${imagePath}`, e);
       }
     }
 

@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { unzipSync, strFromU8 } from 'fflate';
 import { VaultUploader, ImportPreview, ImportProgress } from '../components/import';
 import { useVaultImport } from '../hooks/useVaultImport';
 import { api } from '../lib/api';
@@ -13,72 +12,14 @@ interface DuplicateCheckResponse {
   duplicates: Record<string, { id: number; title: string; matchType: 'title' | 'path' }>;
 }
 
-interface RestoreResult {
-  success: boolean;
-  message: string;
-  stats: {
-    recipes: number;
-    pantryItems: number;
-    mealPlans: number;
-  };
-}
-
 export function ImportPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<ImportStep>('upload');
   const [parseResult, setParseResult] = useState<VaultParseResult | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [restoreError, setRestoreError] = useState<string | null>(null);
-  const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null);
-  const restoreInputRef = useRef<HTMLInputElement>(null);
 
   const { progress, imageProgress, results, isComplete, startImport, reset } = useVaultImport();
-
-  const handleRestore = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsRestoring(true);
-    setRestoreError(null);
-    setRestoreSuccess(null);
-
-    try {
-      let jsonData: string;
-
-      if (file.name.endsWith('.zip')) {
-        const arrayBuffer = await file.arrayBuffer();
-        const zipData = new Uint8Array(arrayBuffer);
-        const unzipped = unzipSync(zipData);
-
-        const backupFile = unzipped['_backup.json'];
-        if (!backupFile) {
-          throw new Error('No _backup.json found in vault ZIP. Make sure you selected a valid vault export.');
-        }
-        jsonData = strFromU8(backupFile);
-      } else {
-        jsonData = await file.text();
-      }
-
-      const data = JSON.parse(jsonData);
-      const result = await api.post<RestoreResult>('/api/export/import', data);
-
-      if (result.success) {
-        setRestoreSuccess(
-          `Restore completed! Restored ${result.stats.recipes} recipes, ${result.stats.pantryItems} pantry items, ${result.stats.mealPlans} meal plans, and more.`
-        );
-        queryClient.invalidateQueries();
-      }
-    } catch (err) {
-      setRestoreError(err instanceof Error ? err.message : 'Failed to restore data');
-    } finally {
-      setIsRestoring(false);
-      if (restoreInputRef.current) {
-        restoreInputRef.current.value = '';
-      }
-    }
-  }, [queryClient]);
 
   const handleDeleteAll = useCallback(async () => {
     if (!confirm('Are you sure you want to delete ALL recipes? This cannot be undone.')) {
@@ -296,53 +237,6 @@ export function ImportPage() {
         </div>
       )}
 
-      {/* Restore from Backup */}
-      {step === 'upload' && (
-        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6">
-          <h3 className="font-medium text-gray-900 dark:text-onedark-fg mb-2">
-            Restore from Backup
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-4">
-            Restore all data from a previous vault export (.zip) or backup file (.json).
-            This will replace all existing data including recipes, pantry items, meal plans, and settings.
-          </p>
-
-          {restoreError && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
-              {restoreError}
-            </div>
-          )}
-
-          {restoreSuccess && (
-            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
-              {restoreSuccess}
-            </div>
-          )}
-
-          <input
-            ref={restoreInputRef}
-            type="file"
-            accept=".json,.zip"
-            onChange={handleRestore}
-            disabled={isRestoring}
-            className="block w-full text-sm text-gray-500 dark:text-onedark-fg-muted
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-lg file:border-0
-              file:text-sm file:font-medium
-              file:bg-amber-50 file:text-amber-700
-              dark:file:bg-amber-900/30 dark:file:text-amber-400
-              hover:file:bg-amber-100 dark:hover:file:bg-amber-900/50
-              file:cursor-pointer file:transition-colors
-              disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-
-          {isRestoring && (
-            <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-              Restoring data... This may take a moment.
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
