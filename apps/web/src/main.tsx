@@ -9,6 +9,10 @@ import { DndProvider } from './components/DndProvider';
 import { ErrorBoundary, RecipeGridSkeleton } from './components/common';
 import { api } from './lib/api';
 import { initWebVitals } from './lib/vitals';
+import '@fontsource/open-sans/400.css';
+import '@fontsource/open-sans/500.css';
+import '@fontsource/open-sans/600.css';
+import '@fontsource/open-sans/700.css';
 import './index.css';
 
 // Initialize Core Web Vitals measurement in development

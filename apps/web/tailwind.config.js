@@ -3,6 +3,9 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'media', // Uses system preference
   theme: {
+    fontFamily: {
+      sans: ['Open Sans', 'system-ui', 'sans-serif'],
+    },
     extend: {
       colors: {
         // One Dark Pro color scheme
