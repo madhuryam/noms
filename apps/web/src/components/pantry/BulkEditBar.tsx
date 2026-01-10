@@ -56,6 +56,11 @@ export function BulkEditBar({
     }
     if (location !== '') {
       updates.location = location;
+      // If moving to non-fridge/non-freezer location and no explicit expiration date set,
+      // clear the expiration date
+      if (!['fridge', 'freezer'].includes(location) && expirationDate === '') {
+        updates.expiration_date = null;
+      }
     }
     if (isStaple !== null) {
       updates.is_staple = isStaple;

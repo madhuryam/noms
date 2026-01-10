@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useUpdatePantryItem, useDeletePantryItem, useToggleRefill } from '../../hooks';
+import { useState, useCallback } from 'react';
+import { useUpdatePantryItem, useDeletePantryItem, useToggleRefill, useShelfLifeEntries } from '../../hooks';
 import type { PantryItem, PantryLocation } from '../../hooks';
 
 interface PantryItemRowProps {
@@ -35,6 +35,39 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
   const updateItem = useUpdatePantryItem();
   const deleteItem = useDeletePantryItem();
   const toggleRefill = useToggleRefill();
+  const { data: shelfLifeEntries = [] } = useShelfLifeEntries();
+
+  // Calculate expiration date based on shelf life data for a given location
+  const getExpirationDate = useCallback((ingredientName: string, location: PantryLocation): string | null => {
+    // Only calculate for fridge/freezer
+    if (location !== 'fridge' && location !== 'freezer') {
+      return null;
+    }
+
+    const nameLower = ingredientName.toLowerCase();
+
+    // Try exact match first
+    let entry = shelfLifeEntries.find(
+      (e) => e.ingredient_name.toLowerCase() === nameLower
+    );
+
+    // Try partial match if no exact match
+    if (!entry) {
+      entry = shelfLifeEntries.find(
+        (e) => nameLower.includes(e.ingredient_name.toLowerCase()) ||
+               e.ingredient_name.toLowerCase().includes(nameLower)
+      );
+    }
+
+    if (!entry) return null;
+
+    const days = location === 'fridge' ? entry.fridge_days : entry.freezer_days;
+    if (!days) return null;
+
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toISOString().split('T')[0];
+  }, [shelfLifeEntries]);
 
   const expirationStatus = getExpirationStatus(item.expiration_date);
 
@@ -72,9 +105,13 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
   };
 
   const handleChangeLocation = async (newLocation: PantryLocation) => {
+    // Recalculate expiration date based on new location
+    const newExpirationDate = getExpirationDate(item.name, newLocation);
+
     await updateItem.mutateAsync({
       id: item.id,
       location: newLocation,
+      expiration_date: newExpirationDate,
     });
   };
 
