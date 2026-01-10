@@ -137,6 +137,7 @@ export function EditRecipePage() {
             notes: recipe.notes,
             source_url: recipe.source_url,
             tags: recipe.tags,
+            image_path: recipe.image_path,
           }}
         />
       </div>

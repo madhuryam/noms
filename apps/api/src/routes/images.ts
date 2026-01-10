@@ -121,16 +121,10 @@ imageRoutes.post('/upload', async (c) => {
       },
     });
 
-    // Update recipe image_path if this is the first/main image
-    const existingRecipe = await c.env.DB.prepare('SELECT image_path FROM recipes WHERE id = ?')
-      .bind(Number(recipeId))
-      .first<{ image_path: string | null }>();
-
-    if (!existingRecipe?.image_path) {
-      await c.env.DB.prepare('UPDATE recipes SET image_path = ? WHERE id = ?')
-        .bind(r2Path, Number(recipeId))
-        .run();
-    }
+    // Update recipe image_path (always update to support replacing images)
+    await c.env.DB.prepare('UPDATE recipes SET image_path = ? WHERE id = ?')
+      .bind(r2Path, Number(recipeId))
+      .run();
 
     return c.json({
       success: true,

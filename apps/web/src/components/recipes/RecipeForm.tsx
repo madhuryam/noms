@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemoveTagFromRecipe, useCreateTag } from '../../hooks';
 import { DEFAULT_SERVINGS } from '../../lib/constants';
 import { TagSelector } from '../tags';
 import { PairingSelector } from './PairingSelector';
+
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
 
 // Section for the editor (used by both ingredients and instructions)
 interface EditorSection {
@@ -180,6 +182,7 @@ interface RecipeFormProps {
     notes: string | null;
     source_url: string | null;
     tags?: RecipeTag[];
+    image_path?: string | null;
   };
 }
 
@@ -195,6 +198,14 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
   const createTag = useCreateTag();
 
   const [selectedTags, setSelectedTags] = useState<RecipeTag[]>([]);
+
+  // Image upload state
+  const [currentImagePath, setCurrentImagePath] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -244,6 +255,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       setSelectedTags(initialData.tags ?? []);
       setIngredientSections(parseToSections(initialData.ingredients_raw ?? ''));
       setInstructionSections(parseToSections(initialData.instructions_raw ?? ''));
+      setCurrentImagePath(initialData.image_path ?? null);
     }
   }, [initialData]);
 
@@ -378,6 +390,70 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     return newTag;
   };
 
+  // Handle image file selection (from file picker or camera)
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setImageError('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload if we have a recipeId (edit mode)
+    if (recipeId) {
+      setIsUploadingImage(true);
+      setImageError(null);
+
+      try {
+        const formData = new FormData();
+        formData.append('recipe_id', String(recipeId));
+        formData.append('file', file);
+
+        const response = await fetch(`${API_URL}/api/images/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload image');
+        }
+
+        const result = await response.json();
+        setCurrentImagePath(result.path);
+        setImagePreview(null); // Clear preview since we now have the real image
+      } catch (error) {
+        setImageError(error instanceof Error ? error.message : 'Failed to upload image');
+        setImagePreview(null);
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
+
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+  };
+
+  // Get the URL for displaying the current image
+  const getImageDisplayUrl = () => {
+    if (imagePreview) return imagePreview;
+    if (currentImagePath) {
+      if (currentImagePath.startsWith('http')) return currentImagePath;
+      return `${API_URL}/api/images/${currentImagePath}`;
+    }
+    return null;
+  };
+
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* Title */}
@@ -424,6 +500,136 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg resize-none placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
         />
       </div>
+
+      {/* Recipe Image - only shown in edit mode */}
+      {mode === 'edit' && recipeId && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-2">
+            Recipe Image
+          </label>
+
+          {/* Hidden file inputs */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            capture="environment"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+
+          {getImageDisplayUrl() ? (
+            // Show current image with replace option
+            <div className="space-y-3">
+              <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden bg-gray-100 dark:bg-onedark-bg">
+                <img
+                  src={getImageDisplayUrl()!}
+                  alt={formData.title || 'Recipe image'}
+                  className="w-full h-full object-cover"
+                />
+                {isUploadingImage && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="flex items-center gap-2 text-white">
+                      <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Uploading...
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-onedark-fg border border-gray-200 dark:border-onedark-bg-highlight rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Replace Image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-onedark-fg border border-gray-200 dark:border-onedark-bg-highlight rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Take Photo
+                </button>
+              </div>
+            </div>
+          ) : (
+            // No image - show upload/camera buttons
+            <div className="border-2 border-dashed border-gray-300 dark:border-onedark-bg-highlight rounded-lg p-6">
+              <div className="text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400 dark:text-onedark-fg-muted"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="mt-2 text-sm text-gray-500 dark:text-onedark-fg-muted">
+                  No image for this recipe
+                </p>
+                <div className="mt-4 flex justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 disabled:opacity-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Take Photo
+                  </button>
+                </div>
+                {isUploadingImage && (
+                  <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-onedark-fg-muted">
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Uploading...
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {imageError && (
+            <p className="mt-2 text-sm text-red-500 dark:text-onedark-red">{imageError}</p>
+          )}
+        </div>
+      )}
 
       {/* Ingredients */}
       <div className="space-y-4">

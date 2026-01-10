@@ -971,6 +971,28 @@ exportRoutes.post('/import', async (c) => {
 exportRoutes.delete('/clear', async (c) => {
   try {
     const db = c.env.DB;
+    const bucket = c.env.IMAGES_BUCKET;
+
+    // First, delete all images from R2 bucket
+    // R2 doesn't have a "delete all" operation, so we need to list and delete in batches
+    let cursor: string | undefined;
+    let deletedCount = 0;
+
+    do {
+      const listed = await bucket.list({
+        cursor,
+        limit: 1000, // Max objects per list request
+      });
+
+      if (listed.objects.length > 0) {
+        // Delete objects in batches
+        const keys = listed.objects.map((obj) => obj.key);
+        await Promise.all(keys.map((key) => bucket.delete(key)));
+        deletedCount += keys.length;
+      }
+
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
 
     // Clear all data in reverse dependency order
     await db.batch([
@@ -992,6 +1014,7 @@ exportRoutes.delete('/clear', async (c) => {
     return c.json({
       success: true,
       message: 'All data cleared successfully',
+      imagesDeleted: deletedCount,
     });
   } catch (error) {
     return c.json(
