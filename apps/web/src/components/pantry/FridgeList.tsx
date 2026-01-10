@@ -6,12 +6,18 @@ interface FridgeListProps {
   location: 'fridge' | 'freezer';
   title?: string;
   emptyMessage?: string;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
+  selectionMode?: boolean;
 }
 
 export function FridgeList({
   location,
   title,
   emptyMessage = 'No items',
+  selectedIds,
+  onToggleSelect,
+  selectionMode,
 }: FridgeListProps) {
   const { data: fridgeItems = [], isLoading: fridgeLoading } = useFridgeItems();
   const { data: freezerItems = [], isLoading: freezerLoading } = useFreezerItems();
@@ -60,6 +66,9 @@ export function FridgeList({
             <PantryItemRow
               key={item.id}
               item={item}
+              isSelected={selectedIds?.has(item.id)}
+              onToggleSelect={onToggleSelect}
+              selectionMode={selectionMode}
             />
           ))}
         </div>

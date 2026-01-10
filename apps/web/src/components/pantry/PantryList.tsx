@@ -7,6 +7,9 @@ interface PantryListProps {
   title?: string;
   emptyMessage?: string;
   filterStaples?: boolean; // true = only staples, false = only non-staples, undefined = all
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
+  selectionMode?: boolean;
 }
 
 export function PantryList({
@@ -14,6 +17,9 @@ export function PantryList({
   title,
   emptyMessage = 'No items in inventory',
   filterStaples,
+  selectedIds,
+  onToggleSelect,
+  selectionMode,
 }: PantryListProps) {
   const { data: items = [], isLoading } = usePantryItems(location);
 
@@ -51,6 +57,9 @@ export function PantryList({
             <PantryItemRow
               key={item.id}
               item={item}
+              isSelected={selectedIds?.has(item.id)}
+              onToggleSelect={onToggleSelect}
+              selectionMode={selectionMode}
             />
           ))}
         </div>

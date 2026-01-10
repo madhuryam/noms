@@ -169,7 +169,7 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
         unit: unit || undefined,
         location,
         expiration_date: expirationDate || undefined,
-        is_staple: location === 'pantry' || location === 'spices',
+        is_staple: true,
       });
 
       // Reset form

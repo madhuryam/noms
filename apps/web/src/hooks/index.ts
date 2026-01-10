@@ -19,6 +19,8 @@ export {
   useBulkAddPantryItems,
   useUpdatePantryItem,
   useDeletePantryItem,
+  useBulkDeletePantryItems,
+  useBulkUpdatePantryItems,
 } from './usePantry';
 export type { PantryItem, IngredientSuggestion, PantryLocation } from './usePantry';
 export {

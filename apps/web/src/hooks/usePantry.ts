@@ -166,3 +166,42 @@ export function useDeletePantryItem() {
     },
   });
 }
+
+export function useBulkDeletePantryItems() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: number[]): Promise<{ success: boolean; deleted_count: number }> => {
+      return api.post('/api/pantry/bulk-delete', { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pantry'] });
+      queryClient.invalidateQueries({ queryKey: ['shopping-list'] });
+    },
+  });
+}
+
+export function useBulkUpdatePantryItems() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      ids,
+      updates,
+    }: {
+      ids: number[];
+      updates: {
+        quantity?: number | null;
+        unit?: string | null;
+        expiration_date?: string | null;
+        location?: PantryLocation;
+        is_staple?: boolean;
+      };
+    }): Promise<{ success: boolean; updated_count: number }> => {
+      return api.post('/api/pantry/bulk-update', { ids, updates });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pantry'] });
+    },
+  });
+}

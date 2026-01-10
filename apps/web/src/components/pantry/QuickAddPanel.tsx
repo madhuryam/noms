@@ -44,7 +44,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
 
   // Paste mode state
   const [pasteText, setPasteText] = useState('');
-  const [isStaple, setIsStaple] = useState(location === 'pantry' || location === 'spices');
+  const [isStaple, setIsStaple] = useState(true);
 
   const addItem = useAddPantryItem();
   const bulkAdd = useBulkAddPantryItems();
@@ -144,7 +144,6 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
 
     setIsAdding(true);
     const itemsArray = Array.from(selectedItems);
-    const today = new Date().toISOString().split('T')[0];
 
     try {
       // Add items in parallel batches of 5
@@ -155,8 +154,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
             addItem.mutateAsync({
               name,
               location,
-              is_staple: location === 'pantry' || location === 'spices',
-              expiration_date: today,
+              is_staple: true,
             })
           )
         );
@@ -175,7 +173,6 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
     if (parsedItems.length === 0) return;
 
     setIsAdding(true);
-    const today = new Date().toISOString().split('T')[0];
 
     try {
       await bulkAdd.mutateAsync(
@@ -183,7 +180,6 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
           ...item,
           location,
           is_staple: isStaple,
-          expiration_date: today,
         }))
       );
 

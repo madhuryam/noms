@@ -4,6 +4,9 @@ import type { PantryItem, PantryLocation } from '../../hooks';
 
 interface PantryItemRowProps {
   item: PantryItem;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
+  selectionMode?: boolean;
 }
 
 function getExpirationStatus(expirationDate: string | null): 'ok' | 'soon' | 'expired' | null {
@@ -21,7 +24,7 @@ function getExpirationStatus(expirationDate: string | null): 'ok' | 'soon' | 'ex
   return 'ok';
 }
 
-export function PantryItemRow({ item }: PantryItemRowProps) {
+export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode }: PantryItemRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [name, setName] = useState(item.name);
@@ -167,8 +170,30 @@ export function PantryItemRow({ item }: PantryItemRowProps) {
     );
   }
 
+  const handleRowClick = () => {
+    if (onToggleSelect) {
+      onToggleSelect(item.id);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight rounded-lg group transition-colors">
+    <div
+      className={`flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight rounded-lg group transition-colors cursor-pointer ${
+        isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+      }`}
+      onClick={handleRowClick}
+    >
+      {/* Checkbox for selection - only show when in selection mode */}
+      {selectionMode && (
+        <input
+          type="checkbox"
+          checked={isSelected ?? false}
+          onChange={() => onToggleSelect?.(item.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 text-blue-600 dark:text-onedark-blue bg-white dark:bg-onedark-bg border-gray-300 dark:border-onedark-bg-highlight rounded focus:ring-blue-500 dark:focus:ring-onedark-blue cursor-pointer"
+        />
+      )}
+
       {/* Name and quantity */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -207,6 +232,7 @@ export function PantryItemRow({ item }: PantryItemRowProps) {
       <select
         value={item.location ?? 'pantry'}
         onChange={(e) => handleChangeLocation(e.target.value as PantryLocation)}
+        onClick={(e) => e.stopPropagation()}
         className="px-2 py-1 text-xs border border-gray-200 dark:border-onedark-bg-highlight rounded bg-white dark:bg-onedark-bg text-gray-600 dark:text-onedark-fg-muted opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <option value="pantry">Pantry</option>
@@ -217,39 +243,41 @@ export function PantryItemRow({ item }: PantryItemRowProps) {
         <option value="snacks">Snacks</option>
       </select>
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={handleToggleStaple}
-          title={item.is_staple ? 'Remove from staples' : 'Mark as staple'}
-          className="p-1.5 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 rounded"
-        >
-          <svg className="w-4 h-4" fill={item.is_staple ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
-        </button>
-        <button
-          onClick={() => setIsEditing(true)}
-          title="Edit"
-          className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-onedark-blue rounded"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        </button>
-        <button
-          onClick={() => {
-            setIsConfirmingDelete(true);
-            setIsEditing(false);
-          }}
-          title="Delete"
-          className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      </div>
+      {/* Action buttons - hide in selection mode */}
+      {!selectionMode && (
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={handleToggleStaple}
+            title={item.is_staple ? 'Remove from staples' : 'Mark as staple'}
+            className="p-1.5 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 rounded"
+          >
+            <svg className="w-4 h-4" fill={item.is_staple ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setIsEditing(true)}
+            title="Edit"
+            className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-onedark-blue rounded"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              setIsConfirmingDelete(true);
+              setIsEditing(false);
+            }}
+            title="Delete"
+            className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

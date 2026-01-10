@@ -1,13 +1,54 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { usePantryItems } from '../hooks';
-import { AddItemForm, PantryList, FridgeList, QuickAddPanel } from '../components/pantry';
+import { AddItemForm, PantryList, FridgeList, QuickAddPanel, BulkEditBar } from '../components/pantry';
 
 type TabType = 'pantry' | 'fridge' | 'freezer' | 'spices' | 'sauces' | 'snacks';
 
 export function PantryPage() {
   const [activeTab, setActiveTab] = useState<TabType>('pantry');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { data: allItems = [] } = usePantryItems();
+
+  // Get items for current tab
+  const currentTabItems = useMemo(() => {
+    return allItems.filter((item) => {
+      if (activeTab === 'pantry') {
+        return item.location === 'pantry' || !item.location;
+      }
+      return item.location === activeTab;
+    });
+  }, [allItems, activeTab]);
+
+  const handleToggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        // Exit selection mode if no items selected
+        if (next.size === 0) {
+          setSelectionMode(false);
+        }
+      } else {
+        next.add(id);
+        // Enter selection mode when first item selected
+        if (!selectionMode) {
+          setSelectionMode(true);
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(currentTabItems.map((item) => item.id)));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
 
   const pantryCount = allItems.filter((i) => i.location === 'pantry' || !i.location).length;
   const fridgeCount = allItems.filter((i) => i.location === 'fridge').length;
@@ -146,12 +187,18 @@ export function PantryPage() {
                 title="Pantry Staples"
                 filterStaples={true}
                 emptyMessage="No staples yet. Add items above to build your pantry."
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                selectionMode={selectionMode}
               />
               <PantryList
                 location="pantry"
                 title="Other Items"
                 filterStaples={false}
                 emptyMessage=""
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                selectionMode={selectionMode}
               />
             </div>
           )}
@@ -161,6 +208,9 @@ export function PantryPage() {
               location="fridge"
               title="In My Fridge"
               emptyMessage="Your fridge is empty. Add items above."
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectionMode}
             />
           )}
 
@@ -169,6 +219,9 @@ export function PantryPage() {
               location="freezer"
               title="In My Freezer"
               emptyMessage="Your freezer is empty. Add items above."
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectionMode}
             />
           )}
 
@@ -177,6 +230,9 @@ export function PantryPage() {
               location="spices"
               title="My Spices"
               emptyMessage="No spices yet. Add your spices above."
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectionMode}
             />
           )}
 
@@ -185,6 +241,9 @@ export function PantryPage() {
               location="sauces"
               title="My Sauces"
               emptyMessage="No sauces yet. Add your sauces above."
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectionMode}
             />
           )}
 
@@ -193,6 +252,9 @@ export function PantryPage() {
               location="snacks"
               title="My Snacks"
               emptyMessage="No snacks yet. Add your snacks above."
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectionMode}
             />
           )}
         </div>
@@ -205,6 +267,19 @@ export function PantryPage() {
           onClose={() => setShowQuickAdd(false)}
         />
       )}
+
+      {/* Bulk Edit Bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <BulkEditBar
+          selectedIds={selectedIds}
+          onClearSelection={handleClearSelection}
+          onSelectAll={handleSelectAll}
+          totalItems={currentTabItems.length}
+        />
+      )}
+
+      {/* Spacer for bulk edit bar */}
+      {selectionMode && selectedIds.size > 0 && <div className="h-20" />}
     </div>
   );
 }

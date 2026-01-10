@@ -410,4 +410,103 @@ pantry.delete('/:id', async (c) => {
   }
 });
 
+// POST /api/pantry/bulk-delete - Delete multiple pantry items
+pantry.post('/bulk-delete', async (c) => {
+  try {
+    const { ids } = await c.req.json<{ ids: number[] }>();
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return c.json({ error: 'ids array is required' }, 400);
+    }
+
+    // Delete in batches using placeholders
+    const placeholders = ids.map(() => '?').join(',');
+    await c.env.DB
+      .prepare(`DELETE FROM pantry_items WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .run();
+
+    return c.json({
+      success: true,
+      deleted_count: ids.length,
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete pantry items' },
+      500
+    );
+  }
+});
+
+// POST /api/pantry/bulk-update - Update multiple pantry items
+pantry.post('/bulk-update', async (c) => {
+  try {
+    const { ids, updates } = await c.req.json<{
+      ids: number[];
+      updates: {
+        quantity?: number | null;
+        unit?: string | null;
+        expiration_date?: string | null;
+        location?: string;
+        is_staple?: boolean;
+      };
+    }>();
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return c.json({ error: 'ids array is required' }, 400);
+    }
+
+    if (!updates || Object.keys(updates).length === 0) {
+      return c.json({ error: 'updates object is required' }, 400);
+    }
+
+    // Build dynamic UPDATE query
+    const setClauses: string[] = [];
+    const values: (string | number | null)[] = [];
+
+    if (updates.quantity !== undefined) {
+      setClauses.push('quantity = ?');
+      values.push(updates.quantity);
+    }
+    if (updates.unit !== undefined) {
+      setClauses.push('unit = ?');
+      values.push(updates.unit);
+    }
+    if (updates.expiration_date !== undefined) {
+      setClauses.push('expiration_date = ?');
+      values.push(updates.expiration_date);
+    }
+    if (updates.location !== undefined) {
+      setClauses.push('location = ?');
+      values.push(updates.location);
+    }
+    if (updates.is_staple !== undefined) {
+      setClauses.push('is_staple = ?');
+      values.push(updates.is_staple ? 1 : 0);
+    }
+
+    if (setClauses.length === 0) {
+      return c.json({ error: 'No valid updates provided' }, 400);
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const query = `UPDATE pantry_items SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`;
+
+    await c.env.DB
+      .prepare(query)
+      .bind(...values, ...ids)
+      .run();
+
+    return c.json({
+      success: true,
+      updated_count: ids.length,
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to update pantry items' },
+      500
+    );
+  }
+});
+
 export default pantry;
