@@ -230,6 +230,7 @@ pantry.post('/bulk', async (c) => {
         unit?: string;
         location?: string;
         is_staple?: boolean;
+        expiration_date?: string;
       }>;
     }>();
 
@@ -266,8 +267,8 @@ pantry.post('/bulk', async (c) => {
 
       const result = await c.env.DB
         .prepare(
-          `INSERT INTO pantry_items (ingredient_id, name, normalized_name, quantity, unit, location, is_staple)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO pantry_items (ingredient_id, name, normalized_name, quantity, unit, location, is_staple, expiration_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           ingredient.id,
@@ -276,7 +277,8 @@ pantry.post('/bulk', async (c) => {
           item.quantity ?? null,
           item.unit ?? null,
           location,
-          item.is_staple ? 1 : 0
+          item.is_staple ? 1 : 0,
+          item.expiration_date ?? null
         )
         .run();
 

@@ -120,6 +120,7 @@ export function useBulkAddPantryItems() {
       unit?: string;
       location?: PantryLocation;
       is_staple?: boolean;
+      expiration_date?: string;
     }>): Promise<BulkAddResponse> => {
       return api.post<BulkAddResponse>('/api/pantry/bulk', { items });
     },

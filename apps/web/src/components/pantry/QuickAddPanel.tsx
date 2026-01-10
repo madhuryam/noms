@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useAddPantryItem, useBulkAddPantryItems } from '../../hooks';
+import { useState, useMemo, useCallback } from 'react';
+import { useAddPantryItem, useBulkAddPantryItems, useShelfLifeEntries } from '../../hooks';
 import type { PantryLocation } from '../../hooks';
 import { getItemsForLocation, type ItemCategory } from '../../data/inventoryItems';
 import { useCustomItems, useAddCustomItem } from '../../hooks/useCustomItems';
@@ -44,12 +44,46 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
 
   // Paste mode state
   const [pasteText, setPasteText] = useState('');
-  const [isStaple, setIsStaple] = useState(true);
+  // Default to staple for pantry, spices, sauces; not for fridge, freezer, snacks
+  const [isStaple, setIsStaple] = useState(!['fridge', 'freezer', 'snacks'].includes(location));
 
   const addItem = useAddPantryItem();
   const bulkAdd = useBulkAddPantryItems();
   const { data: customItems = [] } = useCustomItems(location);
   const addCustomItem = useAddCustomItem();
+  const { data: shelfLifeEntries = [] } = useShelfLifeEntries();
+
+  // Calculate expiration date based on shelf life data
+  const getExpirationDate = useCallback((ingredientName: string): string | undefined => {
+    // Only calculate for fridge/freezer
+    if (location !== 'fridge' && location !== 'freezer') {
+      return undefined;
+    }
+
+    const nameLower = ingredientName.toLowerCase();
+
+    // Try exact match first
+    let entry = shelfLifeEntries.find(
+      (e) => e.ingredient_name.toLowerCase() === nameLower
+    );
+
+    // Try partial match if no exact match
+    if (!entry) {
+      entry = shelfLifeEntries.find(
+        (e) => nameLower.includes(e.ingredient_name.toLowerCase()) ||
+               e.ingredient_name.toLowerCase().includes(nameLower)
+      );
+    }
+
+    if (!entry) return undefined;
+
+    const days = location === 'fridge' ? entry.fridge_days : entry.freezer_days;
+    if (!days) return undefined;
+
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toISOString().split('T')[0];
+  }, [location, shelfLifeEntries]);
 
   // Get items for this location and merge with custom items
   const locationItems = getItemsForLocation(location);
@@ -145,18 +179,23 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
     setIsAdding(true);
     const itemsArray = Array.from(selectedItems);
 
+    // Only mark as staple for pantry, spices, sauces (not fridge, freezer, snacks)
+    const shouldBeStaple = !['fridge', 'freezer', 'snacks'].includes(location);
+
     try {
       // Add items in parallel batches of 5
       for (let i = 0; i < itemsArray.length; i += 5) {
         const batch = itemsArray.slice(i, i + 5);
         await Promise.all(
-          batch.map((name) =>
-            addItem.mutateAsync({
+          batch.map((name) => {
+            const expiration_date = getExpirationDate(name);
+            return addItem.mutateAsync({
               name,
               location,
-              is_staple: true,
-            })
-          )
+              is_staple: shouldBeStaple,
+              expiration_date,
+            });
+          })
         );
       }
 
@@ -180,6 +219,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
           ...item,
           location,
           is_staple: isStaple,
+          expiration_date: getExpirationDate(item.name),
         }))
       );
 
