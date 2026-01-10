@@ -39,7 +39,7 @@ interface BulkAddResponse {
   };
 }
 
-export type PantryLocation = 'pantry' | 'fridge' | 'freezer' | 'spices';
+export type PantryLocation = 'pantry' | 'fridge' | 'freezer' | 'spices' | 'sauces' | 'snacks';
 
 export function usePantryItems(location?: PantryLocation) {
   return useQuery({

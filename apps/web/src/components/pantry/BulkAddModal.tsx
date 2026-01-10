@@ -123,6 +123,9 @@ export function BulkAddModal({ isOpen, onClose, defaultLocation = 'pantry' }: Bu
                 <option value="pantry">Pantry</option>
                 <option value="fridge">Fridge</option>
                 <option value="freezer">Freezer</option>
+                <option value="spices">Spices</option>
+                <option value="sauces">Sauces</option>
+                <option value="snacks">Snacks</option>
               </select>
             </div>
 

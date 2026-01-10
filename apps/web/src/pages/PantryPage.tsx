@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { usePantryItems } from '../hooks';
 import { AddItemForm, PantryList, FridgeList, BulkAddModal } from '../components/pantry';
 
-type TabType = 'pantry' | 'fridge' | 'freezer' | 'spices';
+type TabType = 'pantry' | 'fridge' | 'freezer' | 'spices' | 'sauces' | 'snacks';
 
 export function PantryPage() {
   const [activeTab, setActiveTab] = useState<TabType>('pantry');
@@ -13,6 +13,8 @@ export function PantryPage() {
   const fridgeCount = allItems.filter((i) => i.location === 'fridge').length;
   const freezerCount = allItems.filter((i) => i.location === 'freezer').length;
   const spicesCount = allItems.filter((i) => i.location === 'spices').length;
+  const saucesCount = allItems.filter((i) => i.location === 'sauces').length;
+  const snacksCount = allItems.filter((i) => i.location === 'snacks').length;
 
   const tabs: { id: TabType; label: string; count: number; icon: ReactNode }[] = [
     {
@@ -52,6 +54,26 @@ export function PantryPage() {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'sauces',
+      label: 'Sauces',
+      count: saucesCount,
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      ),
+    },
+    {
+      id: 'snacks',
+      label: 'Snacks',
+      count: snacksCount,
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
     },
@@ -150,6 +172,22 @@ export function PantryPage() {
               location="spices"
               title="My Spices"
               emptyMessage="No spices yet. Add your spices above."
+            />
+          )}
+
+          {activeTab === 'sauces' && (
+            <PantryList
+              location="sauces"
+              title="My Sauces"
+              emptyMessage="No sauces yet. Add your sauces above."
+            />
+          )}
+
+          {activeTab === 'snacks' && (
+            <PantryList
+              location="snacks"
+              title="My Snacks"
+              emptyMessage="No snacks yet. Add your snacks above."
             />
           )}
         </div>

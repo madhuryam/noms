@@ -212,6 +212,9 @@ export function PantryItemRow({ item }: PantryItemRowProps) {
         <option value="pantry">Pantry</option>
         <option value="fridge">Fridge</option>
         <option value="freezer">Freezer</option>
+        <option value="spices">Spices</option>
+        <option value="sauces">Sauces</option>
+        <option value="snacks">Snacks</option>
       </select>
 
       {/* Action buttons */}
