@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { recipes, tags, search, importRoutes, images, associations, pantry, shelfLife, mealPlans, exportRoutes } from './routes';
+import { recipes, tags, search, importRoutes, images, associations, pantry, shelfLife, mealPlans, exportRoutes, nutrition } from './routes';
 import { validateAccessJWT } from './middleware';
 
 interface HealthResponse {
@@ -142,6 +142,7 @@ app.route('/api/pantry', pantry);
 app.route('/api/shelf-life', shelfLife);
 app.route('/api/meal-plans', mealPlans);
 app.route('/api/export', exportRoutes);
+app.route('/api/nutrition', nutrition);
 
 // Recipe tag routes are defined in tags.ts but need /api prefix
 // They're mounted at /api/tags but the routes include /recipes/:id/tags paths

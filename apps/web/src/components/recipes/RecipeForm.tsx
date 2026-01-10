@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemoveTagFromRecipe, useCreateTag } from '../../hooks';
 import { DEFAULT_SERVINGS } from '../../lib/constants';
+import { calculateRecipeMacros } from '../../lib/macroCalculation';
 import { TagSelector } from '../tags';
 import { PairingSelector } from './PairingSelector';
 
@@ -153,6 +154,11 @@ interface FormData {
   cook_time_minutes: string;
   notes: string;
   source_url: string;
+  // Macro fields
+  carbs_total: string;
+  protein_total: string;
+  fat_total: string;
+  calories_total: string;
 }
 
 interface FormErrors {
@@ -183,6 +189,12 @@ interface RecipeFormProps {
     source_url: string | null;
     tags?: RecipeTag[];
     image_path?: string | null;
+    // Macro fields
+    carbs_total?: number | null;
+    protein_total?: number | null;
+    fat_total?: number | null;
+    calories_total?: number | null;
+    macros_manual?: boolean | number;
   };
 }
 
@@ -217,7 +229,19 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     cook_time_minutes: '',
     notes: '',
     source_url: '',
+    carbs_total: '',
+    protein_total: '',
+    fat_total: '',
+    calories_total: '',
   });
+
+  // Macro mode state
+  const [macrosManual, setMacrosManual] = useState(false);
+
+  // Calculate macros from ingredients
+  const calculatedMacros = useMemo(() => {
+    return calculateRecipeMacros(formData.ingredients_raw);
+  }, [formData.ingredients_raw]);
 
   // Section-based editors state
   const [ingredientSections, setIngredientSections] = useState<EditorSection[]>(() =>
@@ -251,11 +275,16 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
         notes: initialData.notes ?? '',
         source_url: initialData.source_url ?? '',
+        carbs_total: initialData.carbs_total?.toString() ?? '',
+        protein_total: initialData.protein_total?.toString() ?? '',
+        fat_total: initialData.fat_total?.toString() ?? '',
+        calories_total: initialData.calories_total?.toString() ?? '',
       });
       setSelectedTags(initialData.tags ?? []);
       setIngredientSections(parseToSections(initialData.ingredients_raw ?? ''));
       setInstructionSections(parseToSections(initialData.instructions_raw ?? ''));
       setCurrentImagePath(initialData.image_path ?? null);
+      setMacrosManual(!!initialData.macros_manual);
     }
   }, [initialData]);
 
@@ -291,6 +320,21 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       return;
     }
 
+    // Determine macro values based on mode
+    const macroValues = macrosManual
+      ? {
+          carbs_total: formData.carbs_total ? Number(formData.carbs_total) : null,
+          protein_total: formData.protein_total ? Number(formData.protein_total) : null,
+          fat_total: formData.fat_total ? Number(formData.fat_total) : null,
+          calories_total: formData.calories_total ? Number(formData.calories_total) : null,
+        }
+      : {
+          carbs_total: calculatedMacros.carbs_total || null,
+          protein_total: calculatedMacros.protein_total || null,
+          fat_total: calculatedMacros.fat_total || null,
+          calories_total: calculatedMacros.calories_total || null,
+        };
+
     const payload = {
       title: formData.title.trim(),
       description: formData.description.trim() || null,
@@ -305,6 +349,8 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         : null,
       notes: formData.notes.trim() || null,
       source_url: formData.source_url.trim() || null,
+      ...macroValues,
+      macros_manual: macrosManual ? 1 : 0,
     };
 
     try {
@@ -863,6 +909,141 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
             className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
           />
         </div>
+      </div>
+
+      {/* Nutrition */}
+      <div className="bg-gray-50 dark:bg-onedark-bg rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg">
+            Nutrition
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-onedark-fg-muted">
+              {macrosManual ? 'Manual entry' : 'Auto-calculated'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setMacrosManual(!macrosManual)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                macrosManual ? 'bg-purple-600 dark:bg-onedark-purple' : 'bg-gray-300 dark:bg-onedark-bg-highlight'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                  macrosManual ? 'translate-x-4.5' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {macrosManual ? (
+          // Manual input mode
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Calories</label>
+              <input
+                type="number"
+                value={formData.calories_total}
+                onChange={(e) => setFormData(prev => ({ ...prev, calories_total: e.target.value }))}
+                min="0"
+                placeholder="0"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Protein (g)</label>
+              <input
+                type="number"
+                value={formData.protein_total}
+                onChange={(e) => setFormData(prev => ({ ...prev, protein_total: e.target.value }))}
+                min="0"
+                step="0.1"
+                placeholder="0"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Carbs (g)</label>
+              <input
+                type="number"
+                value={formData.carbs_total}
+                onChange={(e) => setFormData(prev => ({ ...prev, carbs_total: e.target.value }))}
+                min="0"
+                step="0.1"
+                placeholder="0"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Fat (g)</label>
+              <input
+                type="number"
+                value={formData.fat_total}
+                onChange={(e) => setFormData(prev => ({ ...prev, fat_total: e.target.value }))}
+                min="0"
+                step="0.1"
+                placeholder="0"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
+              />
+            </div>
+          </div>
+        ) : (
+          // Auto-calculated preview
+          <div className="space-y-3">
+            {calculatedMacros.total_count > 0 ? (
+              <>
+                <div className="grid grid-cols-4 gap-3 text-center">
+                  <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg p-2">
+                    <p className="text-lg font-bold text-gray-900 dark:text-onedark-fg">
+                      {Math.round(calculatedMacros.calories_total)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">cal</p>
+                  </div>
+                  <div className="bg-green-50 dark:bg-onedark-green/10 rounded-lg p-2">
+                    <p className="text-lg font-bold text-green-600 dark:text-onedark-green">
+                      {calculatedMacros.protein_total}g
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">protein</p>
+                  </div>
+                  <div className="bg-blue-50 dark:bg-onedark-blue/10 rounded-lg p-2">
+                    <p className="text-lg font-bold text-blue-600 dark:text-onedark-blue">
+                      {calculatedMacros.carbs_total}g
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">carbs</p>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-onedark-yellow/10 rounded-lg p-2">
+                    <p className="text-lg font-bold text-yellow-600 dark:text-onedark-yellow">
+                      {calculatedMacros.fat_total}g
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">fat</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500 dark:text-onedark-fg-muted">
+                    {calculatedMacros.matched_count}/{calculatedMacros.total_count} ingredients matched
+                  </span>
+                  {calculatedMacros.unmatched_ingredients.length > 0 && (
+                    <span className="text-amber-600 dark:text-onedark-yellow" title={calculatedMacros.unmatched_ingredients.join(', ')}>
+                      {calculatedMacros.unmatched_ingredients.length} unmatched
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-400 dark:text-onedark-fg-muted text-center py-2">
+                Add ingredients to calculate nutrition
+              </p>
+            )}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400 dark:text-onedark-fg-muted">
+          {macrosManual
+            ? 'Enter total values for the entire recipe'
+            : 'Calculated from ingredients. Toggle to enter manually.'}
+        </p>
       </div>
 
       {/* Notes */}

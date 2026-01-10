@@ -75,3 +75,12 @@ export type {
 export { usePairings, useAddPairing, useRemovePairing, PAIRING_TYPES } from './usePairings';
 export type { Pairing, AddPairingInput } from './usePairings';
 export { useCustomItems, useAllCustomItems, useAddCustomItem, useRemoveCustomItem } from './useCustomItems';
+export {
+  useNutritionEntries,
+  useNutritionEntriesFromDb,
+  useNutritionLookup,
+  useCreateNutrition,
+  useUpdateNutrition,
+  useDeleteNutrition,
+} from './useNutrition';
+export type { NutritionEntry, NutritionEntryWithSource } from './useNutrition';

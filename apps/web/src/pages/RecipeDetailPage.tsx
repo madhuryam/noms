@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useRecipe, useDeleteRecipe, useRecipeMatch } from '../hooks';
 import {
@@ -8,7 +8,9 @@ import {
   IngredientList,
   InstructionSteps,
   PairingsSection,
+  MacroDisplay,
 } from '../components/recipes';
+import { calculateRecipeMacros } from '../lib/macroCalculation';
 import { MatchSummaryBadge } from '../components/suggestions';
 import { RecipeDetailSkeleton, ErrorState, EmptyState, EmptyStateIcons, getErrorMessage } from '../components/common';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
@@ -75,6 +77,36 @@ export function RecipeDetailPage() {
   const currentServings = servings ?? recipe?.servings ?? DEFAULT_SERVINGS;
   const originalServings = recipe?.servings ?? DEFAULT_SERVINGS;
   const scaleFactor = currentServings / originalServings;
+
+  // Get macros - either stored or calculated
+  const macros = useMemo(() => {
+    if (!recipe) return null;
+
+    // If recipe has stored macros, use them (scaled)
+    if (recipe.carbs_total !== null || recipe.protein_total !== null || recipe.fat_total !== null) {
+      return {
+        carbs: recipe.carbs_total !== null ? recipe.carbs_total * scaleFactor : null,
+        protein: recipe.protein_total !== null ? recipe.protein_total * scaleFactor : null,
+        fat: recipe.fat_total !== null ? recipe.fat_total * scaleFactor : null,
+        calories: recipe.calories_total !== null ? recipe.calories_total * scaleFactor : null,
+        isManual: !!recipe.macros_manual,
+        matchedCount: undefined,
+        totalCount: undefined,
+      };
+    }
+
+    // Otherwise calculate from ingredients
+    const calculated = calculateRecipeMacros(recipe.ingredients_raw);
+    return {
+      carbs: calculated.carbs_total * scaleFactor || null,
+      protein: calculated.protein_total * scaleFactor || null,
+      fat: calculated.fat_total * scaleFactor || null,
+      calories: calculated.calories_total * scaleFactor || null,
+      isManual: false,
+      matchedCount: calculated.matched_count,
+      totalCount: calculated.total_count,
+    };
+  }, [recipe, scaleFactor]);
 
   const handleDelete = async () => {
     if (!recipeId) return;
@@ -180,6 +212,20 @@ export function RecipeDetailPage() {
         onServingsChange={setServings}
         sourceUrl={recipe.source_url}
       />
+
+      {/* Nutrition */}
+      {macros && (macros.calories || macros.protein || macros.carbs || macros.fat) && (
+        <MacroDisplay
+          carbs={macros.carbs}
+          protein={macros.protein}
+          fat={macros.fat}
+          calories={macros.calories}
+          servings={currentServings}
+          isManual={macros.isManual}
+          matchedCount={macros.matchedCount}
+          totalCount={macros.totalCount}
+        />
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -787,6 +787,11 @@ recipes.put('/:id', async (c) => {
       'image_path',
       'source_path',
       'source_url',
+      'carbs_total',
+      'protein_total',
+      'fat_total',
+      'calories_total',
+      'macros_manual',
     ];
 
     const updates: string[] = [];

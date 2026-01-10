@@ -18,6 +18,12 @@ interface Recipe {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Macro fields
+  carbs_total: number | null;
+  protein_total: number | null;
+  fat_total: number | null;
+  calories_total: number | null;
+  macros_manual: boolean | number;
   tags?: { id: number; name: string; display_name: string; color: string; is_category?: boolean | number }[];
   images?: { id: number; path: string; alt: string | null; sort_order: number }[];
 }
@@ -38,6 +44,12 @@ interface CreateRecipeInput {
 interface UpdateRecipeInput extends Partial<CreateRecipeInput> {
   is_favorite?: boolean;
   rating?: number;
+  // Macro fields
+  carbs_total?: number | null;
+  protein_total?: number | null;
+  fat_total?: number | null;
+  calories_total?: number | null;
+  macros_manual?: boolean | number;
 }
 
 export function useRecipe(id: number | undefined) {

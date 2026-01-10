@@ -8,3 +8,4 @@ export { default as pantry } from './pantry';
 export { default as shelfLife } from './shelfLife';
 export { default as mealPlans } from './meal-plans';
 export { default as exportRoutes } from './export';
+export { default as nutrition } from './nutrition';
