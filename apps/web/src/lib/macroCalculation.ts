@@ -230,12 +230,33 @@ function normalizeIngredientName(name: string): string {
     .trim();
 }
 
+export interface CustomNutritionEntry {
+  ingredient_name: string;
+  carbs_per_100g: number | null;
+  protein_per_100g: number | null;
+  fat_per_100g: number | null;
+  calories_per_100g: number | null;
+}
+
 // Find nutrition data for an ingredient
-function findNutrition(ingredientName: string): {
-  nutrition: typeof defaultNutritionMap extends Map<string, infer V> ? V : never;
+function findNutrition(
+  ingredientName: string,
+  customEntries?: CustomNutritionEntry[]
+): {
+  nutrition: { carbs_per_100g: number | null; protein_per_100g: number | null; fat_per_100g: number | null; calories_per_100g: number | null };
   matchedName: string;
 } | null {
   const normalized = normalizeIngredientName(ingredientName);
+
+  // Check custom entries first (user-added entries take priority)
+  if (customEntries) {
+    for (const entry of customEntries) {
+      const customNormalized = entry.ingredient_name.toLowerCase();
+      if (normalized === customNormalized || normalized.includes(customNormalized) || customNormalized.includes(normalized)) {
+        return { nutrition: entry, matchedName: entry.ingredient_name };
+      }
+    }
+  }
 
   // Try exact match first
   let entry = defaultNutritionMap.get(normalized);
@@ -295,9 +316,10 @@ function convertToGrams(quantity: number, unit: string, ingredientName: string):
 // Calculate macros for a single ingredient
 function calculateIngredientMacros(
   raw_text: string,
-  parsed: { quantity: number; unit: string; ingredient: string }
+  parsed: { quantity: number; unit: string; ingredient: string },
+  customEntries?: CustomNutritionEntry[]
 ): IngredientMacros {
-  const match = findNutrition(parsed.ingredient);
+  const match = findNutrition(parsed.ingredient, customEntries);
 
   if (!match) {
     return {
@@ -331,7 +353,10 @@ function calculateIngredientMacros(
 }
 
 // Calculate macros for a recipe given its ingredients_raw text
-export function calculateRecipeMacros(ingredients_raw: string | null): RecipeMacros {
+export function calculateRecipeMacros(
+  ingredients_raw: string | null,
+  customEntries?: CustomNutritionEntry[]
+): RecipeMacros {
   if (!ingredients_raw) {
     return {
       carbs_total: 0,
@@ -382,7 +407,7 @@ export function calculateRecipeMacros(ingredients_raw: string | null): RecipeMac
     if (!parsed) continue;
 
     total_count++;
-    const macros = calculateIngredientMacros(line.trim(), parsed);
+    const macros = calculateIngredientMacros(line.trim(), parsed, customEntries);
     ingredients.push(macros);
 
     if (macros.found) {
