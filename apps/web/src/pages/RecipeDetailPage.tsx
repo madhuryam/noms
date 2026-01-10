@@ -127,7 +127,7 @@ export function RecipeDetailPage() {
 
   if (isError) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <ErrorState
           variant="full"
           title="Failed to load recipe"
@@ -148,7 +148,7 @@ export function RecipeDetailPage() {
 
   if (!recipe) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <EmptyState
           icon={EmptyStateIcons.recipes}
           title="Recipe not found"
@@ -161,7 +161,7 @@ export function RecipeDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm">
         <Link
