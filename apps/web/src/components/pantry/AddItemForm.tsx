@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useIngredientSuggestions, useAddPantryItem, useShelfLifeLookup } from '../../hooks';
+import { useIngredientSuggestions, useAddPantryItem, useShelfLifeLookup, useCustomItems, useAddCustomItem } from '../../hooks';
 import type { PantryLocation, IngredientSuggestion } from '../../hooks';
+import { getItemsForLocation } from '../../data/inventoryItems';
 
 interface AddItemFormProps {
   location: PantryLocation;
@@ -39,9 +40,38 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
   // Debounce the name for shelf life lookup (500ms delay)
   const debouncedName = useDebounce(name.trim(), 500);
 
-  const { data: suggestions = [] } = useIngredientSuggestions(name);
+  const { data: apiSuggestions = [] } = useIngredientSuggestions(name);
   const addItem = useAddPantryItem();
   const { data: shelfLifeData } = useShelfLifeLookup(debouncedName);
+  const { data: customItems = [] } = useCustomItems(location);
+  const addCustomItem = useAddCustomItem();
+
+  // Get predefined items for this location
+  const predefinedItems = useMemo(() => {
+    const locationItems = getItemsForLocation(location);
+    return locationItems.categories.flatMap((cat) => cat.items);
+  }, [location]);
+
+  // Combine all items for suggestions (predefined + custom)
+  const allPredefinedItems = useMemo(() => {
+    return [...new Set([...predefinedItems, ...customItems])];
+  }, [predefinedItems, customItems]);
+
+  // Filter predefined items based on search
+  const predefinedSuggestions = useMemo(() => {
+    if (!name.trim() || name.trim().length < 2) return [];
+    const query = name.toLowerCase();
+    return allPredefinedItems
+      .filter((item) => item.toLowerCase().includes(query))
+      .slice(0, 10);
+  }, [name, allPredefinedItems]);
+
+  // Merge API suggestions with predefined suggestions
+  const suggestions = useMemo(() => {
+    const apiItems = apiSuggestions.map((s) => s.name);
+    const combined = [...new Set([...predefinedSuggestions, ...apiItems])];
+    return combined.slice(0, 10);
+  }, [apiSuggestions, predefinedSuggestions]);
 
   // Check if input contains "leftovers"
   const isLeftovers = useMemo(() => {
@@ -104,9 +134,13 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelectSuggestion = (suggestion: IngredientSuggestion) => {
-    setName(suggestion.name);
-    setSelectedIngredientId(suggestion.id);
+  const handleSelectSuggestion = (suggestionName: string) => {
+    setName(suggestionName);
+    // Try to find matching ingredient ID from API suggestions
+    const apiMatch = apiSuggestions.find(
+      (s) => s.name.toLowerCase() === suggestionName.toLowerCase()
+    );
+    setSelectedIngredientId(apiMatch?.id);
     setShowSuggestions(false);
   };
 
@@ -115,9 +149,21 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
 
     if (!name.trim()) return;
 
+    const trimmedName = name.trim();
+
+    // Check if this item exists in the predefined list
+    const existsInPredefined = allPredefinedItems.some(
+      (item) => item.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    // If it doesn't exist, add it to custom items
+    if (!existsInPredefined) {
+      await addCustomItem.mutateAsync({ location, item: trimmedName });
+    }
+
     try {
       await addItem.mutateAsync({
-        name: name.trim(),
+        name: trimmedName,
         ingredient_id: selectedIngredientId,
         quantity: quantity ? parseFloat(quantity) : undefined,
         unit: unit || undefined,
@@ -168,12 +214,12 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
           >
             {suggestions.map((suggestion) => (
               <button
-                key={suggestion.id}
+                key={suggestion}
                 type="button"
                 onClick={() => handleSelectSuggestion(suggestion)}
                 className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight text-sm text-gray-900 dark:text-onedark-fg"
               >
-                {suggestion.name}
+                {suggestion}
               </button>
             ))}
           </div>

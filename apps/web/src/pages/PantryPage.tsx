@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { usePantryItems } from '../hooks';
-import { AddItemForm, PantryList, FridgeList, BulkAddModal } from '../components/pantry';
+import { AddItemForm, PantryList, FridgeList, QuickAddPanel } from '../components/pantry';
 
 type TabType = 'pantry' | 'fridge' | 'freezer' | 'spices' | 'sauces' | 'snacks';
 
 export function PantryPage() {
   const [activeTab, setActiveTab] = useState<TabType>('pantry');
-  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { data: allItems = [] } = usePantryItems();
 
   const pantryCount = allItems.filter((i) => i.location === 'pantry' || !i.location).length;
@@ -89,15 +89,6 @@ export function PantryPage() {
             {allItems.length} items tracked
           </p>
         </div>
-        <button
-          onClick={() => setShowBulkAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-200 dark:hover:bg-onedark-bg transition-colors text-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          Bulk Add
-        </button>
       </div>
 
       {/* Tabs */}
@@ -129,7 +120,21 @@ export function PantryPage() {
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight">
         {/* Add Item Form - always visible at top of each tab */}
         <div className="p-4 border-b border-gray-200 dark:border-onedark-bg-highlight">
-          <AddItemForm location={activeTab} />
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <AddItemForm location={activeTab} />
+            </div>
+            <button
+              onClick={() => setShowQuickAdd(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors text-sm whitespace-nowrap"
+              title="Add multiple items at once"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="hidden sm:inline">Add Items</span>
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -193,12 +198,13 @@ export function PantryPage() {
         </div>
       </div>
 
-      {/* Bulk Add Modal */}
-      <BulkAddModal
-        isOpen={showBulkAdd}
-        onClose={() => setShowBulkAdd(false)}
-        defaultLocation={activeTab}
-      />
+      {/* Quick Add Panel */}
+      {showQuickAdd && (
+        <QuickAddPanel
+          location={activeTab}
+          onClose={() => setShowQuickAdd(false)}
+        />
+      )}
     </div>
   );
 }
