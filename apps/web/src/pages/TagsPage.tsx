@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTags, useCreateTag, useDeleteTag, useMergeTags } from '../hooks';
+import { useTags, useSmartTags, useCreateTag, useDeleteTag, useMergeTags } from '../hooks';
 import { TagManager, RecipeTagSelector } from '../components/tags';
 import type { Tag } from '../components/tags';
 
@@ -11,6 +11,7 @@ interface TagWithUsage extends Tag {
 export function TagsPage() {
   const navigate = useNavigate();
   const { data: tags = [], isLoading } = useTags();
+  const { data: smartTags = [] } = useSmartTags();
   const createTag = useCreateTag();
   const deleteTag = useDeleteTag();
   const mergeTags = useMergeTags();
@@ -135,9 +136,54 @@ export function TagsPage() {
         </div>
       )}
 
+      {/* Smart Tags */}
+      {smartTags.length > 0 && (
+        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-1">
+              Smart Tags
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
+              Auto-assigned based on recipe data. Click to filter recipes.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {smartTags.map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => navigate(`/recipes?smartTags=${encodeURIComponent(tag.name)}`)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:scale-105"
+                style={{
+                  backgroundColor: tag.color ? `${tag.color}20` : '#e5e7eb',
+                  color: tag.color || '#374151',
+                  border: `1px solid ${tag.color || '#d1d5db'}`,
+                }}
+                title={tag.description || undefined}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                {tag.display_name}
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: tag.color ? `${tag.color}30` : '#d1d5db',
+                  }}
+                >
+                  {tag.usage_count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tag Manager */}
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6">
         <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-1">
+            Custom Tags
+          </h2>
           <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
             Click a tag to view its recipes. Use edit to modify and manage recipes, merge to combine tags, or delete to remove.
           </p>

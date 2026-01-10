@@ -10,8 +10,21 @@ export interface Tag {
   is_category?: boolean | number; // Can be boolean or 0/1 from SQLite
 }
 
+export interface SmartTag {
+  id: number;
+  name: string;
+  display_name: string;
+  color: string | null;
+  description: string | null;
+  usage_count: number;
+}
+
 interface TagsResponse {
   tags: Tag[];
+}
+
+interface SmartTagsResponse {
+  smart_tags: SmartTag[];
 }
 
 interface CreateTagInput {
@@ -33,6 +46,16 @@ export function useTags() {
     queryFn: async (): Promise<Tag[]> => {
       const response = await api.get<TagsResponse>('/api/tags');
       return response.tags;
+    },
+  });
+}
+
+export function useSmartTags() {
+  return useQuery({
+    queryKey: ['smart-tags'],
+    queryFn: async (): Promise<SmartTag[]> => {
+      const response = await api.get<SmartTagsResponse>('/api/tags/smart');
+      return response.smart_tags;
     },
   });
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useInfiniteRecipes, useTags } from '../hooks';
+import { useInfiniteRecipes, useTags, useSmartTags } from '../hooks';
 import { DraggableRecipeGrid } from '../components/recipes';
 import { TagFilter } from '../components/tags';
 import { ErrorState, EmptyState, EmptyStateIcons, getErrorMessage } from '../components/common';
@@ -15,10 +15,17 @@ export function RecipeListPage() {
     return tagsParam ? tagsParam.split(',').filter(Boolean) : [];
   }, [searchParams]);
 
+  // Get smart tag filters from URL
+  const selectedSmartTags = useMemo(() => {
+    const smartTagsParam = searchParams.get('smartTags');
+    return smartTagsParam ? smartTagsParam.split(',').filter(Boolean) : [];
+  }, [searchParams]);
+
   const tagMode = (searchParams.get('tagMode') as 'all' | 'any') || 'all';
 
   // Fetch all tags for the filter component
   const { data: allTags = [] } = useTags();
+  const { data: smartTags = [] } = useSmartTags();
 
   // Convert tag names to IDs for the query
   const selectedTagIds = useMemo(() => {
@@ -28,7 +35,7 @@ export function RecipeListPage() {
   }, [allTags, selectedTagNames]);
 
   const { data, isLoading, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteRecipes({ tags: selectedTagIds, tagMode });
+    useInfiniteRecipes({ tags: selectedTagIds, smartTags: selectedSmartTags, tagMode });
 
   // Update URL when tags change
   const handleTagsChange = (tags: string[]) => {
@@ -48,6 +55,23 @@ export function RecipeListPage() {
         prev.delete('tagMode');
       } else {
         prev.set('tagMode', mode);
+      }
+      return prev;
+    });
+  };
+
+  const handleSmartTagToggle = (tagName: string) => {
+    setSearchParams((prev) => {
+      const current = prev.get('smartTags')?.split(',').filter(Boolean) || [];
+      if (current.includes(tagName)) {
+        const updated = current.filter((t) => t !== tagName);
+        if (updated.length === 0) {
+          prev.delete('smartTags');
+        } else {
+          prev.set('smartTags', updated.join(','));
+        }
+      } else {
+        prev.set('smartTags', [...current, tagName].join(','));
       }
       return prev;
     });
@@ -158,6 +182,9 @@ export function RecipeListPage() {
         onTagsChange={handleTagsChange}
         tagMode={tagMode}
         onModeChange={handleModeChange}
+        smartTags={smartTags}
+        selectedSmartTags={selectedSmartTags}
+        onSmartTagToggle={handleSmartTagToggle}
       />
 
       {/* Error State */}
@@ -194,19 +221,25 @@ export function RecipeListPage() {
       {/* Empty State */}
       {!isLoading && !isError && recipes.length === 0 && (
         <EmptyState
-          icon={selectedTagNames.length > 0 ? EmptyStateIcons.filter : EmptyStateIcons.recipes}
-          title={selectedTagNames.length > 0 ? 'No matching recipes' : 'No recipes yet'}
+          icon={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? EmptyStateIcons.filter : EmptyStateIcons.recipes}
+          title={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? 'No matching recipes' : 'No recipes yet'}
           description={
-            selectedTagNames.length > 0
+            selectedTagNames.length > 0 || selectedSmartTags.length > 0
               ? 'Try adjusting your tag filters or search criteria'
               : 'Get started by adding your first recipe'
           }
-          actionLabel={selectedTagNames.length > 0 ? undefined : 'Add Your First Recipe'}
-          actionLink={selectedTagNames.length > 0 ? undefined : '/recipes/new'}
+          actionLabel={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? undefined : 'Add Your First Recipe'}
+          actionLink={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? undefined : '/recipes/new'}
           secondaryAction={
-            selectedTagNames.length > 0 ? (
+            selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? (
               <button
-                onClick={() => handleTagsChange([])}
+                onClick={() => {
+                  handleTagsChange([]);
+                  setSearchParams((prev) => {
+                    prev.delete('smartTags');
+                    return prev;
+                  });
+                }}
                 className="px-4 py-2 bg-gray-200 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-300 dark:hover:bg-onedark-bg transition-colors"
               >
                 Clear Filters

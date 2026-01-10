@@ -6,8 +6,8 @@ export { useSearch, useSearchSuggestions, useSpellCheck } from './useSearch';
 export type { SearchResult, SearchSuggestion } from './useSearch';
 export { useAssociations, useAssociation, useCreateAssociation, useUpdateAssociation, useDeleteAssociation } from './useAssociations';
 export type { AssociationGroup } from './useAssociations';
-export { useTags, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags, useAddTagToRecipe, useRemoveTagFromRecipe } from './useTags';
-export type { Tag } from './useTags';
+export { useTags, useSmartTags, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags, useAddTagToRecipe, useRemoveTagFromRecipe } from './useTags';
+export type { Tag, SmartTag } from './useTags';
 export { useDailySuggestions } from './useDailySuggestions';
 export {
   usePantryItems,

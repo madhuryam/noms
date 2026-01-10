@@ -3,12 +3,24 @@ import { Link } from 'react-router-dom';
 import { TagPill, type Tag } from './TagPill';
 import { useCreateTag } from '../../hooks';
 
+interface SmartTag {
+  id: number;
+  name: string;
+  display_name: string;
+  color: string | null;
+  description: string | null;
+  usage_count: number;
+}
+
 interface TagFilterProps {
   tags: (Tag & { usage_count: number; is_category?: boolean | number })[];
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
   tagMode: 'all' | 'any';
   onModeChange: (mode: 'all' | 'any') => void;
+  smartTags?: SmartTag[];
+  selectedSmartTags?: string[];
+  onSmartTagToggle?: (tagName: string) => void;
 }
 
 export function TagFilter({
@@ -17,6 +29,9 @@ export function TagFilter({
   onTagsChange,
   tagMode,
   onModeChange,
+  smartTags = [],
+  selectedSmartTags = [],
+  onSmartTagToggle,
 }: TagFilterProps) {
   const [showAll, setShowAll] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -178,12 +193,56 @@ export function TagFilter({
       )}
 
       {/* Tags */}
-      {tags.length === 0 ? (
+      {tags.length === 0 && smartTags.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
           No tags yet. Click "Add Tag" to create your first tag.
         </p>
       ) : (
         <div className="space-y-4">
+          {/* Smart Tags Section */}
+          {smartTags.length > 0 && onSmartTagToggle && (
+            <div>
+              <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Smart Tags
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {smartTags.map((tag) => {
+                  const isSelected = selectedSmartTags.includes(tag.name);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => onSmartTagToggle(tag.name)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                        isSelected
+                          ? 'ring-2 ring-offset-1 dark:ring-offset-onedark-bg-lighter'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: tag.color ? `${tag.color}${isSelected ? '30' : '15'}` : '#e5e7eb',
+                        color: tag.color || '#374151',
+                        ['--tw-ring-color' as string]: tag.color || '#3b82f6',
+                      }}
+                      title={tag.description || undefined}
+                    >
+                      {tag.display_name}
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: tag.color ? `${tag.color}40` : '#d1d5db',
+                        }}
+                      >
+                        {tag.usage_count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Category Tags Section */}
           {categoryTags.length > 0 && (
             <div>

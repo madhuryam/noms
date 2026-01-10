@@ -58,6 +58,7 @@ recipes.get('/', async (c) => {
   const limit = Math.min(Number(c.req.query('limit')) || 20, 100);
   const offset = Number(c.req.query('offset')) || 0;
   const tagsParam = c.req.query('tags'); // comma-separated tag names or ids
+  const smartTagsParam = c.req.query('smartTags'); // comma-separated smart tag names or ids
   const tagMode = c.req.query('tagMode') || 'all'; // 'all' (AND) or 'any' (OR)
   const sortByParam = c.req.query('sortBy') || 'updated_at';
   const sortOrderParam = c.req.query('sortOrder') || 'desc';
@@ -76,8 +77,9 @@ recipes.get('/', async (c) => {
     let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
     const bindings: unknown[] = [];
     const countBindings: unknown[] = [];
+    const whereConditions: string[] = [];
 
-    // Handle tag filtering
+    // Handle regular tag filtering
     if (tagsParam) {
       const tagValues = tagsParam.split(',').map((t) => t.trim().toLowerCase());
       const tagCount = tagValues.length;
@@ -95,8 +97,7 @@ recipes.get('/', async (c) => {
         const tagConditions = tagValues
           .map(() => '(LOWER(t.name) = ? OR CAST(t.id AS TEXT) = ?)')
           .join(' OR ');
-        query += ` WHERE (${tagConditions})`;
-        countQuery += ` WHERE (${tagConditions})`;
+        whereConditions.push(`(${tagConditions})`);
 
         // Add bindings for each tag (twice: once for name, once for id)
         for (const tag of tagValues) {
@@ -106,10 +107,46 @@ recipes.get('/', async (c) => {
 
         // For AND logic, require all tags to match
         if (tagMode === 'all' && tagCount > 1) {
-          query += ` GROUP BY r.id HAVING COUNT(DISTINCT t.id) >= ${tagCount}`;
-          countQuery = `SELECT COUNT(*) as total FROM (${countQuery} GROUP BY r.id HAVING COUNT(DISTINCT t.id) >= ${tagCount})`;
+          query += ` WHERE (${tagConditions}) GROUP BY r.id HAVING COUNT(DISTINCT t.id) >= ${tagCount}`;
+          countQuery = `SELECT COUNT(*) as total FROM (${countQuery} WHERE (${tagConditions}) GROUP BY r.id HAVING COUNT(DISTINCT t.id) >= ${tagCount})`;
+          // Skip normal where handling since we handled it above
+          whereConditions.length = 0;
         }
       }
+    }
+
+    // Handle smart tag filtering
+    if (smartTagsParam) {
+      const smartTagValues = smartTagsParam.split(',').map((t) => t.trim().toLowerCase());
+      const smartTagCount = smartTagValues.length;
+
+      if (smartTagCount > 0) {
+        // Join with recipe_smart_tags and smart_tags
+        const smartTagJoin = `
+          JOIN recipe_smart_tags rst ON r.id = rst.recipe_id
+          JOIN smart_tags st ON rst.smart_tag_id = st.id
+        `;
+        query += smartTagJoin;
+        countQuery += smartTagJoin;
+
+        // Build WHERE clause for smart tag names or IDs
+        const smartTagConditions = smartTagValues
+          .map(() => '(LOWER(st.name) = ? OR CAST(st.id AS TEXT) = ?)')
+          .join(' OR ');
+        whereConditions.push(`(${smartTagConditions})`);
+
+        // Add bindings for each smart tag (twice: once for name, once for id)
+        for (const smartTag of smartTagValues) {
+          bindings.push(smartTag, smartTag);
+          countBindings.push(smartTag, smartTag);
+        }
+      }
+    }
+
+    // Add WHERE clause if there are conditions
+    if (whereConditions.length > 0) {
+      query += ` WHERE ${whereConditions.join(' AND ')}`;
+      countQuery += ` WHERE ${whereConditions.join(' AND ')}`;
     }
 
     // Add ordering and pagination
@@ -128,9 +165,12 @@ recipes.get('/', async (c) => {
     // Get tags for each recipe
     const recipeIds = (results.results ?? []).map((r) => (r as { id: number }).id);
     let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; is_category: number }>> = {};
+    let recipeSmartTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; description: string | null }>> = {};
 
     if (recipeIds.length > 0) {
       const placeholders = recipeIds.map(() => '?').join(',');
+
+      // Fetch regular tags
       const tagsResult = await c.env.DB.prepare(
         `
         SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color, t.is_category
@@ -156,6 +196,33 @@ recipes.get('/', async (c) => {
           is_category: r.is_category,
         });
       }
+
+      // Fetch smart tags
+      const smartTagsResult = await c.env.DB.prepare(
+        `
+        SELECT rst.recipe_id, st.id, st.name, st.display_name, st.color, st.description
+        FROM recipe_smart_tags rst
+        JOIN smart_tags st ON rst.smart_tag_id = st.id
+        WHERE rst.recipe_id IN (${placeholders})
+      `
+      )
+        .bind(...recipeIds)
+        .all();
+
+      // Group smart tags by recipe_id
+      for (const row of smartTagsResult.results ?? []) {
+        const r = row as { recipe_id: number; id: number; name: string; display_name: string; color: string | null; description: string | null };
+        if (!recipeSmartTags[r.recipe_id]) {
+          recipeSmartTags[r.recipe_id] = [];
+        }
+        recipeSmartTags[r.recipe_id].push({
+          id: r.id,
+          name: r.name,
+          display_name: r.display_name,
+          color: r.color,
+          description: r.description,
+        });
+      }
     }
 
     // Attach tags to each recipe
@@ -164,6 +231,7 @@ recipes.get('/', async (c) => {
       return {
         ...recipe,
         tags: recipeTags[r.id] ?? [],
+        smart_tags: recipeSmartTags[r.id] ?? [],
       };
     });
 
@@ -673,6 +741,19 @@ recipes.get('/:id', async (c) => {
       .bind(id)
       .all();
 
+    // Get smart tags for this recipe
+    const smartTags = await c.env.DB.prepare(
+      `
+      SELECT st.id, st.name, st.display_name, st.color, st.description
+      FROM smart_tags st
+      JOIN recipe_smart_tags rst ON st.id = rst.smart_tag_id
+      WHERE rst.recipe_id = ?
+      ORDER BY st.sort_order, st.name
+    `
+    )
+      .bind(id)
+      .all();
+
     // Get images for this recipe
     const images = await c.env.DB.prepare(
       `
@@ -688,6 +769,7 @@ recipes.get('/:id', async (c) => {
     return c.json({
       ...recipe,
       tags: tags.results,
+      smart_tags: smartTags.results,
       images: images.results,
     });
   } catch (error) {

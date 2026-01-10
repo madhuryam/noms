@@ -38,6 +38,91 @@ tags.get('/', async (c) => {
   }
 });
 
+// GET /api/tags/smart - List all smart tags with calculated usage_count
+tags.get('/smart', async (c) => {
+  try {
+    const results = await c.env.DB.prepare(
+      `
+      SELECT
+        st.id,
+        st.name,
+        st.display_name,
+        st.color,
+        st.description,
+        st.condition_sql,
+        st.sort_order,
+        COUNT(rst.recipe_id) as usage_count
+      FROM smart_tags st
+      LEFT JOIN recipe_smart_tags rst ON st.id = rst.smart_tag_id
+      GROUP BY st.id
+      ORDER BY st.sort_order, st.name
+    `
+    ).all();
+
+    return c.json({ smart_tags: results.results });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch smart tags',
+      },
+      500
+    );
+  }
+});
+
+// POST /api/tags/smart/recalculate - Recalculate all smart tag assignments
+tags.post('/smart/recalculate', async (c) => {
+  try {
+    // Clear all existing smart tag assignments
+    await c.env.DB.prepare('DELETE FROM recipe_smart_tags').run();
+
+    // Re-populate Quick Meals
+    await c.env.DB.prepare(`
+      INSERT INTO recipe_smart_tags (recipe_id, smart_tag_id)
+      SELECT r.id, st.id
+      FROM recipes r, smart_tags st
+      WHERE st.name = 'quick-meals'
+        AND COALESCE(r.prep_time_minutes, 0) + COALESCE(r.cook_time_minutes, 0) > 0
+        AND COALESCE(r.prep_time_minutes, 0) + COALESCE(r.cook_time_minutes, 0) < 20
+    `).run();
+
+    // Re-populate High Protein
+    await c.env.DB.prepare(`
+      INSERT INTO recipe_smart_tags (recipe_id, smart_tag_id)
+      SELECT r.id, st.id
+      FROM recipes r, smart_tags st
+      WHERE st.name = 'high-protein'
+        AND r.protein_total IS NOT NULL
+        AND r.servings IS NOT NULL
+        AND r.servings > 0
+        AND (r.protein_total / r.servings) > 25
+    `).run();
+
+    // Get updated counts
+    const results = await c.env.DB.prepare(`
+      SELECT
+        st.name,
+        COUNT(rst.recipe_id) as count
+      FROM smart_tags st
+      LEFT JOIN recipe_smart_tags rst ON st.id = rst.smart_tag_id
+      GROUP BY st.id
+    `).all();
+
+    return c.json({
+      success: true,
+      message: 'Smart tags recalculated',
+      counts: results.results,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to recalculate smart tags',
+      },
+      500
+    );
+  }
+});
+
 // POST /api/tags - Create tag
 tags.post('/', async (c) => {
   try {
