@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { api } from '../lib/api';
+import { defaultShelfLifeData, defaultShelfLifeMap } from '../data/defaultShelfLife';
 
 export interface ShelfLifeEntry {
   id: number;
@@ -21,7 +23,9 @@ interface ShelfLifeLookup {
   is_default?: boolean;
 }
 
-export function useShelfLifeEntries() {
+// Fetch user-customized shelf life entries from the database
+// Used by Settings page to show/edit user overrides
+export function useShelfLifeEntriesFromDb() {
   return useQuery({
     queryKey: ['shelf-life'],
     queryFn: async (): Promise<ShelfLifeEntry[]> => {
@@ -31,18 +35,101 @@ export function useShelfLifeEntries() {
   });
 }
 
+// Returns all shelf life entries: built-in defaults + user customizations
+// User customizations are marked with isCustom: true and can be edited
+// Built-in defaults are marked with isCustom: false and are read-only
+export interface ShelfLifeEntryWithSource extends ShelfLifeEntry {
+  isCustom: boolean;
+}
+
+export function useShelfLifeEntries() {
+  const { data: dbEntries = [], ...rest } = useShelfLifeEntriesFromDb();
+
+  const allEntries = useMemo((): ShelfLifeEntryWithSource[] => {
+    // Create a map of user entries for quick lookup
+    const userEntriesMap = new Map(
+      dbEntries.map((entry) => [entry.ingredient_name.toLowerCase(), entry])
+    );
+
+    const result: ShelfLifeEntryWithSource[] = [];
+
+    // Add all defaults, marking user overrides
+    for (const defaultEntry of defaultShelfLifeData) {
+      const userEntry = userEntriesMap.get(defaultEntry.ingredient_name.toLowerCase());
+      if (userEntry) {
+        // User has customized this entry
+        result.push({ ...userEntry, isCustom: true });
+      } else {
+        // Use default
+        result.push({
+          id: -1,
+          ingredient_name: defaultEntry.ingredient_name,
+          fridge_days: defaultEntry.fridge_days,
+          freezer_days: defaultEntry.freezer_days,
+          created_at: '',
+          updated_at: '',
+          isCustom: false,
+        });
+      }
+    }
+
+    // Add any user entries that aren't in defaults
+    for (const userEntry of dbEntries) {
+      if (!defaultShelfLifeMap.has(userEntry.ingredient_name.toLowerCase())) {
+        result.push({ ...userEntry, isCustom: true });
+      }
+    }
+
+    return result;
+  }, [dbEntries]);
+
+  return {
+    ...rest,
+    data: allEntries,
+  };
+}
+
+// Fast shelf life lookup using only built-in defaults (no API call)
+// This is efficient since most users won't customize shelf life data
 export function useShelfLifeLookup(ingredientName: string) {
-  return useQuery({
-    queryKey: ['shelf-life', 'lookup', ingredientName],
-    queryFn: async (): Promise<ShelfLifeLookup> => {
-      const response = await api.get<ShelfLifeLookup>(
-        `/api/shelf-life/lookup/${encodeURIComponent(ingredientName)}`
-      );
-      return response;
-    },
-    enabled: ingredientName.length >= 2,
-    staleTime: 60 * 1000, // 1 minute
-  });
+  const result = useMemo((): ShelfLifeLookup | null => {
+    if (!ingredientName || ingredientName.length < 2) {
+      return null;
+    }
+
+    const nameLower = ingredientName.toLowerCase();
+
+    // Try exact match first
+    let entry = defaultShelfLifeMap.get(nameLower);
+
+    // Try partial matching if no exact match
+    if (!entry) {
+      for (const [key, defaultEntry] of defaultShelfLifeMap) {
+        if (nameLower.includes(key) || key.includes(nameLower)) {
+          entry = defaultEntry;
+          break;
+        }
+      }
+    }
+
+    if (entry) {
+      return {
+        ingredient_name: entry.ingredient_name,
+        fridge_days: entry.fridge_days,
+        freezer_days: entry.freezer_days,
+        is_default: true,
+      };
+    }
+
+    return null;
+  }, [ingredientName]);
+
+  return {
+    data: result,
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 }
 
 export function useCreateShelfLife() {

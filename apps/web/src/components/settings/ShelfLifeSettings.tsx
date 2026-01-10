@@ -5,7 +5,7 @@ import {
   useUpdateShelfLife,
   useDeleteShelfLife,
 } from '../../hooks';
-import type { ShelfLifeEntry } from '../../hooks';
+import type { ShelfLifeEntryWithSource } from '../../hooks/useShelfLife';
 
 export function ShelfLifeSettings() {
   const { data: entries = [], isLoading } = useShelfLifeEntries();
@@ -52,7 +52,8 @@ export function ShelfLifeSettings() {
     }
   };
 
-  const startEdit = (entry: ShelfLifeEntry) => {
+  const startEdit = (entry: ShelfLifeEntryWithSource) => {
+    if (!entry.isCustom) return; // Can't edit defaults
     setEditingId(entry.id);
     setEditFridgeDays(entry.fridge_days?.toString() ?? '');
     setEditFreezerDays(entry.freezer_days?.toString() ?? '');
@@ -85,7 +86,7 @@ export function ShelfLifeSettings() {
             Shelf Life Data
           </h2>
           <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
-            Configure how long ingredients last in fridge/freezer ({entries.length} entries)
+            {entries.length} built-in entries. Add custom entries to override defaults.
           </p>
         </div>
         <button
@@ -219,7 +220,14 @@ export function ShelfLifeSettings() {
                   ) : (
                     <>
                       <td className="px-3 py-2 text-gray-900 dark:text-onedark-fg">
-                        {entry.ingredient_name}
+                        <span className="flex items-center gap-2">
+                          {entry.ingredient_name}
+                          {entry.isCustom && (
+                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                              custom
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-center">
                         {editingId === entry.id ? (
@@ -274,7 +282,7 @@ export function ShelfLifeSettings() {
                               </svg>
                             </button>
                           </div>
-                        ) : (
+                        ) : entry.isCustom ? (
                           <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100">
                             <button
                               onClick={() => startEdit(entry)}
@@ -298,7 +306,7 @@ export function ShelfLifeSettings() {
                               </svg>
                             </button>
                           </div>
-                        )}
+                        ) : null}
                       </td>
                     </>
                   )}

@@ -100,8 +100,8 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
       return;
     }
 
-    // Only auto-set if we have actual shelf life data and it's not a default fallback
-    if (shelfLifeData && !shelfLifeData.is_default) {
+    // Use shelf life data (from database or built-in defaults)
+    if (shelfLifeData) {
       const days = location === 'fridge' ? shelfLifeData.fridge_days : shelfLifeData.freezer_days;
       if (days) {
         const date = new Date();
@@ -161,6 +161,9 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
       await addCustomItem.mutateAsync({ location, item: trimmedName });
     }
 
+    // Only mark as staple for pantry, spices, sauces (not fridge, freezer, snacks)
+    const shouldBeStaple = !['fridge', 'freezer', 'snacks'].includes(location);
+
     try {
       await addItem.mutateAsync({
         name: trimmedName,
@@ -169,7 +172,7 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
         unit: unit || undefined,
         location,
         expiration_date: expirationDate || undefined,
-        is_staple: true,
+        is_staple: shouldBeStaple,
       });
 
       // Reset form
