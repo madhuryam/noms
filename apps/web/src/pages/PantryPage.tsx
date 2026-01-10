@@ -159,23 +159,32 @@ export function PantryPage() {
 
       {/* Tab Content */}
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight">
-        {/* Add Item Form - always visible at top of each tab */}
+        {/* Add Item Form or Bulk Edit Bar */}
         <div className="p-4 border-b border-gray-200 dark:border-onedark-bg-highlight">
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <AddItemForm location={activeTab} />
+          {selectionMode && selectedIds.size > 0 ? (
+            <BulkEditBar
+              selectedIds={selectedIds}
+              onClearSelection={handleClearSelection}
+              onSelectAll={handleSelectAll}
+              totalItems={currentTabItems.length}
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <AddItemForm location={activeTab} />
+              </div>
+              <button
+                onClick={() => setShowQuickAdd(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors text-sm whitespace-nowrap"
+                title="Add multiple items at once"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="hidden sm:inline">Add Items</span>
+              </button>
             </div>
-            <button
-              onClick={() => setShowQuickAdd(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors text-sm whitespace-nowrap"
-              title="Add multiple items at once"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="hidden sm:inline">Add Items</span>
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Content */}
@@ -267,19 +276,6 @@ export function PantryPage() {
           onClose={() => setShowQuickAdd(false)}
         />
       )}
-
-      {/* Bulk Edit Bar */}
-      {selectionMode && selectedIds.size > 0 && (
-        <BulkEditBar
-          selectedIds={selectedIds}
-          onClearSelection={handleClearSelection}
-          onSelectAll={handleSelectAll}
-          totalItems={currentTabItems.length}
-        />
-      )}
-
-      {/* Spacer for bulk edit bar */}
-      {selectionMode && selectedIds.size > 0 && <div className="h-20" />}
     </div>
   );
 }

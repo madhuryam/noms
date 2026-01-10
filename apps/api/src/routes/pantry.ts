@@ -14,6 +14,7 @@ interface PantryItem {
   location: string | null;
   expiration_date: string | null;
   is_staple: number;
+  needs_refill: number;
 }
 
 interface Ingredient {
@@ -159,6 +160,7 @@ pantry.post('/', async (c) => {
       location?: string;
       expiration_date?: string;
       is_staple?: boolean;
+      needs_refill?: boolean;
     }>();
 
     if (!body.name) {
@@ -188,8 +190,8 @@ pantry.post('/', async (c) => {
 
     const result = await c.env.DB
       .prepare(
-        `INSERT INTO pantry_items (ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO pantry_items (ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         ingredientId,
@@ -199,7 +201,8 @@ pantry.post('/', async (c) => {
         body.unit ?? null,
         body.location ?? 'pantry',
         body.expiration_date ?? null,
-        body.is_staple ? 1 : 0
+        body.is_staple ? 1 : 0,
+        body.needs_refill ? 1 : 0
       )
       .run();
 
@@ -315,6 +318,7 @@ pantry.put('/:id', async (c) => {
       location?: string;
       expiration_date?: string | null;
       is_staple?: boolean;
+      needs_refill?: boolean;
     }>();
 
     const existing = await c.env.DB
@@ -358,6 +362,10 @@ pantry.put('/:id', async (c) => {
     if (body.is_staple !== undefined) {
       updates.push('is_staple = ?');
       values.push(body.is_staple ? 1 : 0);
+    }
+    if (body.needs_refill !== undefined) {
+      updates.push('needs_refill = ?');
+      values.push(body.needs_refill ? 1 : 0);
     }
 
     if (updates.length === 0) {
@@ -449,6 +457,7 @@ pantry.post('/bulk-update', async (c) => {
         expiration_date?: string | null;
         location?: string;
         is_staple?: boolean;
+        needs_refill?: boolean;
       };
     }>();
 
@@ -483,6 +492,10 @@ pantry.post('/bulk-update', async (c) => {
     if (updates.is_staple !== undefined) {
       setClauses.push('is_staple = ?');
       values.push(updates.is_staple ? 1 : 0);
+    }
+    if (updates.needs_refill !== undefined) {
+      setClauses.push('needs_refill = ?');
+      values.push(updates.needs_refill ? 1 : 0);
     }
 
     if (setClauses.length === 0) {

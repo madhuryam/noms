@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useIngredientSuggestions, useAddPantryItem, useShelfLifeLookup, useCustomItems, useAddCustomItem } from '../../hooks';
-import type { PantryLocation, IngredientSuggestion } from '../../hooks';
+import type { PantryLocation } from '../../hooks';
 import { getItemsForLocation } from '../../data/inventoryItems';
 
 interface AddItemFormProps {

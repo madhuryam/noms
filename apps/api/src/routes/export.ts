@@ -89,6 +89,7 @@ interface FullExportData {
     location: string | null;
     expiration_date: string | null;
     is_staple: number;
+    needs_refill: number;
   }[];
   // Meal Planning
   mealPlans: {
@@ -525,7 +526,7 @@ exportRoutes.get('/data', async (c) => {
 
     // Get all pantry items
     const pantryResult = await db
-      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple FROM pantry_items ORDER BY name')
+      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill FROM pantry_items ORDER BY name')
       .all();
 
     // Get all meal plans
@@ -851,8 +852,8 @@ exportRoutes.post('/import', async (c) => {
       const pantryStmts = importData.pantryItems.map((item) =>
         db.prepare(`
           INSERT INTO pantry_items (
-            id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
             item.id,
@@ -863,7 +864,8 @@ exportRoutes.post('/import', async (c) => {
             n(item.unit),
             n(item.location),
             n(item.expiration_date),
-            item.is_staple ?? 0
+            item.is_staple ?? 0,
+            (item as { needs_refill?: number }).needs_refill ?? 0
           )
       );
       await runBatched(pantryStmts);
@@ -1234,10 +1236,10 @@ exportRoutes.post('/import-zip', async (c) => {
     if (importData.pantryItems?.length) {
       const pantryStmts = importData.pantryItems.map((item) =>
         db.prepare(`
-          INSERT INTO pantry_items (id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO pantry_items (id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
-          .bind(item.id, n(item.ingredient_id), item.name, item.normalized_name, n(item.quantity), n(item.unit), n(item.location), n(item.expiration_date), item.is_staple ?? 0)
+          .bind(item.id, n(item.ingredient_id), item.name, item.normalized_name, n(item.quantity), n(item.unit), n(item.location), n(item.expiration_date), item.is_staple ?? 0, (item as { needs_refill?: number }).needs_refill ?? 0)
       );
       await runBatched(pantryStmts);
       stats.pantryItems = importData.pantryItems.length;
@@ -1373,6 +1375,9 @@ function generateInventoryMarkdown(
       }
       if (item.is_staple) {
         line += ' *staple*';
+      }
+      if (item.needs_refill) {
+        line += ' **needs refill**';
       }
       lines.push(line);
     }
@@ -1533,7 +1538,7 @@ exportRoutes.get('/vault', async (c) => {
     }
 
     const pantryResult = await db
-      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple FROM pantry_items ORDER BY name')
+      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill FROM pantry_items ORDER BY name')
       .all();
     const pantryItems = (pantryResult.results || []) as FullExportData['pantryItems'];
 

@@ -11,6 +11,7 @@ export interface PantryItem {
   location: string | null;
   expiration_date: string | null;
   is_staple: number;
+  needs_refill: number;
   ingredient_category?: string | null;
 }
 
@@ -144,6 +145,7 @@ export function useUpdatePantryItem() {
       location?: PantryLocation;
       expiration_date?: string | null;
       is_staple?: boolean;
+      needs_refill?: boolean;
     }): Promise<PantryItem> => {
       return api.put<PantryItem>(`/api/pantry/${id}`, updates);
     },
@@ -196,6 +198,7 @@ export function useBulkUpdatePantryItems() {
         expiration_date?: string | null;
         location?: PantryLocation;
         is_staple?: boolean;
+        needs_refill?: boolean;
       };
     }): Promise<{ success: boolean; updated_count: number }> => {
       return api.post('/api/pantry/bulk-update', { ids, updates });
@@ -204,4 +207,31 @@ export function useBulkUpdatePantryItems() {
       queryClient.invalidateQueries({ queryKey: ['pantry'] });
     },
   });
+}
+
+export function useToggleRefill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      needs_refill,
+    }: {
+      id: number;
+      needs_refill: boolean;
+    }): Promise<PantryItem> => {
+      return api.put<PantryItem>(`/api/pantry/${id}`, { needs_refill });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pantry'] });
+    },
+  });
+}
+
+export function useRefillItems() {
+  const { data: items = [], ...rest } = usePantryItems();
+  return {
+    ...rest,
+    data: items.filter((item) => item.needs_refill === 1),
+  };
 }

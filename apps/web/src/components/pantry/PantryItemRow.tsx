@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useUpdatePantryItem, useDeletePantryItem } from '../../hooks';
+import { useUpdatePantryItem, useDeletePantryItem, useToggleRefill } from '../../hooks';
 import type { PantryItem, PantryLocation } from '../../hooks';
 
 interface PantryItemRowProps {
@@ -34,6 +34,7 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
 
   const updateItem = useUpdatePantryItem();
   const deleteItem = useDeletePantryItem();
+  const toggleRefill = useToggleRefill();
 
   const expirationStatus = getExpirationStatus(item.expiration_date);
 
@@ -60,6 +61,13 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
     await updateItem.mutateAsync({
       id: item.id,
       is_staple: item.is_staple === 0,
+    });
+  };
+
+  const handleToggleRefill = async () => {
+    await toggleRefill.mutateAsync({
+      id: item.id,
+      needs_refill: item.needs_refill !== 1,
     });
   };
 
@@ -205,6 +213,11 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
               staple
             </span>
           )}
+          {item.needs_refill === 1 && (
+            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+              refill
+            </span>
+          )}
         </div>
         {(item.quantity || item.unit) && (
           <span className="text-sm text-gray-500 dark:text-onedark-fg-muted">
@@ -253,6 +266,15 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
           >
             <svg className="w-4 h-4" fill={item.is_staple ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          </button>
+          <button
+            onClick={handleToggleRefill}
+            title={item.needs_refill ? 'Remove from refill list' : 'Add to refill list'}
+            className={`p-1.5 rounded ${item.needs_refill ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:text-blue-500 dark:hover:text-blue-400'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
           <button

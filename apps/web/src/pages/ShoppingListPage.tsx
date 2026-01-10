@@ -9,10 +9,13 @@ import {
   useItemCategories,
   useItemOrder,
   usePantryOverrides,
+  useRefillItems,
+  useToggleRefill,
   exportAsText,
   exportAsMarkdown,
 } from '../hooks';
 import { ShoppingList } from '../components/shopping-list';
+import { RefillSection } from '../components/shopping-list/RefillSection';
 
 export function ShoppingListPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +36,8 @@ export function ShoppingListPage() {
   const { itemCategories, assignItem, assignItems } = useItemCategories(planId);
   const { itemOrder, reorderItems } = useItemOrder(planId);
   const { togglePantryStatus, getEffectivePantryStatus } = usePantryOverrides(planId);
+  const { data: refillItems = [] } = useRefillItems();
+  const toggleRefill = useToggleRefill();
 
   // Update date filters
   const handleDateChange = (field: 'startDate' | 'endDate', value: string) => {
@@ -261,6 +266,14 @@ export function ShoppingListPage() {
           </span>
         </label>
       </div>
+
+      {/* Refill section - items from inventory that need restocking */}
+      {refillItems.length > 0 && (
+        <RefillSection
+          items={refillItems}
+          onMarkBought={(id) => toggleRefill.mutate({ id, needs_refill: false })}
+        />
+      )}
 
       {/* Shopping list */}
       <div ref={printRef}>

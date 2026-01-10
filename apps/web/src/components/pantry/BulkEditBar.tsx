@@ -21,6 +21,7 @@ export function BulkEditBar({
   const [expirationDate, setExpirationDate] = useState('');
   const [location, setLocation] = useState<PantryLocation | ''>('');
   const [isStaple, setIsStaple] = useState<boolean | null>(null);
+  const [needsRefill, setNeedsRefill] = useState<boolean | null>(null);
 
   const bulkDelete = useBulkDeletePantryItems();
   const bulkUpdate = useBulkUpdatePantryItems();
@@ -41,6 +42,7 @@ export function BulkEditBar({
       expiration_date?: string | null;
       location?: PantryLocation;
       is_staple?: boolean;
+      needs_refill?: boolean;
     } = {};
 
     if (quantity !== '') {
@@ -58,15 +60,16 @@ export function BulkEditBar({
     if (isStaple !== null) {
       updates.is_staple = isStaple;
     }
+    if (needsRefill !== null) {
+      updates.needs_refill = needsRefill;
+    }
 
     if (Object.keys(updates).length === 0) {
-      setShowEditForm(false);
       return;
     }
 
     await bulkUpdate.mutateAsync({ ids, updates });
     onClearSelection();
-    setShowEditForm(false);
     resetForm();
   };
 
@@ -76,13 +79,14 @@ export function BulkEditBar({
     setExpirationDate('');
     setLocation('');
     setIsStaple(null);
+    setNeedsRefill(null);
   };
 
   if (selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-onedark-bg-lighter border-t border-gray-200 dark:border-onedark-bg-highlight shadow-lg z-50">
-      <div className="max-w-4xl mx-auto px-4 py-4">
+    <div className="w-full">
+      <div className="space-y-3">
         {showDeleteConfirm ? (
           <div className="flex items-center justify-between">
             <p className="text-base font-medium text-red-600 dark:text-red-400">
@@ -130,7 +134,7 @@ export function BulkEditBar({
               <div className="flex gap-2">
                 <button
                   onClick={handleUpdate}
-                  disabled={bulkUpdate.isPending || (quantity === '' && unit === '' && expirationDate === '' && location === '' && isStaple === null)}
+                  disabled={bulkUpdate.isPending || (quantity === '' && unit === '' && expirationDate === '' && location === '' && isStaple === null && needsRefill === null)}
                   className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {bulkUpdate.isPending ? 'Saving...' : 'Save'}
@@ -190,6 +194,15 @@ export function BulkEditBar({
                 <option value="">Staple...</option>
                 <option value="true">Mark as staple</option>
                 <option value="false">Not a staple</option>
+              </select>
+              <select
+                value={needsRefill === null ? '' : needsRefill ? 'true' : 'false'}
+                onChange={(e) => setNeedsRefill(e.target.value === '' ? null : e.target.value === 'true')}
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-onedark-bg-highlight rounded-lg bg-white dark:bg-onedark-bg text-gray-900 dark:text-onedark-fg"
+              >
+                <option value="">Refill...</option>
+                <option value="true">Needs refill</option>
+                <option value="false">No refill needed</option>
               </select>
             </div>
           </div>
