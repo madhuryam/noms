@@ -26,11 +26,63 @@ function stripExtraSuffixes(ingredient: string): string {
 }
 
 /**
+ * Preprocess "+" notation for combined measurements.
+ * E.g., "2 cups + 2 Tablespoons (265g) all-purpose flour" -> "2 cups all-purpose flour"
+ * E.g., "1 large egg + 1 egg yolk" -> "1 large egg"
+ * The goal is to remove the secondary measurement so the parser focuses on the ingredient name.
+ */
+function preprocessPlusNotation(rawText: string): string {
+  const plusIndex = rawText.indexOf('+');
+
+  if (plusIndex !== -1) {
+    const beforePlus = rawText.substring(0, plusIndex).trim();
+
+    // Common measurement units - if before+ only has these + numbers, the ingredient is after +
+    const units = new Set([
+      'cup', 'cups', 'tbsp', 'tsp', 'tablespoon', 'tablespoons',
+      'teaspoon', 'teaspoons', 'ounce', 'ounces', 'oz', 'pound', 'pounds',
+      'lb', 'lbs', 'gram', 'grams', 'g', 'kg', 'ml', 'l', 'quart', 'quarts',
+      'pint', 'pints', 'gallon', 'gallons', 'large', 'medium', 'small', 'whole',
+    ]);
+
+    // Check if the part before + contains an ingredient word (not just qty/unit)
+    const words = beforePlus.toLowerCase().split(/\s+/);
+    const hasIngredientWord = words.some(word => {
+      const cleaned = word.replace(/[^\w]/g, '');
+      return cleaned.length >= 2 &&
+             !/^\d+$/.test(cleaned) &&
+             !units.has(cleaned);
+    });
+
+    if (hasIngredientWord) {
+      // The part before + has an ingredient (e.g., "1 large egg"), use just that
+      let cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
+      return cleaned.replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // Fall back to removing "+ quantity unit" patterns (for cases like "2 cups + 2 tbsp flour")
+  const plusPattern = /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
+  let cleaned = rawText.replace(plusPattern, ' ');
+
+  // Also remove parenthetical weight notations like "(265g)"
+  cleaned = cleaned.replace(/\(\d+\s*g\)/gi, '');
+
+  // Clean up multiple spaces
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  return cleaned;
+}
+
+/**
  * Extract ingredient name using sharp-recipe-parser.
  */
 function extractIngredientName(rawText: string): string {
+  // Preprocess to handle "+" notation for combined measurements
+  const preprocessed = preprocessPlusNotation(rawText);
+
   try {
-    const result = parseIngredient(rawText, 'en', {
+    const result = parseIngredient(preprocessed, 'en', {
       includeExtra: true,
       includeAlternativeUnits: false,
       fallbackLanguage: 'en',
