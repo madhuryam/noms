@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
 
 type Bindings = {
   DB: D1Database;
@@ -327,11 +328,14 @@ async function insertRecipeIngredients(
       continue;
     }
 
+    // Generate normalization key for improved matching
+    const normalizationKey = normalizeIngredientKey(ing.name);
+
     await db
       .prepare(
         `INSERT INTO recipe_ingredients
-         (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+         (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order, normalization_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         recipeId,
@@ -340,7 +344,8 @@ async function insertRecipeIngredients(
         cleanIngredientLine(ing.original),
         ing.preparation,
         currentGroup,
-        sortOrder++
+        sortOrder++,
+        normalizationKey
       )
       .run();
   }
@@ -449,11 +454,13 @@ importRoutes.post('/vault', async (c) => {
           currentGroup = ing.name;
           continue;
         }
+        // Generate normalization key for improved matching
+        const normalizationKey = normalizeIngredientKey(ing.name);
         statements.push(
           c.env.DB.prepare(
-            `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).bind(recipeId, ing.quantity, ing.unit, cleanIngredientLine(ing.original), ing.preparation, currentGroup, sortOrder++)
+            `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order, normalization_key)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(recipeId, ing.quantity, ing.unit, cleanIngredientLine(ing.original), ing.preparation, currentGroup, sortOrder++, normalizationKey)
         );
       }
 
@@ -669,6 +676,62 @@ importRoutes.get('/status', async (c) => {
     return c.json(
       {
         error: error instanceof Error ? error.message : 'Failed to get status',
+      },
+      500
+    );
+  }
+});
+
+// POST /api/import/backfill-normalization - Backfill normalization_key for existing data
+importRoutes.post('/backfill-normalization', async (c) => {
+  try {
+    let pantryUpdated = 0;
+    let ingredientsUpdated = 0;
+
+    // Backfill pantry items
+    const pantryItems = await c.env.DB.prepare(`
+      SELECT id, name FROM pantry_items WHERE normalization_key IS NULL
+    `).all();
+
+    for (const item of (pantryItems.results ?? []) as Array<{ id: number; name: string }>) {
+      const normalizationKey = normalizeIngredientKey(item.name);
+      await c.env.DB.prepare(`
+        UPDATE pantry_items SET normalization_key = ? WHERE id = ?
+      `).bind(normalizationKey, item.id).run();
+      pantryUpdated++;
+    }
+
+    // Backfill recipe ingredients
+    // We need to extract the ingredient name from raw_text using a simple approach
+    const ingredients = await c.env.DB.prepare(`
+      SELECT id, raw_text FROM recipe_ingredients WHERE normalization_key IS NULL
+    `).all();
+
+    for (const ing of (ingredients.results ?? []) as Array<{ id: number; raw_text: string }>) {
+      // Extract name from raw_text by removing quantities and units at the start
+      const rawText = ing.raw_text.trim();
+      // Simple extraction: remove leading numbers, fractions, and common units
+      const nameMatch = rawText
+        .replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-]+/, '') // Remove numbers and fractions
+        .replace(/^(cup|cups|tbsp|tsp|tablespoon|tablespoons|teaspoon|teaspoons|oz|ounce|ounces|lb|lbs|pound|pounds|g|gram|grams|kg|ml|l|liter|liters|quart|quarts|pint|pints|bunch|bunches|head|heads|clove|cloves|stalk|stalks|can|cans|jar|jars|piece|pieces|slice|slices|pinch|dash|small|medium|large)\s+/i, '')
+        .trim();
+
+      const normalizationKey = normalizeIngredientKey(nameMatch || rawText);
+      await c.env.DB.prepare(`
+        UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
+      `).bind(normalizationKey, ing.id).run();
+      ingredientsUpdated++;
+    }
+
+    return c.json({
+      success: true,
+      pantry_items_updated: pantryUpdated,
+      recipe_ingredients_updated: ingredientsUpdated,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to backfill normalization keys',
       },
       500
     );

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
 
 type Bindings = {
   DB: D1Database;
@@ -188,15 +189,19 @@ pantry.post('/', async (c) => {
       return c.json({ error: 'Item already exists in this location' }, 409);
     }
 
+    // Generate normalization key for improved matching
+    const normalizationKey = normalizeIngredientKey(body.name);
+
     const result = await c.env.DB
       .prepare(
-        `INSERT INTO pantry_items (ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO pantry_items (ingredient_id, name, normalized_name, normalization_key, quantity, unit, location, expiration_date, is_staple, needs_refill)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         ingredientId,
         body.name.trim(),
         normalizedName,
+        normalizationKey,
         body.quantity ?? null,
         body.unit ?? null,
         body.location ?? 'pantry',
@@ -265,15 +270,19 @@ pantry.post('/bulk', async (c) => {
       // Find or create ingredient
       const ingredient = await findOrCreateIngredient(c.env.DB, item.name);
 
+      // Generate normalization key for improved matching
+      const normalizationKey = normalizeIngredientKey(item.name);
+
       const result = await c.env.DB
         .prepare(
-          `INSERT INTO pantry_items (ingredient_id, name, normalized_name, quantity, unit, location, is_staple, expiration_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO pantry_items (ingredient_id, name, normalized_name, normalization_key, quantity, unit, location, is_staple, expiration_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           ingredient.id,
           item.name.trim(),
           normalizedName,
+          normalizationKey,
           item.quantity ?? null,
           item.unit ?? null,
           location,
@@ -344,6 +353,8 @@ pantry.put('/:id', async (c) => {
       values.push(trimmedName);
       updates.push('normalized_name = ?');
       values.push(normalizeIngredientName(trimmedName));
+      updates.push('normalization_key = ?');
+      values.push(normalizeIngredientKey(trimmedName));
     }
     if (body.quantity !== undefined) {
       updates.push('quantity = ?');

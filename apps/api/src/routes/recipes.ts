@@ -1,9 +1,68 @@
 import { Hono } from 'hono';
+import { keysMatch, normalizeIngredientKey } from '../lib/ingredient-normalizer';
 
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
 };
+
+/**
+ * Parse ingredient name from a raw ingredient line.
+ * Strips quantities, units, and common prefixes to extract the ingredient name.
+ */
+function extractIngredientName(rawText: string): string {
+  let text = rawText.trim();
+
+  // Remove leading numbers, fractions, and ranges (e.g., "2-3", "1/2", "½")
+  text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
+
+  // Remove common units at the start
+  const unitPattern = /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|kilograms?|ml|milliliters?|liters?|l|quarts?|qt|pints?|pt|gallons?|gal|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|packages?|pkg|pieces?|slices?|pinch(?:es)?|dash(?:es)?|small|medium|large|extra[\s-]?large|xl)\s+/i;
+  text = text.replace(unitPattern, '');
+
+  // Remove "of" at the start (e.g., "of flour" -> "flour")
+  text = text.replace(/^of\s+/i, '');
+
+  return text.trim();
+}
+
+/**
+ * Parse ingredients_raw text into individual ingredient entries.
+ * Handles section headers (### or **Header**) and individual ingredient lines.
+ */
+function parseIngredientsRaw(ingredientsRaw: string): Array<{
+  rawText: string;
+  groupName: string | null;
+  isHeader: boolean;
+}> {
+  const lines = ingredientsRaw.split('\n');
+  const result: Array<{ rawText: string; groupName: string | null; isHeader: boolean }> = [];
+  let currentGroup: string | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check for section headers (### Header or **Header**)
+    const headerMatch = trimmed.match(/^###\s*(.+)$/) || trimmed.match(/^\*\*(.+?)\*\*:?$/);
+    if (headerMatch) {
+      currentGroup = headerMatch[1].trim();
+      continue;
+    }
+
+    // Skip markdown list markers
+    const ingredientText = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
+    if (!ingredientText) continue;
+
+    result.push({
+      rawText: ingredientText,
+      groupName: currentGroup,
+      isHeader: false,
+    });
+  }
+
+  return result;
+}
 
 /**
  * Normalize instructions to use numbered steps, restarting at 1 for each section
@@ -328,7 +387,7 @@ recipes.get('/suggestions/pantry', async (c) => {
   try {
     // Get all pantry items based on location filter
     let pantryQuery = `
-      SELECT p.id, p.ingredient_id, p.normalized_name, i.normalized_name as ingredient_normalized_name
+      SELECT p.id, p.ingredient_id, p.normalized_name, p.normalization_key, i.normalized_name as ingredient_normalized_name
       FROM pantry_items p
       LEFT JOIN ingredients i ON p.ingredient_id = i.id
     `;
@@ -346,12 +405,14 @@ recipes.get('/suggestions/pantry', async (c) => {
       id: number;
       ingredient_id: number | null;
       normalized_name: string;
+      normalization_key: string | null;
       ingredient_normalized_name: string | null;
     }>;
 
-    // Build a set of normalized names and ingredient IDs we have
+    // Build sets for matching
     const pantryIngredientIds = new Set<number>();
     const pantryNormalizedNames = new Set<string>();
+    const pantryNormalizationKeys: string[] = [];
 
     for (const item of pantryItems) {
       if (item.ingredient_id) {
@@ -360,6 +421,9 @@ recipes.get('/suggestions/pantry', async (c) => {
       pantryNormalizedNames.add(item.normalized_name.toLowerCase());
       if (item.ingredient_normalized_name) {
         pantryNormalizedNames.add(item.ingredient_normalized_name.toLowerCase());
+      }
+      if (item.normalization_key) {
+        pantryNormalizationKeys.push(item.normalization_key);
       }
     }
 
@@ -410,7 +474,7 @@ recipes.get('/suggestions/pantry', async (c) => {
 
     for (const recipe of recipes) {
       const ingredientsResult = await c.env.DB.prepare(`
-        SELECT ri.ingredient_id, ri.raw_text, ri.is_optional, i.normalized_name
+        SELECT ri.ingredient_id, ri.raw_text, ri.is_optional, ri.normalization_key, i.normalized_name
         FROM recipe_ingredients ri
         LEFT JOIN ingredients i ON ri.ingredient_id = i.id
         WHERE ri.recipe_id = ?
@@ -422,6 +486,7 @@ recipes.get('/suggestions/pantry', async (c) => {
         ingredient_id: number | null;
         raw_text: string;
         is_optional: number;
+        normalization_key: string | null;
         normalized_name: string | null;
       }>;
 
@@ -439,19 +504,30 @@ recipes.get('/suggestions/pantry', async (c) => {
       for (const ing of requiredIngredients) {
         let isMatched = false;
 
-        // Check by ingredient_id
+        // Tier 1: Check by ingredient_id (exact link)
         if (ing.ingredient_id && pantryIngredientIds.has(ing.ingredient_id)) {
           isMatched = true;
         }
 
-        // Check by normalized name
+        // Tier 2: Check by normalization_key with flexible matching
+        if (!isMatched && ing.normalization_key) {
+          for (const pantryKey of pantryNormalizationKeys) {
+            const matchResult = keysMatch(ing.normalization_key, pantryKey);
+            if (matchResult.matched) {
+              isMatched = true;
+              break;
+            }
+          }
+        }
+
+        // Tier 3: Check by normalized name (legacy matching)
         if (!isMatched && ing.normalized_name) {
           const normalizedLower = ing.normalized_name.toLowerCase();
           if (pantryNormalizedNames.has(normalizedLower)) {
             isMatched = true;
           }
 
-          // Check food associations
+          // Tier 4: Check food associations
           if (!isMatched) {
             const relatedTerms = associations.get(normalizedLower);
             if (relatedTerms) {
@@ -567,7 +643,7 @@ recipes.get('/:id/match', async (c) => {
 
     // Get pantry items
     let pantryQuery = `
-      SELECT p.id, p.ingredient_id, p.normalized_name, p.name, i.normalized_name as ingredient_normalized_name
+      SELECT p.id, p.ingredient_id, p.normalized_name, p.normalization_key, p.name, i.normalized_name as ingredient_normalized_name
       FROM pantry_items p
       LEFT JOIN ingredients i ON p.ingredient_id = i.id
     `;
@@ -585,12 +661,14 @@ recipes.get('/:id/match', async (c) => {
       id: number;
       ingredient_id: number | null;
       normalized_name: string;
+      normalization_key: string | null;
       name: string;
       ingredient_normalized_name: string | null;
     }>;
 
     const pantryIngredientIds = new Set<number>();
     const pantryNormalizedNames = new Map<string, string>(); // normalized -> display name
+    const pantryNormalizationKeyMap = new Map<string, string>(); // key -> display name
 
     for (const item of pantryItems) {
       if (item.ingredient_id) {
@@ -599,6 +677,9 @@ recipes.get('/:id/match', async (c) => {
       pantryNormalizedNames.set(item.normalized_name.toLowerCase(), item.name);
       if (item.ingredient_normalized_name) {
         pantryNormalizedNames.set(item.ingredient_normalized_name.toLowerCase(), item.name);
+      }
+      if (item.normalization_key) {
+        pantryNormalizationKeyMap.set(item.normalization_key, item.name);
       }
     }
 
@@ -622,7 +703,7 @@ recipes.get('/:id/match', async (c) => {
 
     // Get recipe ingredients
     const ingredientsResult = await c.env.DB.prepare(`
-      SELECT ri.id, ri.ingredient_id, ri.raw_text, ri.is_optional, ri.group_name, ri.sort_order, i.normalized_name
+      SELECT ri.id, ri.ingredient_id, ri.raw_text, ri.is_optional, ri.group_name, ri.sort_order, ri.normalization_key, i.normalized_name
       FROM recipe_ingredients ri
       LEFT JOIN ingredients i ON ri.ingredient_id = i.id
       WHERE ri.recipe_id = ?
@@ -638,6 +719,7 @@ recipes.get('/:id/match', async (c) => {
       is_optional: number;
       group_name: string | null;
       sort_order: number;
+      normalization_key: string | null;
       normalized_name: string | null;
     }>;
 
@@ -645,12 +727,24 @@ recipes.get('/:id/match', async (c) => {
       let isMatched = false;
       let matchedPantryItem: string | null = null;
 
-      // Check by ingredient_id
+      // Tier 1: Check by ingredient_id (exact link)
       if (ing.ingredient_id && pantryIngredientIds.has(ing.ingredient_id)) {
         isMatched = true;
       }
 
-      // Check by normalized name
+      // Tier 2: Check by normalization_key with flexible matching
+      if (!isMatched && ing.normalization_key) {
+        for (const [pantryKey, pantryName] of pantryNormalizationKeyMap) {
+          const matchResult = keysMatch(ing.normalization_key, pantryKey);
+          if (matchResult.matched) {
+            isMatched = true;
+            matchedPantryItem = pantryName;
+            break;
+          }
+        }
+      }
+
+      // Tier 3: Check by normalized name (legacy matching)
       if (!isMatched && ing.normalized_name) {
         const normalizedLower = ing.normalized_name.toLowerCase();
         if (pantryNormalizedNames.has(normalizedLower)) {
@@ -658,7 +752,7 @@ recipes.get('/:id/match', async (c) => {
           matchedPantryItem = pantryNormalizedNames.get(normalizedLower) ?? null;
         }
 
-        // Check food associations
+        // Tier 4: Check food associations
         if (!isMatched) {
           const relatedTerms = associations.get(normalizedLower);
           if (relatedTerms) {
@@ -825,8 +919,28 @@ recipes.post('/', async (c) => {
       )
       .run();
 
+    const recipeId = result.meta.last_row_id as number;
+
+    // Create recipe_ingredients with normalization keys for matching
+    if (ingredients_raw) {
+      const parsedIngredients = parseIngredientsRaw(ingredients_raw);
+      let sortOrder = 0;
+
+      for (const ing of parsedIngredients) {
+        const ingredientName = extractIngredientName(ing.rawText);
+        const normalizationKey = normalizeIngredientKey(ingredientName);
+
+        await c.env.DB.prepare(
+          `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key)
+           VALUES (?, ?, ?, ?, ?)`
+        )
+          .bind(recipeId, ing.rawText, ing.groupName, sortOrder++, normalizationKey)
+          .run();
+      }
+    }
+
     const newRecipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?')
-      .bind(result.meta.last_row_id)
+      .bind(recipeId)
       .first();
 
     return c.json(newRecipe, 201);
@@ -906,6 +1020,32 @@ recipes.put('/:id', async (c) => {
     )
       .bind(...values)
       .run();
+
+    // If ingredients_raw was updated, regenerate recipe_ingredients for matching
+    if (body.ingredients_raw !== undefined) {
+      // Delete existing recipe_ingredients
+      await c.env.DB.prepare('DELETE FROM recipe_ingredients WHERE recipe_id = ?')
+        .bind(id)
+        .run();
+
+      // Parse and insert new ingredients with normalization keys
+      if (body.ingredients_raw) {
+        const parsedIngredients = parseIngredientsRaw(body.ingredients_raw);
+        let sortOrder = 0;
+
+        for (const ing of parsedIngredients) {
+          const ingredientName = extractIngredientName(ing.rawText);
+          const normalizationKey = normalizeIngredientKey(ingredientName);
+
+          await c.env.DB.prepare(
+            `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key)
+             VALUES (?, ?, ?, ?, ?)`
+          )
+            .bind(id, ing.rawText, ing.groupName, sortOrder++, normalizationKey)
+            .run();
+        }
+      }
+    }
 
     const updated = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?').bind(id).first();
 
