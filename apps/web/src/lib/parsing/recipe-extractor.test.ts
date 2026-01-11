@@ -369,6 +369,7 @@ describe('validateRecipe', () => {
         categories: [],
         difficulty: null,
         cuisine: null,
+        nutrition: null,
       },
     };
 
