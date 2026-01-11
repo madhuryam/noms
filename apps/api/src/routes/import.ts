@@ -52,6 +52,34 @@ function extractIngredientName(rawText: string): string {
   return stripExtraSuffixes(text.trim());
 }
 
+/**
+ * Generate normalization key(s) for an ingredient line.
+ * Handles "or" alternatives by returning pipe-separated keys.
+ * E.g., "butter or margarine" -> "butter|margarine"
+ */
+function generateNormalizationKeys(rawText: string): string {
+  const ingredientName = extractIngredientName(rawText);
+
+  // Split on " or " (with word boundaries to avoid splitting "oregano")
+  const alternatives = ingredientName.split(/\s+or\s+/i);
+
+  // If only one part, no "or" was found
+  if (alternatives.length === 1) {
+    return normalizeIngredientKey(ingredientName);
+  }
+
+  // Generate a normalization key for each alternative
+  const keys = alternatives
+    .map(alt => alt.trim())
+    .filter(alt => alt.length > 0)
+    .map(alt => normalizeIngredientKey(stripExtraSuffixes(alt)))
+    .filter(key => key.length > 0);
+
+  // Remove duplicates and join with pipe
+  const uniqueKeys = [...new Set(keys)];
+  return uniqueKeys.join('|');
+}
+
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
@@ -481,9 +509,9 @@ importRoutes.post('/vault', async (c) => {
           continue;
         }
         // Use sharp-recipe-parser to extract ingredient name, then normalize
+        // Handles "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
         const cleanedRaw = cleanIngredientLine(ing.original);
-        const ingredientName = extractIngredientName(cleanedRaw);
-        const normalizationKey = normalizeIngredientKey(ingredientName);
+        const normalizationKey = generateNormalizationKeys(cleanedRaw);
         statements.push(
           c.env.DB.prepare(
             `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order, normalization_key)
@@ -740,8 +768,8 @@ importRoutes.post('/backfill-normalization', async (c) => {
 
     for (const ing of (ingredients.results ?? []) as Array<{ id: number; raw_text: string }>) {
       // Use sharp-recipe-parser to extract ingredient name
-      const ingredientName = extractIngredientName(ing.raw_text);
-      const normalizationKey = normalizeIngredientKey(ingredientName);
+      // Handles "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
+      const normalizationKey = generateNormalizationKeys(ing.raw_text);
       await c.env.DB.prepare(`
         UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
       `).bind(normalizationKey, ing.id).run();

@@ -232,14 +232,10 @@ export function normalizeIngredientKey(name: string): string {
 }
 
 /**
- * Check if two normalization keys match using flexible token-based matching.
+ * Check if a single key matches another single key using flexible token-based matching.
  * This allows "onion" to match "red onion" or "onion powder".
- *
- * @param key1 First normalization key
- * @param key2 Second normalization key
- * @returns Match result with type
  */
-export function keysMatch(
+function singleKeyMatch(
   key1: string,
   key2: string
 ): { matched: boolean; matchType: 'exact' | 'flexible' | 'none' } {
@@ -265,4 +261,46 @@ export function keysMatch(
   }
 
   return { matched: false, matchType: 'none' };
+}
+
+/**
+ * Check if two normalization keys match using flexible token-based matching.
+ * Supports multiple keys separated by '|' (for "or" alternatives).
+ * If either key contains alternatives, returns a match if ANY combination matches.
+ *
+ * @param key1 First normalization key (may contain '|' for alternatives)
+ * @param key2 Second normalization key (may contain '|' for alternatives)
+ * @returns Match result with type
+ */
+export function keysMatch(
+  key1: string,
+  key2: string
+): { matched: boolean; matchType: 'exact' | 'flexible' | 'none' } {
+  if (!key1 || !key2) {
+    return { matched: false, matchType: 'none' };
+  }
+
+  // Split on '|' to get all alternatives
+  const keys1 = key1.split('|').map(k => k.trim()).filter(k => k.length > 0);
+  const keys2 = key2.split('|').map(k => k.trim()).filter(k => k.length > 0);
+
+  // Check all combinations - return best match type found
+  let bestMatch: 'exact' | 'flexible' | 'none' = 'none';
+
+  for (const k1 of keys1) {
+    for (const k2 of keys2) {
+      const result = singleKeyMatch(k1, k2);
+      if (result.matchType === 'exact') {
+        return { matched: true, matchType: 'exact' };
+      }
+      if (result.matchType === 'flexible') {
+        bestMatch = 'flexible';
+      }
+    }
+  }
+
+  return {
+    matched: bestMatch !== 'none',
+    matchType: bestMatch,
+  };
 }

@@ -143,6 +143,49 @@ function extractIngredientName(rawText: string): string {
 }
 
 /**
+ * Extract all ingredient alternatives from raw text (handles "or" delimiter).
+ * Returns array of ingredient names for "a or b or c" style lines.
+ * Uses sharp-recipe-parser for each alternative.
+ */
+function extractIngredientAlternatives(rawText: string): string[] {
+  // First, get the parsed ingredient from sharp-recipe-parser
+  const parsed = parseIngredientLine(rawText);
+  const ingredientText = parsed?.ingredient || rawText;
+
+  // Split on " or " (with word boundaries to avoid splitting "oregano")
+  const alternatives = ingredientText.split(/\s+or\s+/i);
+
+  // If only one part, no "or" was found
+  if (alternatives.length === 1) {
+    return [stripExtraSuffixes(ingredientText)];
+  }
+
+  // Clean up each alternative
+  return alternatives
+    .map(alt => alt.trim())
+    .filter(alt => alt.length > 0)
+    .map(alt => stripExtraSuffixes(alt));
+}
+
+/**
+ * Generate normalization key(s) for an ingredient line.
+ * Handles "or" alternatives by returning pipe-separated keys.
+ * E.g., "butter or margarine" -> "butter|margarine"
+ */
+function generateNormalizationKeys(rawText: string): string {
+  const alternatives = extractIngredientAlternatives(rawText);
+
+  // Generate a normalization key for each alternative
+  const keys = alternatives
+    .map(alt => normalizeIngredientKey(alt))
+    .filter(key => key.length > 0);
+
+  // Remove duplicates and join with pipe
+  const uniqueKeys = [...new Set(keys)];
+  return uniqueKeys.join('|');
+}
+
+/**
  * Parse ingredients_raw text into individual ingredient entries.
  * Handles section headers (### or **Header**) and individual ingredient lines.
  */
@@ -1043,8 +1086,8 @@ recipes.post('/', async (c) => {
       let sortOrder = 0;
 
       for (const ing of parsedIngredients) {
-        const ingredientName = extractIngredientName(ing.rawText);
-        const normalizationKey = normalizeIngredientKey(ingredientName);
+        // Generate normalization key(s) - handles "or" alternatives
+        const normalizationKey = generateNormalizationKeys(ing.rawText);
 
         await c.env.DB.prepare(
           `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key)
@@ -1150,8 +1193,8 @@ recipes.put('/:id', async (c) => {
         let sortOrder = 0;
 
         for (const ing of parsedIngredients) {
-          const ingredientName = extractIngredientName(ing.rawText);
-          const normalizationKey = normalizeIngredientKey(ingredientName);
+          // Generate normalization key(s) - handles "or" alternatives
+          const normalizationKey = generateNormalizationKeys(ing.rawText);
 
           await c.env.DB.prepare(
             `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key)
@@ -1484,8 +1527,11 @@ recipes.patch('/:id/ingredients/:ingredientId', async (c) => {
       return c.json({ error: 'Ingredient not found' }, 404);
     }
 
-    // Generate new normalization key from the provided ingredient name
-    const normalizationKey = normalizeIngredientKey(body.ingredientName);
+    // Generate normalization key(s) from the provided ingredient name
+    // Handles "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
+    const alternatives = body.ingredientName.split(/\s+or\s+/i).map(s => s.trim()).filter(s => s);
+    const keys = alternatives.map(alt => normalizeIngredientKey(alt)).filter(k => k);
+    const normalizationKey = [...new Set(keys)].join('|');
 
     await c.env.DB.prepare(`
       UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?

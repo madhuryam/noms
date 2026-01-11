@@ -124,8 +124,9 @@ function groupIntoSections(ingredients: DisplayIngredient[]): IngredientSection[
 }
 
 /**
- * Renders an ingredient name with the normalization key portion bolded.
- * E.g., "yellow onions" with key "onion" renders as "yellow <b>onion</b>s"
+ * Renders an ingredient name with the normalization key portion(s) bolded.
+ * Handles multiple keys separated by '|' (for "or" alternatives).
+ * E.g., "butter or margarine" with key "butter|margarine" bolds both.
  */
 function HighlightedIngredient({
   ingredient,
@@ -139,28 +140,65 @@ function HighlightedIngredient({
     return <span>{ingredient}</span>;
   }
 
-  // Find where the normalization key appears in the ingredient (case-insensitive)
-  const lowerIngredient = ingredient.toLowerCase();
-  const lowerKey = normalizationKey.toLowerCase();
-  const keyIndex = lowerIngredient.indexOf(lowerKey);
+  // Split normalization key on '|' for alternatives
+  const keys = normalizationKey.split('|').map(k => k.trim()).filter(k => k.length > 0);
 
-  // If the key isn't found in the ingredient, just bold the whole thing
-  if (keyIndex === -1) {
+  // Find all matches and their positions
+  const lowerIngredient = ingredient.toLowerCase();
+  const matches: { start: number; end: number }[] = [];
+
+  for (const key of keys) {
+    const lowerKey = key.toLowerCase();
+    let searchIndex = 0;
+    while (searchIndex < lowerIngredient.length) {
+      const foundIndex = lowerIngredient.indexOf(lowerKey, searchIndex);
+      if (foundIndex === -1) break;
+      matches.push({ start: foundIndex, end: foundIndex + key.length });
+      searchIndex = foundIndex + 1;
+    }
+  }
+
+  // If no matches found, bold the whole ingredient
+  if (matches.length === 0) {
     return <span className="font-semibold">{ingredient}</span>;
   }
 
-  // Split the ingredient into parts: before, matched, after
-  const before = ingredient.slice(0, keyIndex);
-  const matched = ingredient.slice(keyIndex, keyIndex + normalizationKey.length);
-  const after = ingredient.slice(keyIndex + normalizationKey.length);
+  // Sort matches by start position and merge overlapping ranges
+  matches.sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number }[] = [];
+  for (const match of matches) {
+    if (merged.length === 0 || match.start > merged[merged.length - 1].end) {
+      merged.push({ ...match });
+    } else {
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, match.end);
+    }
+  }
 
-  return (
-    <span>
-      {before}
-      <span className="font-semibold">{matched}</span>
-      {after}
-    </span>
-  );
+  // Build the result with bolded portions
+  const parts: React.ReactNode[] = [];
+  let lastEnd = 0;
+
+  for (let i = 0; i < merged.length; i++) {
+    const { start, end } = merged[i];
+    // Add non-bold text before this match
+    if (start > lastEnd) {
+      parts.push(<span key={`text-${i}`}>{ingredient.slice(lastEnd, start)}</span>);
+    }
+    // Add bold text for the match
+    parts.push(
+      <span key={`bold-${i}`} className="font-semibold">
+        {ingredient.slice(start, end)}
+      </span>
+    );
+    lastEnd = end;
+  }
+
+  // Add any remaining text after the last match
+  if (lastEnd < ingredient.length) {
+    parts.push(<span key="text-end">{ingredient.slice(lastEnd)}</span>);
+  }
+
+  return <span>{parts}</span>;
 }
 
 export function IngredientList({
