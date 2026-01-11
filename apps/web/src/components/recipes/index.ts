@@ -10,3 +10,4 @@ export { InstructionSteps } from './InstructionSteps';
 export { PairingsSection } from './PairingsSection';
 export { PairingSelector } from './PairingSelector';
 export { MacroDisplay } from './MacroDisplay';
+export { AddToCalendarModal } from './AddToCalendarModal';

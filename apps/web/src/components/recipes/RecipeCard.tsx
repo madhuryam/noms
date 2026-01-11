@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RecipeImage } from '../common/RecipeImage';
+import { AddToCalendarModal } from './AddToCalendarModal';
 import type { RecipeTag } from '../../hooks/useRecipes';
 
 interface RecipeCardProps {
@@ -11,6 +13,7 @@ interface RecipeCardProps {
   cookTime?: number | null;
   servings?: number | null;
   tags?: RecipeTag[];
+  showCalendarButton?: boolean;
 }
 
 export function RecipeCard({
@@ -22,23 +25,42 @@ export function RecipeCard({
   cookTime,
   servings,
   tags = [],
+  showCalendarButton = true,
 }: RecipeCardProps) {
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const totalTime = (prepTime || 0) + (cookTime || 0);
 
   return (
-    <Link
-      to={`/recipes/${id}`}
-      className="group block bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-500 dark:hover:border-onedark-blue hover:shadow-lg transition-all"
-    >
-      {/* Image */}
-      <div className="relative overflow-hidden">
-        <RecipeImage
-          imagePath={imageUrl}
-          title={title}
-          recipeId={id}
-          className="group-hover:scale-105 transition-transform duration-300"
-        />
-      </div>
+    <>
+      <Link
+        to={`/recipes/${id}`}
+        className="group block bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-500 dark:hover:border-onedark-blue hover:shadow-lg transition-all"
+      >
+        {/* Image */}
+        <div className="relative overflow-hidden">
+          <RecipeImage
+            imagePath={imageUrl}
+            title={title}
+            recipeId={id}
+            className="group-hover:scale-105 transition-transform duration-300"
+          />
+          {/* Calendar button overlay */}
+          {showCalendarButton && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowCalendarModal(true);
+              }}
+              className="absolute top-2 right-2 p-2 bg-white/90 dark:bg-onedark-bg/90 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white dark:hover:bg-onedark-bg-lighter"
+              title="Add to Calendar"
+            >
+              <svg className="w-4 h-4 text-gray-700 dark:text-onedark-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+          )}
+        </div>
 
       {/* Content */}
       <div className="p-4">
@@ -116,6 +138,17 @@ export function RecipeCard({
           </div>
         )}
       </div>
-    </Link>
+      </Link>
+
+      {/* Add to Calendar Modal */}
+      {showCalendarModal && (
+        <AddToCalendarModal
+          recipeId={id}
+          recipeTitle={title}
+          defaultServings={servings ?? 4}
+          onClose={() => setShowCalendarModal(false)}
+        />
+      )}
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
   InstructionSteps,
   PairingsSection,
   MacroDisplay,
+  AddToCalendarModal,
 } from '../components/recipes';
 import { calculateRecipeMacros } from '../lib/macroCalculation';
 import { MatchSummaryBadge } from '../components/suggestions';
@@ -72,6 +73,7 @@ export function RecipeDetailPage() {
     useRecipeProgress(recipeId);
 
   const [servings, setServings] = useState<number | null>(null);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
 
   // Initialize servings when recipe loads
   const currentServings = servings ?? recipe?.servings ?? DEFAULT_SERVINGS;
@@ -162,17 +164,28 @@ export function RecipeDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm">
-        <Link
-          to="/recipes"
-          className="text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg"
+      {/* Breadcrumb + Add to Calendar */}
+      <div className="flex items-center justify-between gap-4">
+        <nav className="flex items-center gap-2 text-sm min-w-0">
+          <Link
+            to="/recipes"
+            className="text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg flex-shrink-0"
+          >
+            Recipes
+          </Link>
+          <span className="text-gray-400 dark:text-onedark-fg-muted flex-shrink-0">/</span>
+          <span className="text-gray-900 dark:text-onedark-fg truncate">{recipe.title}</span>
+        </nav>
+        <button
+          onClick={() => setShowCalendarModal(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
         >
-          Recipes
-        </Link>
-        <span className="text-gray-400 dark:text-onedark-fg-muted">/</span>
-        <span className="text-gray-900 dark:text-onedark-fg truncate">{recipe.title}</span>
-      </nav>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="hidden sm:inline">Add to Calendar</span>
+        </button>
+      </div>
 
       {/* Header: Image, Title, Description */}
       <RecipeHeader
@@ -382,6 +395,16 @@ export function RecipeDetailPage() {
           Share
         </button>
       </div>
+
+      {/* Add to Calendar Modal */}
+      {showCalendarModal && (
+        <AddToCalendarModal
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          defaultServings={recipe.servings ?? DEFAULT_SERVINGS}
+          onClose={() => setShowCalendarModal(false)}
+        />
+      )}
     </div>
   );
 }
