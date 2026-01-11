@@ -1,5 +1,33 @@
 import { Hono } from 'hono';
+import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
 import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
+
+/**
+ * Extract ingredient name using sharp-recipe-parser.
+ */
+function extractIngredientName(rawText: string): string {
+  try {
+    const result = parseIngredient(rawText, 'en', {
+      includeExtra: true,
+      includeAlternativeUnits: false,
+      fallbackLanguage: 'en',
+    });
+
+    if (result && result.ingredient) {
+      return result.ingredient;
+    }
+  } catch {
+    // Fall through to fallback
+  }
+
+  // Fallback: basic cleanup if parser fails
+  let text = rawText.trim();
+  text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
+  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|small|medium|large)\s+/i, '');
+  text = text.replace(/^of\s+/i, '');
+
+  return text.trim();
+}
 
 type Bindings = {
   DB: D1Database;
@@ -328,8 +356,10 @@ async function insertRecipeIngredients(
       continue;
     }
 
-    // Generate normalization key for improved matching
-    const normalizationKey = normalizeIngredientKey(ing.name);
+    // Use sharp-recipe-parser to extract ingredient name, then normalize
+    const cleanedRaw = cleanIngredientLine(ing.original);
+    const ingredientName = extractIngredientName(cleanedRaw);
+    const normalizationKey = normalizeIngredientKey(ingredientName);
 
     await db
       .prepare(
@@ -341,7 +371,7 @@ async function insertRecipeIngredients(
         recipeId,
         ing.quantity,
         ing.unit,
-        cleanIngredientLine(ing.original),
+        cleanedRaw,
         ing.preparation,
         currentGroup,
         sortOrder++,
@@ -454,13 +484,15 @@ importRoutes.post('/vault', async (c) => {
           currentGroup = ing.name;
           continue;
         }
-        // Generate normalization key for improved matching
-        const normalizationKey = normalizeIngredientKey(ing.name);
+        // Use sharp-recipe-parser to extract ingredient name, then normalize
+        const cleanedRaw = cleanIngredientLine(ing.original);
+        const ingredientName = extractIngredientName(cleanedRaw);
+        const normalizationKey = normalizeIngredientKey(ingredientName);
         statements.push(
           c.env.DB.prepare(
             `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order, normalization_key)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(recipeId, ing.quantity, ing.unit, cleanIngredientLine(ing.original), ing.preparation, currentGroup, sortOrder++, normalizationKey)
+          ).bind(recipeId, ing.quantity, ing.unit, cleanedRaw, ing.preparation, currentGroup, sortOrder++, normalizationKey)
         );
       }
 
@@ -683,15 +715,18 @@ importRoutes.get('/status', async (c) => {
 });
 
 // POST /api/import/backfill-normalization - Backfill normalization_key for existing data
+// Query param ?force=true to re-process all items, not just those with NULL keys
 importRoutes.post('/backfill-normalization', async (c) => {
   try {
+    const force = c.req.query('force') === 'true';
     let pantryUpdated = 0;
     let ingredientsUpdated = 0;
 
     // Backfill pantry items
-    const pantryItems = await c.env.DB.prepare(`
-      SELECT id, name FROM pantry_items WHERE normalization_key IS NULL
-    `).all();
+    const pantryQuery = force
+      ? 'SELECT id, name FROM pantry_items'
+      : 'SELECT id, name FROM pantry_items WHERE normalization_key IS NULL';
+    const pantryItems = await c.env.DB.prepare(pantryQuery).all();
 
     for (const item of (pantryItems.results ?? []) as Array<{ id: number; name: string }>) {
       const normalizationKey = normalizeIngredientKey(item.name);
@@ -701,22 +736,16 @@ importRoutes.post('/backfill-normalization', async (c) => {
       pantryUpdated++;
     }
 
-    // Backfill recipe ingredients
-    // We need to extract the ingredient name from raw_text using a simple approach
-    const ingredients = await c.env.DB.prepare(`
-      SELECT id, raw_text FROM recipe_ingredients WHERE normalization_key IS NULL
-    `).all();
+    // Backfill recipe ingredients using sharp-recipe-parser
+    const ingredientsQuery = force
+      ? 'SELECT id, raw_text FROM recipe_ingredients'
+      : 'SELECT id, raw_text FROM recipe_ingredients WHERE normalization_key IS NULL';
+    const ingredients = await c.env.DB.prepare(ingredientsQuery).all();
 
     for (const ing of (ingredients.results ?? []) as Array<{ id: number; raw_text: string }>) {
-      // Extract name from raw_text by removing quantities and units at the start
-      const rawText = ing.raw_text.trim();
-      // Simple extraction: remove leading numbers, fractions, and common units
-      const nameMatch = rawText
-        .replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-]+/, '') // Remove numbers and fractions
-        .replace(/^(cup|cups|tbsp|tsp|tablespoon|tablespoons|teaspoon|teaspoons|oz|ounce|ounces|lb|lbs|pound|pounds|g|gram|grams|kg|ml|l|liter|liters|quart|quarts|pint|pints|bunch|bunches|head|heads|clove|cloves|stalk|stalks|can|cans|jar|jars|piece|pieces|slice|slices|pinch|dash|small|medium|large)\s+/i, '')
-        .trim();
-
-      const normalizationKey = normalizeIngredientKey(nameMatch || rawText);
+      // Use sharp-recipe-parser to extract ingredient name
+      const ingredientName = extractIngredientName(ing.raw_text);
+      const normalizationKey = normalizeIngredientKey(ingredientName);
       await c.env.DB.prepare(`
         UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
       `).bind(normalizationKey, ing.id).run();

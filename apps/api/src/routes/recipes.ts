@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
 import { keysMatch, normalizeIngredientKey } from '../lib/ingredient-normalizer';
 
 type Bindings = {
@@ -6,21 +7,64 @@ type Bindings = {
   IMAGES_BUCKET: R2Bucket;
 };
 
+interface ParsedIngredientResult {
+  quantity: number | null;
+  quantityText: string;
+  minQuantity: number | null;
+  maxQuantity: number | null;
+  unit: string;
+  unitText: string;
+  ingredient: string;
+  extra: string;
+}
+
 /**
- * Parse ingredient name from a raw ingredient line.
- * Strips quantities, units, and common prefixes to extract the ingredient name.
+ * Parse ingredient using sharp-recipe-parser.
+ * Returns the parsed ingredient name and other details.
+ */
+function parseIngredientLine(rawText: string): ParsedIngredientResult | null {
+  try {
+    const result = parseIngredient(rawText, 'en', {
+      includeExtra: true,
+      includeAlternativeUnits: false,
+      fallbackLanguage: 'en',
+    });
+
+    if (!result) return null;
+
+    return {
+      quantity: result.quantity || null,
+      quantityText: result.quantityText || '',
+      minQuantity: result.minQuantity || null,
+      maxQuantity: result.maxQuantity || null,
+      unit: result.unit || '',
+      unitText: result.unitText || '',
+      ingredient: result.ingredient || '',
+      extra: result.extra || '',
+    };
+  } catch {
+    // If parsing fails, return null and fall back to using raw text
+    return null;
+  }
+}
+
+/**
+ * Extract ingredient name from raw text.
+ * Uses sharp-recipe-parser for accurate extraction, with fallback to raw text.
  */
 function extractIngredientName(rawText: string): string {
+  const parsed = parseIngredientLine(rawText);
+
+  if (parsed && parsed.ingredient) {
+    return parsed.ingredient;
+  }
+
+  // Fallback: basic cleanup if parser fails
   let text = rawText.trim();
-
-  // Remove leading numbers, fractions, and ranges (e.g., "2-3", "1/2", "½")
+  // Remove leading numbers, fractions, and ranges
   text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
-
-  // Remove common units at the start
-  const unitPattern = /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|kilograms?|ml|milliliters?|liters?|l|quarts?|qt|pints?|pt|gallons?|gal|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|packages?|pkg|pieces?|slices?|pinch(?:es)?|dash(?:es)?|small|medium|large|extra[\s-]?large|xl)\s+/i;
-  text = text.replace(unitPattern, '');
-
-  // Remove "of" at the start (e.g., "of flour" -> "flour")
+  // Remove common units
+  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|small|medium|large)\s+/i, '');
   text = text.replace(/^of\s+/i, '');
 
   return text.trim();
