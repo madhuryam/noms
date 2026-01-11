@@ -503,8 +503,8 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
         // Build a map of category name to category id, creating categories as needed
         const categoryNameToId = new Map<string, number>();
         for (const categoryName of itemsByCategoryName.keys()) {
-          // Skip "Your Items" category - those go uncategorized
-          if (categoryName === 'Your Items') {
+          // Skip "Your Items" and "Other" categories - those go uncategorized
+          if (categoryName === 'Your Items' || categoryName === 'Other') {
             continue;
           }
 

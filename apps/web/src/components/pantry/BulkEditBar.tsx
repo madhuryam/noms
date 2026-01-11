@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useBulkDeletePantryItems, useBulkUpdatePantryItems } from '../../hooks';
+import { useBulkDeletePantryItems, useBulkUpdatePantryItems, usePantryCategories, useCreatePantryCategory } from '../../hooks';
 import type { PantryLocation } from '../../hooks';
 
 interface BulkEditBarProps {
@@ -7,6 +7,7 @@ interface BulkEditBarProps {
   onClearSelection: () => void;
   onSelectAll: () => void;
   totalItems: number;
+  currentLocation: PantryLocation;
 }
 
 export function BulkEditBar({
@@ -14,6 +15,7 @@ export function BulkEditBar({
   onClearSelection,
   onSelectAll,
   totalItems,
+  currentLocation,
 }: BulkEditBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [quantity, setQuantity] = useState('');
@@ -22,9 +24,16 @@ export function BulkEditBar({
   const [location, setLocation] = useState<PantryLocation | ''>('');
   const [isStaple, setIsStaple] = useState<boolean | null>(null);
   const [needsRefill, setNeedsRefill] = useState<boolean | null>(null);
+  // Track category by name so we can create it in the target location if needed
+  const [categoryName, setCategoryName] = useState<string | null | 'unchanged'>('unchanged');
 
   const bulkDelete = useBulkDeletePantryItems();
   const bulkUpdate = useBulkUpdatePantryItems();
+  const createCategory = useCreatePantryCategory();
+
+  // Get the effective location (target location if moving, current location otherwise)
+  const effectiveLocation = location || currentLocation;
+  const { data: categories = [] } = usePantryCategories(effectiveLocation);
 
   const selectedCount = selectedIds.size;
   const ids = Array.from(selectedIds);
@@ -43,6 +52,7 @@ export function BulkEditBar({
       location?: PantryLocation;
       is_staple?: boolean;
       needs_refill?: boolean;
+      category_id?: number | null;
     } = {};
 
     if (quantity !== '') {
@@ -69,6 +79,29 @@ export function BulkEditBar({
       updates.needs_refill = needsRefill;
     }
 
+    // Handle category - find or create in target location
+    if (categoryName !== 'unchanged') {
+      if (categoryName === null) {
+        updates.category_id = null;
+      } else {
+        // Look for category by name in target location
+        const existingCategory = categories.find(
+          (c) => c.name.toLowerCase() === categoryName.toLowerCase()
+        );
+
+        if (existingCategory) {
+          updates.category_id = existingCategory.id;
+        } else {
+          // Create the category in the target location
+          const newCategory = await createCategory.mutateAsync({
+            name: categoryName,
+            location: effectiveLocation,
+          });
+          updates.category_id = newCategory.id;
+        }
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       return;
     }
@@ -85,6 +118,7 @@ export function BulkEditBar({
     setLocation('');
     setIsStaple(null);
     setNeedsRefill(null);
+    setCategoryName('unchanged');
   };
 
   if (selectedCount === 0) return null;
@@ -138,10 +172,10 @@ export function BulkEditBar({
                 <div className="w-px h-5 bg-gray-300 dark:bg-onedark-bg-highlight" />
                 <button
                   onClick={handleUpdate}
-                  disabled={bulkUpdate.isPending || (quantity === '' && unit === '' && expirationDate === '' && location === '' && isStaple === null && needsRefill === null)}
+                  disabled={bulkUpdate.isPending || createCategory.isPending || (quantity === '' && unit === '' && expirationDate === '' && location === '' && isStaple === null && needsRefill === null && categoryName === 'unchanged')}
                   className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {bulkUpdate.isPending ? 'Saving...' : 'Save'}
+                  {bulkUpdate.isPending || createCategory.isPending ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
@@ -207,6 +241,28 @@ export function BulkEditBar({
                 <option value="">Refill...</option>
                 <option value="true">Needs refill</option>
                 <option value="false">No refill needed</option>
+              </select>
+              <select
+                value={categoryName === 'unchanged' ? '' : categoryName === null ? 'none' : categoryName}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setCategoryName('unchanged');
+                  } else if (val === 'none') {
+                    setCategoryName(null);
+                  } else {
+                    setCategoryName(val);
+                  }
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-onedark-bg-highlight rounded-lg bg-white dark:bg-onedark-bg text-gray-900 dark:text-onedark-fg"
+              >
+                <option value="">Category...</option>
+                <option value="none">Uncategorized</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

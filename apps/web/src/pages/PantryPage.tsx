@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactNode } from 'react';
 import { usePantryItems } from '../hooks';
-import { AddItemForm, FridgeList, CategorizedPantryList, QuickAddPanel, BulkEditBar } from '../components/pantry';
+import { AddItemForm, CategorizedPantryList, QuickAddPanel, BulkEditBar } from '../components/pantry';
 
 type TabType = 'pantry' | 'fridge' | 'freezer' | 'spices' | 'sauces' | 'snacks';
 
@@ -167,6 +167,7 @@ export function PantryPage() {
               onClearSelection={handleClearSelection}
               onSelectAll={handleSelectAll}
               totalItems={currentTabItems.length}
+              currentLocation={activeTab}
             />
           ) : (
             <div className="flex items-center gap-2">
@@ -200,9 +201,8 @@ export function PantryPage() {
           )}
 
           {activeTab === 'fridge' && (
-            <FridgeList
+            <CategorizedPantryList
               location="fridge"
-              title="In My Fridge"
               emptyMessage="Your fridge is empty. Add items above."
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -211,9 +211,8 @@ export function PantryPage() {
           )}
 
           {activeTab === 'freezer' && (
-            <FridgeList
+            <CategorizedPantryList
               location="freezer"
-              title="In My Freezer"
               emptyMessage="Your freezer is empty. Add items above."
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { usePantryItems, usePantryCategories, useCreatePantryCategory, useUpdatePantryItem } from '../../hooks';
+import { usePantryItems, usePantryCategories, useCreatePantryCategory, useUpdatePantryCategory } from '../../hooks';
 import type { PantryLocation, PantryItem, PantryCategory } from '../../hooks';
 import { PantryItemRow } from './PantryItemRow';
 
@@ -26,11 +26,38 @@ export function CategorizedPantryList({
   const { data: items = [], isLoading: itemsLoading } = usePantryItems(location);
   const { data: categories = [], isLoading: categoriesLoading } = usePantryCategories(location);
   const createCategory = useCreatePantryCategory();
-  const updateItem = useUpdatePantryItem();
+  const updateCategory = useUpdatePantryCategory();
 
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+
+  // Get sorted categories for reordering (only categories with items)
+  const sortedCategoriesWithItems = useMemo(() => {
+    const categoryIdsWithItems = new Set(items.map(item => item.category_id).filter(id => id !== null));
+    return categories.filter(cat => categoryIdsWithItems.has(cat.id));
+  }, [categories, items]);
+
+  // Move a category up or down
+  const handleMoveCategory = async (categoryId: number, direction: 'up' | 'down') => {
+    const currentIndex = sortedCategoriesWithItems.findIndex(c => c.id === categoryId);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= sortedCategoriesWithItems.length) return;
+
+    const currentCategory = sortedCategoriesWithItems[currentIndex];
+    const targetCategory = sortedCategoriesWithItems[targetIndex];
+
+    // Swap sort_order values
+    try {
+      await Promise.all([
+        updateCategory.mutateAsync({ id: currentCategory.id, sort_order: targetCategory.sort_order }),
+        updateCategory.mutateAsync({ id: targetCategory.id, sort_order: currentCategory.sort_order }),
+      ]);
+    } catch {
+      // Error handling is done by the mutation
+    }
+  };
 
   // Group items by category
   const sections = useMemo((): CategorySection[] => {
@@ -80,29 +107,6 @@ export function CategorizedPantryList({
       setNewCategoryName('');
     } catch {
       // Error handling is done by the mutation
-    }
-  };
-
-  const handleDragStart = (itemId: number) => {
-    setDraggedItemId(itemId);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDropOnCategory = async (categoryId: number | null) => {
-    if (draggedItemId === null) return;
-
-    try {
-      await updateItem.mutateAsync({
-        id: draggedItemId,
-        category_id: categoryId,
-      });
-    } catch {
-      // Error handling is done by the mutation
-    } finally {
-      setDraggedItemId(null);
     }
   };
 
@@ -166,55 +170,71 @@ export function CategorizedPantryList({
             </button>
           </div>
           <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">
-            Drag items to move them between categories
+            Use the arrows to reorder categories. Select items to change their category.
           </p>
         </div>
       )}
 
       {/* Category Sections */}
-      {sections.map((section) => (
+      {sections.map((section) => {
+        const categoryIndex = section.category
+          ? sortedCategoriesWithItems.findIndex(c => c.id === section.category?.id)
+          : -1;
+        const isFirst = categoryIndex === 0;
+        const isLast = categoryIndex === sortedCategoriesWithItems.length - 1;
+
+        return (
         <div
           key={section.category?.id ?? 'uncategorized'}
           className="space-y-2"
-          onDragOver={handleDragOver}
-          onDrop={() => handleDropOnCategory(section.category?.id ?? null)}
         >
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-onedark-fg uppercase tracking-wide flex items-center gap-2">
-            {section.category?.name ?? 'Uncategorized'}
-            <span className="text-xs font-normal text-gray-500 dark:text-onedark-fg-muted">
-              ({section.items.length})
-            </span>
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-onedark-fg uppercase tracking-wide flex items-center gap-2">
+              {section.category?.name ?? 'Uncategorized'}
+              <span className="text-xs font-normal text-gray-500 dark:text-onedark-fg-muted">
+                ({section.items.length})
+              </span>
+            </h3>
+            {/* Reorder buttons - only show in management mode and for real categories */}
+            {showCategoryManager && section.category && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleMoveCategory(section.category!.id, 'up')}
+                  disabled={isFirst || updateCategory.isPending}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Move up"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleMoveCategory(section.category!.id, 'down')}
+                  disabled={isLast || updateCategory.isPending}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Move down"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
           <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight divide-y divide-gray-100 dark:divide-onedark-bg-highlight">
             {section.items.map((item) => (
-              <div
+              <PantryItemRow
                 key={item.id}
-                draggable={showCategoryManager}
-                onDragStart={() => handleDragStart(item.id)}
-                className={showCategoryManager ? 'cursor-move' : ''}
-              >
-                <PantryItemRow
-                  item={item}
-                  isSelected={selectedIds?.has(item.id)}
-                  onToggleSelect={onToggleSelect}
-                  selectionMode={selectionMode}
-                />
-              </div>
+                item={item}
+                isSelected={selectedIds?.has(item.id)}
+                onToggleSelect={onToggleSelect}
+                selectionMode={selectionMode}
+              />
             ))}
           </div>
         </div>
-      ))}
-
-      {/* Empty drop zone for uncategorized if not shown */}
-      {showCategoryManager && !sections.some(s => s.category === null) && (
-        <div
-          className="border-2 border-dashed border-gray-300 dark:border-onedark-bg-highlight rounded-lg p-4 text-center text-sm text-gray-500 dark:text-onedark-fg-muted"
-          onDragOver={handleDragOver}
-          onDrop={() => handleDropOnCategory(null)}
-        >
-          Drop here to remove from category
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
