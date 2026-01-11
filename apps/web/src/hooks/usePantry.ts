@@ -12,7 +12,18 @@ export interface PantryItem {
   expiration_date: string | null;
   is_staple: number;
   needs_refill: number;
+  category_id: number | null;
+  category_name?: string | null;
+  category_sort_order?: number | null;
   ingredient_category?: string | null;
+  original_name: string | null;
+}
+
+export interface PantryCategory {
+  id: number;
+  name: string;
+  location: string;
+  sort_order: number;
 }
 
 export interface IngredientSuggestion {
@@ -100,6 +111,8 @@ export function useAddPantryItem() {
       location?: PantryLocation;
       expiration_date?: string;
       is_staple?: boolean;
+      category_id?: number;
+      original_name?: string;
     }): Promise<PantryItem> => {
       return api.post<PantryItem>('/api/pantry', item);
     },
@@ -121,6 +134,8 @@ export function useBulkAddPantryItems() {
       location?: PantryLocation;
       is_staple?: boolean;
       expiration_date?: string;
+      category_id?: number;
+      original_name?: string;
     }>): Promise<BulkAddResponse> => {
       return api.post<BulkAddResponse>('/api/pantry/bulk', { items });
     },
@@ -147,6 +162,7 @@ export function useUpdatePantryItem() {
       expiration_date?: string | null;
       is_staple?: boolean;
       needs_refill?: boolean;
+      category_id?: number | null;
     }): Promise<PantryItem> => {
       return api.put<PantryItem>(`/api/pantry/${id}`, updates);
     },
@@ -200,6 +216,7 @@ export function useBulkUpdatePantryItems() {
         location?: PantryLocation;
         is_staple?: boolean;
         needs_refill?: boolean;
+        category_id?: number | null;
       };
     }): Promise<{ success: boolean; updated_count: number }> => {
       return api.post('/api/pantry/bulk-update', { ids, updates });
@@ -235,4 +252,73 @@ export function useRefillItems() {
     ...rest,
     data: items.filter((item) => item.needs_refill === 1),
   };
+}
+
+// Category hooks
+interface CategoriesResponse {
+  categories: PantryCategory[];
+}
+
+export function usePantryCategories(location?: PantryLocation) {
+  return useQuery({
+    queryKey: ['pantry-categories', location ?? 'all'],
+    queryFn: async (): Promise<PantryCategory[]> => {
+      const url = location
+        ? `/api/pantry-categories?location=${location}`
+        : '/api/pantry-categories';
+      const response = await api.get<CategoriesResponse>(url);
+      return response.categories;
+    },
+  });
+}
+
+export function useCreatePantryCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (category: {
+      name: string;
+      location: PantryLocation;
+      sort_order?: number;
+    }): Promise<PantryCategory> => {
+      return api.post<PantryCategory>('/api/pantry-categories', category);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pantry-categories'] });
+    },
+  });
+}
+
+export function useUpdatePantryCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...updates
+    }: {
+      id: number;
+      name?: string;
+      sort_order?: number;
+    }): Promise<PantryCategory> => {
+      return api.put<PantryCategory>(`/api/pantry-categories/${id}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pantry-categories'] });
+    },
+  });
+}
+
+export function useDeletePantryCategory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<{ success: boolean; id: number }> => {
+      return api.delete(`/api/pantry-categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pantry-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['pantry'] });
+    },
+  });
 }

@@ -24,8 +24,12 @@ export {
   useBulkUpdatePantryItems,
   useToggleRefill,
   useRefillItems,
+  usePantryCategories,
+  useCreatePantryCategory,
+  useUpdatePantryCategory,
+  useDeletePantryCategory,
 } from './usePantry';
-export type { PantryItem, IngredientSuggestion, PantryLocation } from './usePantry';
+export type { PantryItem, PantryCategory, IngredientSuggestion, PantryLocation } from './usePantry';
 export {
   useShelfLifeEntries,
   useShelfLifeLookup,

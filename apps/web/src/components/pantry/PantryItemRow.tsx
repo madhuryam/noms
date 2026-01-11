@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useUpdatePantryItem, useDeletePantryItem, useToggleRefill, useShelfLifeEntries } from '../../hooks';
 import type { PantryItem, PantryLocation } from '../../hooks';
+import { useRenameItem } from '../../hooks/useCustomItems';
 
 interface PantryItemRowProps {
   item: PantryItem;
@@ -36,6 +37,7 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
   const deleteItem = useDeletePantryItem();
   const toggleRefill = useToggleRefill();
   const { data: shelfLifeEntries = [] } = useShelfLifeEntries();
+  const renameItem = useRenameItem();
 
   // Calculate expiration date based on shelf life data for a given location
   const getExpirationDate = useCallback((ingredientName: string, location: PantryLocation): string | null => {
@@ -75,13 +77,25 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
+    const nameChanged = trimmedName !== item.name;
+
     await updateItem.mutateAsync({
       id: item.id,
-      name: trimmedName !== item.name ? trimmedName : undefined,
+      name: nameChanged ? trimmedName : undefined,
       quantity: quantity ? parseFloat(quantity) : null,
       unit: unit || null,
       expiration_date: expirationDate || null,
     });
+
+    // Sync rename to localStorage for multi-select modal
+    if (nameChanged && item.original_name && item.location) {
+      renameItem.mutate({
+        location: item.location,
+        originalName: item.original_name,
+        newName: trimmedName,
+      });
+    }
+
     setIsEditing(false);
   };
 

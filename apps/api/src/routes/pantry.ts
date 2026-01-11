@@ -16,6 +16,8 @@ interface PantryItem {
   expiration_date: string | null;
   is_staple: number;
   needs_refill: number;
+  category_id: number | null;
+  original_name: string | null;
 }
 
 interface Ingredient {
@@ -92,9 +94,10 @@ pantry.get('/', async (c) => {
 
   try {
     let query = `
-      SELECT p.*, i.category as ingredient_category
+      SELECT p.*, i.category as ingredient_category, pc.name as category_name, pc.sort_order as category_sort_order
       FROM pantry_items p
       LEFT JOIN ingredients i ON p.ingredient_id = i.id
+      LEFT JOIN pantry_categories pc ON p.category_id = pc.id
     `;
     const bindings: string[] = [];
 
@@ -103,7 +106,7 @@ pantry.get('/', async (c) => {
       bindings.push(location);
     }
 
-    query += ' ORDER BY p.is_staple DESC, p.name ASC';
+    query += ' ORDER BY COALESCE(pc.sort_order, 999) ASC, p.is_staple DESC, p.name ASC';
 
     const results = await c.env.DB.prepare(query).bind(...bindings).all();
 
@@ -162,6 +165,8 @@ pantry.post('/', async (c) => {
       expiration_date?: string;
       is_staple?: boolean;
       needs_refill?: boolean;
+      category_id?: number;
+      original_name?: string;
     }>();
 
     if (!body.name) {
@@ -194,8 +199,8 @@ pantry.post('/', async (c) => {
 
     const result = await c.env.DB
       .prepare(
-        `INSERT INTO pantry_items (ingredient_id, name, normalized_name, normalization_key, quantity, unit, location, expiration_date, is_staple, needs_refill)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO pantry_items (ingredient_id, name, normalized_name, normalization_key, quantity, unit, location, expiration_date, is_staple, needs_refill, category_id, original_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         ingredientId,
@@ -207,7 +212,9 @@ pantry.post('/', async (c) => {
         body.location ?? 'pantry',
         body.expiration_date ?? null,
         body.is_staple ? 1 : 0,
-        body.needs_refill ? 1 : 0
+        body.needs_refill ? 1 : 0,
+        body.category_id ?? null,
+        body.original_name ?? body.name.trim()
       )
       .run();
 
@@ -236,6 +243,8 @@ pantry.post('/bulk', async (c) => {
         location?: string;
         is_staple?: boolean;
         expiration_date?: string;
+        category_id?: number;
+        original_name?: string;
       }>;
     }>();
 
@@ -275,8 +284,8 @@ pantry.post('/bulk', async (c) => {
 
       const result = await c.env.DB
         .prepare(
-          `INSERT INTO pantry_items (ingredient_id, name, normalized_name, normalization_key, quantity, unit, location, is_staple, expiration_date)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO pantry_items (ingredient_id, name, normalized_name, normalization_key, quantity, unit, location, is_staple, expiration_date, category_id, original_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           ingredient.id,
@@ -287,7 +296,9 @@ pantry.post('/bulk', async (c) => {
           item.unit ?? null,
           location,
           item.is_staple ? 1 : 0,
-          item.expiration_date ?? null
+          item.expiration_date ?? null,
+          item.category_id ?? null,
+          item.original_name ?? item.name.trim()
         )
         .run();
 
@@ -330,6 +341,7 @@ pantry.put('/:id', async (c) => {
       expiration_date?: string | null;
       is_staple?: boolean;
       needs_refill?: boolean;
+      category_id?: number | null;
     }>();
 
     const existing = await c.env.DB
@@ -379,6 +391,10 @@ pantry.put('/:id', async (c) => {
     if (body.needs_refill !== undefined) {
       updates.push('needs_refill = ?');
       values.push(body.needs_refill ? 1 : 0);
+    }
+    if (body.category_id !== undefined) {
+      updates.push('category_id = ?');
+      values.push(body.category_id);
     }
 
     if (updates.length === 0) {
@@ -471,6 +487,7 @@ pantry.post('/bulk-update', async (c) => {
         location?: string;
         is_staple?: boolean;
         needs_refill?: boolean;
+        category_id?: number | null;
       };
     }>();
 
@@ -509,6 +526,10 @@ pantry.post('/bulk-update', async (c) => {
     if (updates.needs_refill !== undefined) {
       setClauses.push('needs_refill = ?');
       values.push(updates.needs_refill ? 1 : 0);
+    }
+    if (updates.category_id !== undefined) {
+      setClauses.push('category_id = ?');
+      values.push(updates.category_id);
     }
 
     if (setClauses.length === 0) {

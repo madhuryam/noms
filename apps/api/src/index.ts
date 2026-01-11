@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { recipes, tags, search, importRoutes, images, associations, pantry, shelfLife, mealPlans, exportRoutes, nutrition } from './routes';
+import { recipes, tags, search, importRoutes, images, associations, pantry, pantryCategories, shelfLife, mealPlans, exportRoutes, nutrition } from './routes';
 import { validateAccessJWT } from './middleware';
 
 interface HealthResponse {
@@ -139,6 +139,7 @@ app.route('/api/import', importRoutes);
 app.route('/api/images', images);
 app.route('/api/associations', associations);
 app.route('/api/pantry', pantry);
+app.route('/api/pantry-categories', pantryCategories);
 app.route('/api/shelf-life', shelfLife);
 app.route('/api/meal-plans', mealPlans);
 app.route('/api/export', exportRoutes);

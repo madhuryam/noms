@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactNode } from 'react';
 import { usePantryItems } from '../hooks';
-import { AddItemForm, PantryList, FridgeList, QuickAddPanel, BulkEditBar } from '../components/pantry';
+import { AddItemForm, FridgeList, CategorizedPantryList, QuickAddPanel, BulkEditBar } from '../components/pantry';
 
 type TabType = 'pantry' | 'fridge' | 'freezer' | 'spices' | 'sauces' | 'snacks';
 
@@ -190,26 +190,13 @@ export function PantryPage() {
         {/* Content */}
         <div className="p-4">
           {activeTab === 'pantry' && (
-            <div className="space-y-6">
-              <PantryList
-                location="pantry"
-                title="Pantry Staples"
-                filterStaples={true}
-                emptyMessage="No staples yet. Add items above to build your pantry."
-                selectedIds={selectedIds}
-                onToggleSelect={handleToggleSelect}
-                selectionMode={selectionMode}
-              />
-              <PantryList
-                location="pantry"
-                title="Other Items"
-                filterStaples={false}
-                emptyMessage=""
-                selectedIds={selectedIds}
-                onToggleSelect={handleToggleSelect}
-                selectionMode={selectionMode}
-              />
-            </div>
+            <CategorizedPantryList
+              location="pantry"
+              emptyMessage="No pantry items yet. Add items above to build your pantry."
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectionMode}
+            />
           )}
 
           {activeTab === 'fridge' && (
@@ -235,9 +222,8 @@ export function PantryPage() {
           )}
 
           {activeTab === 'spices' && (
-            <PantryList
+            <CategorizedPantryList
               location="spices"
-              title="My Spices"
               emptyMessage="No spices yet. Add your spices above."
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -246,9 +232,8 @@ export function PantryPage() {
           )}
 
           {activeTab === 'sauces' && (
-            <PantryList
+            <CategorizedPantryList
               location="sauces"
-              title="My Sauces"
               emptyMessage="No sauces yet. Add your sauces above."
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -257,9 +242,8 @@ export function PantryPage() {
           )}
 
           {activeTab === 'snacks' && (
-            <PantryList
+            <CategorizedPantryList
               location="snacks"
-              title="My Snacks"
               emptyMessage="No snacks yet. Add your snacks above."
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}

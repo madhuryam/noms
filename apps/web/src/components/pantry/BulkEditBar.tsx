@@ -117,10 +117,10 @@ export function BulkEditBar({
           <div className="space-y-3">
             {/* Selection info and action buttons row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-base font-medium text-gray-900 dark:text-onedark-fg">
-                  {selectedCount} selected
-                </span>
+              <span className="text-base font-medium text-gray-900 dark:text-onedark-fg">
+                {selectedCount} selected
+              </span>
+              <div className="flex items-center gap-3">
                 {selectedCount < totalItems && (
                   <button
                     onClick={onSelectAll}
@@ -133,10 +133,9 @@ export function BulkEditBar({
                   onClick={onClearSelection}
                   className="text-sm text-gray-500 dark:text-onedark-fg-muted hover:underline"
                 >
-                  Clear selection
+                  Clear
                 </button>
-              </div>
-              <div className="flex gap-2">
+                <div className="w-px h-5 bg-gray-300 dark:bg-onedark-bg-highlight" />
                 <button
                   onClick={handleUpdate}
                   disabled={bulkUpdate.isPending || (quantity === '' && unit === '' && expirationDate === '' && location === '' && isStaple === null && needsRefill === null)}
