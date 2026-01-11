@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../../lib/recipeProgress';
 import { useRecipeIngredients, type ParsedIngredient } from '../../hooks';
+import type { IngredientMatch } from '../../hooks/usePantryMatch';
 import { formatAmount } from '../../lib/ingredientScaling';
 
 // Ingredients that should not be scaled (leaveners, salt, spices in small amounts)
@@ -29,9 +30,11 @@ interface IngredientListProps {
   scaleFactor?: number;
   onProgressChange?: (checked: Set<number>) => void;
   checkedItems: Set<number>;
+  pantryMatches?: IngredientMatch[];
 }
 
 interface DisplayIngredient {
+  id: number | null;
   quantity: string | null;
   unit: string | null;
   ingredient: string | null;
@@ -60,6 +63,7 @@ function formatIngredientDisplay(
   // If no parsed data, fall back to raw text as the ingredient
   if (!parsed) {
     return {
+      id: ingredient.id,
       quantity: null,
       unit: null,
       ingredient: ingredient.rawText,
@@ -81,6 +85,7 @@ function formatIngredientDisplay(
   }
 
   return {
+    id: ingredient.id,
     quantity: quantityStr,
     unit: parsed.unitText || null,
     ingredient: parsed.ingredient || null,
@@ -207,9 +212,16 @@ export function IngredientList({
   scaleFactor = 1,
   onProgressChange,
   checkedItems,
+  pantryMatches,
 }: IngredientListProps) {
   // Fetch parsed ingredients from API
   const { data: parsedIngredients, isLoading } = useRecipeIngredients(recipeId);
+
+  // Create a map of ingredient ID to pantry match for quick lookup
+  const pantryMatchMap = useMemo(() => {
+    if (!pantryMatches) return new Map<number, IngredientMatch>();
+    return new Map(pantryMatches.map(m => [m.id, m]));
+  }, [pantryMatches]);
 
   // Format ingredients for display
   const ingredients = useMemo(() => {
@@ -219,7 +231,8 @@ export function IngredientList({
       return ingredientsRaw
         .split('\n')
         .filter(line => line.trim())
-        .map(line => ({
+        .map((line) => ({
+          id: null,
           quantity: null,
           unit: null,
           ingredient: line.trim(),
@@ -329,6 +342,8 @@ export function IngredientList({
             <ul className="space-y-3">
               {section.items.map(({ ingredient, originalIndex }) => {
                 const isChecked = checkedItems.has(originalIndex);
+                const pantryMatch = ingredient.id ? pantryMatchMap.get(ingredient.id) : undefined;
+                const hasPantryData = pantryMatches && pantryMatches.length > 0;
                 return (
                   <li key={`${recipeId}-ingredient-${originalIndex}`}>
                     <label className="flex items-start gap-3 cursor-pointer group">
@@ -365,7 +380,7 @@ export function IngredientList({
                       </button>
                       <span
                         title={ingredient.original}
-                        className={`pt-0.5 transition-all cursor-help ${
+                        className={`pt-0.5 flex-1 transition-all cursor-help ${
                           isChecked
                             ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
                             : 'text-gray-700 dark:text-onedark-fg group-hover:text-gray-900 dark:group-hover:text-onedark-fg'
@@ -383,6 +398,25 @@ export function IngredientList({
                           <span className="text-gray-500 dark:text-onedark-fg-muted"> ({ingredient.extra})</span>
                         )}
                       </span>
+                      {/* Pantry match indicator */}
+                      {hasPantryData && (
+                        <span
+                          title={pantryMatch?.have_ingredient
+                            ? `In pantry${pantryMatch.matched_pantry_item ? `: ${pantryMatch.matched_pantry_item}` : ''}`
+                            : 'Need to buy'}
+                          className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-400 dark:text-onedark-fg-muted"
+                        >
+                          {pantryMatch?.have_ingredient ? (
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                          )}
+                        </span>
+                      )}
                     </label>
                   </li>
                 );

@@ -257,6 +257,7 @@ export function RecipeDetailPage() {
                   scaleFactor={scaleFactor}
                   checkedItems={ingredientsChecked}
                   onProgressChange={updateIngredients}
+                  pantryMatches={matchData?.ingredients}
                 />
                 {/* Debug button - temporary for parsing analysis */}
                 <button
