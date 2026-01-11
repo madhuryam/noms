@@ -1,6 +1,29 @@
 import { Hono } from 'hono';
 import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
+import { getUnits } from '@jlucaspains/sharp-recipe-parser/src/units.js';
 import { keysMatch, normalizeIngredientKey } from '../lib/ingredient-normalizer';
+
+// Add custom units to sharp-recipe-parser
+const englishUnits = getUnits('en');
+if (englishUnits?.ingredientUnits) {
+  const handful = { symbol: 'handful', text: 'handful' };
+  englishUnits.ingredientUnits.set('handful', handful);
+  englishUnits.ingredientUnits.set('handfuls', handful);
+}
+
+/**
+ * Strip common suffix phrases that should be treated as "extra" info, not ingredient name.
+ * These are modifiers like "per person", "per serving", "to taste", etc.
+ */
+function stripExtraSuffixes(ingredient: string): string {
+  return ingredient
+    .replace(/\s+per\s+(person|serving|portion)$/i, '')
+    .replace(/\s+to\s+taste$/i, '')
+    .replace(/\s+as\s+needed$/i, '')
+    .replace(/\s+for\s+(garnish|serving|topping)$/i, '')
+    .replace(/\s+optional$/i, '')
+    .trim();
+}
 
 type Bindings = {
   DB: D1Database;
@@ -18,9 +41,48 @@ interface ParsedIngredientResult {
   extra: string;
 }
 
+// Sizes that sharp-recipe-parser strips from ingredients
+const INGREDIENT_SIZES = ['small', 'medium', 'large', 'extra-large', 'extra large', 'xl', 'jumbo', 'mini', 'tiny', 'big'];
+
+/**
+ * Extract content that sharp-recipe-parser strips out but we want to keep as extras.
+ * This includes: sizes (small, medium, large), parenthetical content, etc.
+ */
+function extractStrippedContent(rawText: string, parsedIngredient: string): string[] {
+  const stripped: string[] = [];
+  const lowerRaw = rawText.toLowerCase();
+
+  // Extract sizes that appear before the ingredient
+  for (const size of INGREDIENT_SIZES) {
+    // Check if size appears in raw text but not in parsed ingredient
+    if (lowerRaw.includes(size) && !parsedIngredient.toLowerCase().includes(size)) {
+      // Make sure it's a whole word match
+      const regex = new RegExp(`\\b${size}\\b`, 'i');
+      if (regex.test(rawText)) {
+        stripped.push(size);
+      }
+    }
+  }
+
+  // Extract parenthetical content (e.g., "(sifted)", "(about 2 cups)")
+  const parenMatches = rawText.match(/\(([^)]+)\)/g);
+  if (parenMatches) {
+    for (const match of parenMatches) {
+      // Remove the parentheses and add the content
+      const content = match.slice(1, -1).trim();
+      if (content && !parsedIngredient.includes(content)) {
+        stripped.push(content);
+      }
+    }
+  }
+
+  return stripped;
+}
+
 /**
  * Parse ingredient using sharp-recipe-parser.
  * Returns the parsed ingredient name and other details.
+ * Captures stripped content (sizes, parenthetical content) and adds to extras.
  */
 function parseIngredientLine(rawText: string): ParsedIngredientResult | null {
   try {
@@ -32,6 +94,16 @@ function parseIngredientLine(rawText: string): ParsedIngredientResult | null {
 
     if (!result) return null;
 
+    // Extract content that was stripped by the parser
+    const strippedContent = extractStrippedContent(rawText, result.ingredient || '');
+
+    // Combine stripped content with existing extras
+    let combinedExtra = result.extra || '';
+    if (strippedContent.length > 0) {
+      const strippedStr = strippedContent.join(', ');
+      combinedExtra = combinedExtra ? `${strippedStr}, ${combinedExtra}` : strippedStr;
+    }
+
     return {
       quantity: result.quantity || null,
       quantityText: result.quantityText || '',
@@ -40,7 +112,7 @@ function parseIngredientLine(rawText: string): ParsedIngredientResult | null {
       unit: result.unit || '',
       unitText: result.unitText || '',
       ingredient: result.ingredient || '',
-      extra: result.extra || '',
+      extra: combinedExtra,
     };
   } catch {
     // If parsing fails, return null and fall back to using raw text
@@ -56,7 +128,7 @@ function extractIngredientName(rawText: string): string {
   const parsed = parseIngredientLine(rawText);
 
   if (parsed && parsed.ingredient) {
-    return parsed.ingredient;
+    return stripExtraSuffixes(parsed.ingredient);
   }
 
   // Fallback: basic cleanup if parser fails
@@ -64,10 +136,10 @@ function extractIngredientName(rawText: string): string {
   // Remove leading numbers, fractions, and ranges
   text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
   // Remove common units
-  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|small|medium|large)\s+/i, '');
+  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i, '');
   text = text.replace(/^of\s+/i, '');
 
-  return text.trim();
+  return stripExtraSuffixes(text.trim());
 }
 
 /**
@@ -1336,6 +1408,100 @@ recipes.delete('/:id/pairings/:pairingId', async (c) => {
   } catch (error) {
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to delete pairing' },
+      500
+    );
+  }
+});
+
+// GET /api/recipes/:id/ingredients - Get all ingredients with parsing info
+recipes.get('/:id/ingredients', async (c) => {
+  const recipeId = Number(c.req.param('id'));
+
+  try {
+    const ingredients = await c.env.DB.prepare(`
+      SELECT id, raw_text, quantity, unit, preparation, group_name, sort_order, normalization_key
+      FROM recipe_ingredients
+      WHERE recipe_id = ?
+      ORDER BY sort_order
+    `)
+      .bind(recipeId)
+      .all();
+
+    // Parse each ingredient to show what the parser extracts
+    const results = (ingredients.results ?? []).map((ing: Record<string, unknown>) => {
+      const rawText = ing.raw_text as string;
+      const parsed = parseIngredientLine(rawText);
+
+      return {
+        id: ing.id,
+        rawText,
+        quantity: ing.quantity,
+        unit: ing.unit,
+        preparation: ing.preparation,
+        groupName: ing.group_name,
+        sortOrder: ing.sort_order,
+        normalizationKey: ing.normalization_key,
+        parsed: parsed ? {
+          quantity: parsed.quantity,
+          quantityText: parsed.quantityText,
+          unit: parsed.unit,
+          unitText: parsed.unitText,
+          ingredient: parsed.ingredient,
+          extra: parsed.extra,
+        } : null,
+      };
+    });
+
+    return c.json({ ingredients: results });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to get ingredients' },
+      500
+    );
+  }
+});
+
+// PATCH /api/recipes/:id/ingredients/:ingredientId - Update ingredient normalization
+recipes.patch('/:id/ingredients/:ingredientId', async (c) => {
+  const recipeId = Number(c.req.param('id'));
+  const ingredientId = Number(c.req.param('ingredientId'));
+
+  try {
+    const body = await c.req.json<{ ingredientName?: string }>();
+
+    if (!body.ingredientName) {
+      return c.json({ error: 'ingredientName is required' }, 400);
+    }
+
+    // Verify ingredient exists and belongs to this recipe
+    const existing = await c.env.DB.prepare(`
+      SELECT id FROM recipe_ingredients WHERE id = ? AND recipe_id = ?
+    `)
+      .bind(ingredientId, recipeId)
+      .first();
+
+    if (!existing) {
+      return c.json({ error: 'Ingredient not found' }, 404);
+    }
+
+    // Generate new normalization key from the provided ingredient name
+    const normalizationKey = normalizeIngredientKey(body.ingredientName);
+
+    await c.env.DB.prepare(`
+      UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
+    `)
+      .bind(normalizationKey, ingredientId)
+      .run();
+
+    return c.json({
+      success: true,
+      id: ingredientId,
+      ingredientName: body.ingredientName,
+      normalizationKey,
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to update ingredient' },
       500
     );
   }

@@ -217,7 +217,7 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   // Common units (including abbreviations)
   const unitPattern =
-    /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kilograms?|kg\.?|milliliters?|ml\.?|liters?|l\.?|quarts?|qt\.?|pints?|pt\.?|gallons?|gal\.?|pinch(?:es)?|dash(?:es)?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|packages?|pkgs?\.?|sticks?|large|medium|small|whole)\s+/i;
+    /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kilograms?|kg\.?|milliliters?|ml\.?|liters?|l\.?|quarts?|qt\.?|pints?|pt\.?|gallons?|gal\.?|pinch(?:es)?|dash(?:es)?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|packages?|pkgs?\.?|sticks?|handfuls?|large|medium|small|whole)\s+/i;
 
   const unitMatch = rest.match(unitPattern);
 
@@ -237,7 +237,7 @@ export function parseIngredient(line: string): ParsedIngredient {
 }
 
 // Format a number nicely for display
-function formatAmount(num: number): string {
+export function formatAmount(num: number): string {
   // Handle very small numbers
   if (num < 0.1) {
     // Return as fraction if close to common fractions

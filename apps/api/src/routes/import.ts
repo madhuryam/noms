@@ -1,6 +1,29 @@
 import { Hono } from 'hono';
 import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
+import { getUnits } from '@jlucaspains/sharp-recipe-parser/src/units.js';
 import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
+
+// Add custom units to sharp-recipe-parser
+const englishUnits = getUnits('en');
+if (englishUnits?.ingredientUnits) {
+  const handful = { symbol: 'handful', text: 'handful' };
+  englishUnits.ingredientUnits.set('handful', handful);
+  englishUnits.ingredientUnits.set('handfuls', handful);
+}
+
+/**
+ * Strip common suffix phrases that should be treated as "extra" info, not ingredient name.
+ * These are modifiers like "per person", "per serving", "to taste", etc.
+ */
+function stripExtraSuffixes(ingredient: string): string {
+  return ingredient
+    .replace(/\s+per\s+(person|serving|portion)$/i, '')
+    .replace(/\s+to\s+taste$/i, '')
+    .replace(/\s+as\s+needed$/i, '')
+    .replace(/\s+for\s+(garnish|serving|topping)$/i, '')
+    .replace(/\s+optional$/i, '')
+    .trim();
+}
 
 /**
  * Extract ingredient name using sharp-recipe-parser.
@@ -14,7 +37,7 @@ function extractIngredientName(rawText: string): string {
     });
 
     if (result && result.ingredient) {
-      return result.ingredient;
+      return stripExtraSuffixes(result.ingredient);
     }
   } catch {
     // Fall through to fallback
@@ -23,10 +46,10 @@ function extractIngredientName(rawText: string): string {
   // Fallback: basic cleanup if parser fails
   let text = rawText.trim();
   text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
-  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|small|medium|large)\s+/i, '');
+  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i, '');
   text = text.replace(/^of\s+/i, '');
 
-  return text.trim();
+  return stripExtraSuffixes(text.trim());
 }
 
 type Bindings = {
@@ -69,6 +92,19 @@ interface ImportRecipe {
     categories: string[];
     difficulty: string | null;
     cuisine: string | null;
+    // Nutrition info (if present in source recipe)
+    nutrition?: {
+      calories?: number | null;
+      protein?: number | null;
+      carbs?: number | null;
+      fat?: number | null;
+      fiber?: number | null;
+      sugar?: number | null;
+      sodium?: number | null;
+      cholesterol?: number | null;
+      saturatedFat?: number | null;
+      unsaturatedFat?: number | null;
+    } | null;
   };
 }
 
@@ -85,16 +121,6 @@ interface ImportResult {
 }
 
 const importRoutes = new Hono<{ Bindings: Bindings }>();
-
-/**
- * Generate a slug from a name
- */
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
 
 /**
  * Strip checkbox markers and list prefixes from an ingredient line
@@ -339,48 +365,6 @@ async function getOrCreateTag(db: D1Database, tagName: string, isCategory: boole
   return result.meta.last_row_id as number;
 }
 
-/**
- * Insert recipe ingredients
- */
-async function insertRecipeIngredients(
-  db: D1Database,
-  recipeId: number,
-  ingredients: ParsedIngredient[]
-): Promise<void> {
-  let currentGroup: string | null = null;
-  let sortOrder = 0;
-
-  for (const ing of ingredients) {
-    if (ing.isGroupHeader) {
-      currentGroup = ing.name;
-      continue;
-    }
-
-    // Use sharp-recipe-parser to extract ingredient name, then normalize
-    const cleanedRaw = cleanIngredientLine(ing.original);
-    const ingredientName = extractIngredientName(cleanedRaw);
-    const normalizationKey = normalizeIngredientKey(ingredientName);
-
-    await db
-      .prepare(
-        `INSERT INTO recipe_ingredients
-         (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order, normalization_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        recipeId,
-        ing.quantity,
-        ing.unit,
-        cleanedRaw,
-        ing.preparation,
-        currentGroup,
-        sortOrder++,
-        normalizationKey
-      )
-      .run();
-  }
-}
-
 // POST /api/import/vault - Import recipes from vault
 // Imports a SINGLE recipe at a time (client batches requests)
 importRoutes.post('/vault', async (c) => {
@@ -435,13 +419,20 @@ importRoutes.post('/vault', async (c) => {
       const cleanedInstructions = normalizeInstructions(cleanText(recipe.instructions));
       const cleanedNotes = cleanText(recipe.notes);
 
+      // Extract nutrition data if present
+      const nutrition = recipe.metadata?.nutrition;
+      const hasNutrition = nutrition && (
+        nutrition.calories || nutrition.protein || nutrition.carbs || nutrition.fat
+      );
+
       // Insert the recipe first to get the ID
       const recipeResult = await c.env.DB.prepare(
         `INSERT INTO recipes (
           title, source_path, source_url, markdown_content, description,
           ingredients_raw, instructions_raw, notes,
-          prep_time_minutes, cook_time_minutes, servings, servings_unit
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          prep_time_minutes, cook_time_minutes, servings, servings_unit,
+          calories_total, protein_total, carbs_total, fat_total, macros_manual
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           recipe.title,
@@ -455,7 +446,12 @@ importRoutes.post('/vault', async (c) => {
           recipe.metadata?.prepTime ?? null,
           recipe.metadata?.cookTime ?? null,
           recipe.metadata?.servings ?? null,
-          recipe.metadata?.servingsUnit ?? 'servings'
+          recipe.metadata?.servingsUnit ?? 'servings',
+          hasNutrition ? (nutrition.calories ?? null) : null,
+          hasNutrition ? (nutrition.protein ?? null) : null,
+          hasNutrition ? (nutrition.carbs ?? null) : null,
+          hasNutrition ? (nutrition.fat ?? null) : null,
+          hasNutrition ? 0 : null  // macros_manual = 0 means imported/calculated, not manually entered
         )
         .run();
 

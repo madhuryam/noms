@@ -37,6 +37,20 @@ function isSectionHeader(line: string): boolean {
   return false;
 }
 
+function isNutritionLine(line: string): boolean {
+  const trimmed = line.trim();
+  // Skip pipe-separated nutrition lines (Calories: X | Carbs: Y | ...)
+  if (/calories\s*:\s*\d+\s*(?:kcal|cal)?.*\|/i.test(trimmed)) {
+    return true;
+  }
+  // Skip lines that are primarily nutrition data (multiple nutrition items)
+  const nutritionItems = trimmed.match(/(?:calories?|carbs?|carbohydrates?|protein|fat|fiber|sugar|sodium|cholesterol|potassium|vitamin\s*[a-d]|calcium|iron)\s*:\s*[\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?/gi);
+  if (nutritionItems && nutritionItems.length >= 3) {
+    return true;
+  }
+  return false;
+}
+
 function extractSectionTitle(line: string): string {
   let title = line.trim();
   // Remove ### prefix
@@ -60,6 +74,9 @@ function parseInstructions(raw: string): ParsedInstruction[] {
     for (const line of lines) {
       const stripped = stripCheckbox(line);
       if (!stripped) continue;
+
+      // Skip nutrition lines
+      if (isNutritionLine(stripped)) continue;
 
       if (isSectionHeader(stripped)) {
         result.push({

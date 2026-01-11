@@ -10,9 +10,6 @@ export type { SectionType, DetectedSections } from './section-detector';
 export { parseIngredientLine, parseIngredientSection, formatIngredient } from './ingredient-parser';
 export type { ParsedIngredient } from './ingredient-parser';
 
-// Ingredient normalizer
-export { normalizeIngredientKey, keysMatch } from './ingredient-normalizer';
-
 // Image extractor
 export { extractImages, extractImagesFromRawContent } from './image-extractor';
 export type { ImageRef } from './image-extractor';

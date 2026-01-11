@@ -102,6 +102,8 @@ const UNIT_TO_GRAMS: Record<string, number> = {
   'sprigs': 2,
   'leaf': 1,
   'leaves': 1,
+  'handful': 30,
+  'handfuls': 30,
 };
 
 // Ingredient-specific density adjustments (multipliers for cup measurements)
@@ -188,7 +190,7 @@ function parseIngredientLine(line: string): { quantity: number; unit: string; in
 
   // Pattern: quantity unit ingredient
   // Examples: "2 cups flour", "1/2 tsp salt", "1 lb chicken breast"
-  const quantityUnitPattern = /^([\d\s\/\.]+)\s*(cup|cups|c|tablespoon|tablespoons|tbsp|tbs|tb|teaspoon|teaspoons|tsp|ts|t|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|ml|l|pint|pints|pt|quart|quarts|qt|gallon|gallons|gal|fl oz|piece|pieces|slice|slices|clove|cloves|pinch|pinches|dash|dashes|stick|sticks|can|cans|bunch|bunches|head|heads|sprig|sprigs|leaf|leaves)s?\b\.?\s+(.+)/i;
+  const quantityUnitPattern = /^([\d\s\/\.]+)\s*(cup|cups|c|tablespoon|tablespoons|tbsp|tbs|tb|teaspoon|teaspoons|tsp|ts|t|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|ml|l|pint|pints|pt|quart|quarts|qt|gallon|gallons|gal|fl oz|piece|pieces|slice|slices|clove|cloves|pinch|pinches|dash|dashes|stick|sticks|can|cans|bunch|bunches|head|heads|sprig|sprigs|leaf|leaves|handful|handfuls)s?\b\.?\s+(.+)/i;
 
   const match = cleaned.match(quantityUnitPattern);
   if (match) {
@@ -430,21 +432,5 @@ export function calculateRecipeMacros(
     unmatched_ingredients: unmatched,
     matched_count,
     total_count,
-  };
-}
-
-// Calculate macros per serving
-export function calculatePerServing(macros: RecipeMacros, servings: number | null): {
-  carbs: number;
-  protein: number;
-  fat: number;
-  calories: number;
-} {
-  const divisor = servings && servings > 0 ? servings : 1;
-  return {
-    carbs: Math.round((macros.carbs_total / divisor) * 10) / 10,
-    protein: Math.round((macros.protein_total / divisor) * 10) / 10,
-    fat: Math.round((macros.fat_total / divisor) * 10) / 10,
-    calories: Math.round(macros.calories_total / divisor),
   };
 }

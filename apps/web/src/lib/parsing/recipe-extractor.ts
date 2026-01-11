@@ -31,6 +31,27 @@ export interface ParsedRecipe {
     categories: string[];
     difficulty: string | null;
     cuisine: string | null;
+    /** Detailed nutrition info extracted from recipe content */
+    nutrition: {
+      calories: number | null;
+      carbs: number | null;
+      protein: number | null;
+      fat: number | null;
+      saturatedFat: number | null;
+      polyunsaturatedFat: number | null;
+      monounsaturatedFat: number | null;
+      transFat: number | null;
+      cholesterol: number | null;
+      sodium: number | null;
+      potassium: number | null;
+      fiber: number | null;
+      sugar: number | null;
+      vitaminA: number | null;
+      vitaminC: number | null;
+      vitaminD: number | null;
+      calcium: number | null;
+      iron: number | null;
+    } | null;
   };
 }
 
@@ -222,13 +243,24 @@ function titleFromFilename(filename: string): string {
 }
 
 /**
- * Parse a time string like "30 min", "1 hour", "1h 30m" to minutes
+ * Parse a time string like "30 min", "1 hour", "1h 30m", "PT30M" to minutes
  */
 function parseTimeToMinutes(time: unknown): number | null {
   if (typeof time === 'number') return time;
   if (typeof time !== 'string') return null;
 
   const str = time.toLowerCase().trim();
+
+  // Try ISO 8601 duration format: PT30M, PT1H30M, PT1H
+  const isoPattern = /^pt(?:(\d+)h)?(?:(\d+)m)?$/i;
+  const isoMatch = str.match(isoPattern);
+  if (isoMatch) {
+    const hours = isoMatch[1] ? parseInt(isoMatch[1], 10) : 0;
+    const minutes = isoMatch[2] ? parseInt(isoMatch[2], 10) : 0;
+    if (hours > 0 || minutes > 0) {
+      return hours * 60 + minutes;
+    }
+  }
 
   // Try patterns like "1h 30m", "1 hour 30 minutes"
   const hourMinPattern = /(\d+)\s*h(?:ours?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?/i;
@@ -239,7 +271,7 @@ function parseTimeToMinutes(time: unknown): number | null {
     return hours * 60 + minutes;
   }
 
-  // Try pattern like "30 min", "30 minutes"
+  // Try pattern like "30 min", "30 minutes", "30m"
   const minPattern = /(\d+)\s*m(?:in(?:utes?)?)?/i;
   const minMatch = str.match(minPattern);
   if (minMatch) {
@@ -333,6 +365,266 @@ function stripSourceFromNotes(notes: string | null): string | null {
 }
 
 /**
+ * Detailed nutrition info that can be extracted from recipe content
+ */
+export interface DetailedNutrition {
+  calories: number | null;
+  carbs: number | null;
+  protein: number | null;
+  fat: number | null;
+  saturatedFat: number | null;
+  polyunsaturatedFat: number | null;
+  monounsaturatedFat: number | null;
+  transFat: number | null;
+  cholesterol: number | null;
+  sodium: number | null;
+  potassium: number | null;
+  fiber: number | null;
+  sugar: number | null;
+  vitaminA: number | null;
+  vitaminC: number | null;
+  vitaminD: number | null;
+  calcium: number | null;
+  iron: number | null;
+}
+
+/**
+ * Extract a numeric value from a nutrition string like "69kcal", "16g", "27mg", "68IU"
+ */
+function parseNutritionValue(value: string): number | null {
+  if (!value) return null;
+  const match = value.trim().match(/^([\d.]+)\s*(?:kcal|cal|g|mg|iu|mcg|%)?$/i);
+  if (match) {
+    const num = parseFloat(match[1]);
+    return isNaN(num) ? null : num;
+  }
+  return null;
+}
+
+/**
+ * Extract detailed nutrition info from recipe content
+ * Handles formats like:
+ * - "Calories: 69kcal" (newline separated)
+ * - "Calories: 582kcal | Carbohydrates: 70g | Protein: 25g" (pipe separated)
+ */
+export function extractDetailedNutrition(content: string): DetailedNutrition {
+  const nutrition: DetailedNutrition = {
+    calories: null,
+    carbs: null,
+    protein: null,
+    fat: null,
+    saturatedFat: null,
+    polyunsaturatedFat: null,
+    monounsaturatedFat: null,
+    transFat: null,
+    cholesterol: null,
+    sodium: null,
+    potassium: null,
+    fiber: null,
+    sugar: null,
+    vitaminA: null,
+    vitaminC: null,
+    vitaminD: null,
+    calcium: null,
+    iron: null,
+  };
+
+  // Mapping of possible labels to nutrition keys
+  const labelMap: Record<string, keyof DetailedNutrition> = {
+    'calories': 'calories',
+    'calorie': 'calories',
+    'cal': 'calories',
+    'carbohydrates': 'carbs',
+    'carbohydrate': 'carbs',
+    'carbs': 'carbs',
+    'carb': 'carbs',
+    'protein': 'protein',
+    'proteins': 'protein',
+    'fat': 'fat',
+    'fats': 'fat',
+    'total fat': 'fat',
+    'saturated fat': 'saturatedFat',
+    'saturatedfat': 'saturatedFat',
+    'sat fat': 'saturatedFat',
+    'polyunsaturated fat': 'polyunsaturatedFat',
+    'polyunsaturatedfat': 'polyunsaturatedFat',
+    'poly fat': 'polyunsaturatedFat',
+    'monounsaturated fat': 'monounsaturatedFat',
+    'monounsaturatedfat': 'monounsaturatedFat',
+    'mono fat': 'monounsaturatedFat',
+    'trans fat': 'transFat',
+    'transfat': 'transFat',
+    'cholesterol': 'cholesterol',
+    'sodium': 'sodium',
+    'salt': 'sodium',
+    'potassium': 'potassium',
+    'fiber': 'fiber',
+    'fibre': 'fiber',
+    'dietary fiber': 'fiber',
+    'sugar': 'sugar',
+    'sugars': 'sugar',
+    'vitamin a': 'vitaminA',
+    'vitamina': 'vitaminA',
+    'vit a': 'vitaminA',
+    'vitamin c': 'vitaminC',
+    'vitaminc': 'vitaminC',
+    'vit c': 'vitaminC',
+    'vitamin d': 'vitaminD',
+    'vitamind': 'vitaminD',
+    'vit d': 'vitaminD',
+    'calcium': 'calcium',
+    'iron': 'iron',
+  };
+
+  // Pattern to match "Label: Value" pairs
+  // Handles both newline and pipe-separated formats
+  const pattern = /([a-z][a-z\s]*?)[:]\s*([\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?)/gi;
+
+  let match;
+  while ((match = pattern.exec(content)) !== null) {
+    const label = match[1].toLowerCase().trim();
+    const value = match[2];
+
+    const key = labelMap[label];
+    if (key) {
+      const numValue = parseNutritionValue(value);
+      if (numValue !== null) {
+        nutrition[key] = numValue;
+      }
+    }
+  }
+
+  return nutrition;
+}
+
+/**
+ * Strip nutrition information lines from content
+ * Removes lines like:
+ * - "Calories: 582kcal | Carbohydrates: 70g | Protein: 25g | ..."
+ * - "Nutrition" headers followed by nutrition data
+ * - Lines that are primarily nutrition data
+ */
+function stripNutritionFromContent(content: string): string {
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let inNutritionBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check for "Nutrition" header
+    if (/^#{1,3}\s*nutrition/i.test(trimmed) || /^\*\*nutrition\*\*/i.test(trimmed) || /^nutrition:?\s*$/i.test(trimmed)) {
+      inNutritionBlock = true;
+      continue;
+    }
+
+    // Check if we're exiting a nutrition block (new header)
+    if (inNutritionBlock && /^#{1,3}\s+/.test(trimmed)) {
+      inNutritionBlock = false;
+    }
+
+    // Skip lines in nutrition block
+    if (inNutritionBlock) {
+      continue;
+    }
+
+    // Skip pipe-separated nutrition lines (Calories: X | Carbs: Y | ...)
+    if (/calories\s*:\s*\d+\s*(?:kcal|cal)?.*\|/i.test(trimmed)) {
+      continue;
+    }
+
+    // Skip lines that are primarily nutrition data (multiple nutrition items)
+    const nutritionItems = trimmed.match(/(?:calories?|carbs?|carbohydrates?|protein|fat|fiber|sugar|sodium|cholesterol|potassium|vitamin\s*[a-d]|calcium|iron)\s*:\s*[\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?/gi);
+    if (nutritionItems && nutritionItems.length >= 3) {
+      continue;
+    }
+
+    result.push(line);
+  }
+
+  return result.join('\n').trim();
+}
+
+/**
+ * Extract inline metadata from recipe content
+ * Looks for patterns like "Prep: 30 minutes", "Cook: 20 minutes", "Servings: 4"
+ */
+function extractInlineMetadata(content: string): {
+  prepTime: number | null;
+  cookTime: number | null;
+  totalTime: number | null;
+  servings: number | null;
+  servingsUnit: string | null;
+} {
+  const result = {
+    prepTime: null as number | null,
+    cookTime: null as number | null,
+    totalTime: null as number | null,
+    servings: null as number | null,
+    servingsUnit: null as string | null,
+  };
+
+  // Patterns for inline metadata - match "Key: Value" or "Key - Value" at start of line
+  // Prep time patterns
+  const prepPatterns = [
+    /^(?:prep(?:aration)?(?:\s*time)?)\s*[:：\-]\s*(.+)$/im,
+    /^(?:prep)\s*[:：\-]\s*(.+)$/im,
+  ];
+  for (const pattern of prepPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      result.prepTime = parseTimeToMinutes(match[1].trim());
+      if (result.prepTime !== null) break;
+    }
+  }
+
+  // Cook time patterns
+  const cookPatterns = [
+    /^(?:cook(?:ing)?(?:\s*time)?)\s*[:：\-]\s*(.+)$/im,
+    /^(?:cook)\s*[:：\-]\s*(.+)$/im,
+  ];
+  for (const pattern of cookPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      result.cookTime = parseTimeToMinutes(match[1].trim());
+      if (result.cookTime !== null) break;
+    }
+  }
+
+  // Total time patterns
+  const totalPatterns = [
+    /^(?:total(?:\s*time)?)\s*[:：\-]\s*(.+)$/im,
+    /^(?:time)\s*[:：\-]\s*(.+)$/im,
+  ];
+  for (const pattern of totalPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      result.totalTime = parseTimeToMinutes(match[1].trim());
+      if (result.totalTime !== null) break;
+    }
+  }
+
+  // Servings patterns
+  const servingsPatterns = [
+    /^(?:servings?|serves?|yield|portions?)\s*[:：\-]\s*(\d+)(?:\s*[-–]\s*\d+)?(?:\s+(.+))?$/im,
+    /^(?:makes)\s*[:：\-]?\s*(\d+)(?:\s*[-–]\s*\d+)?(?:\s+(.+))?$/im,
+  ];
+  for (const pattern of servingsPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      result.servings = parseInt(match[1], 10);
+      if (match[2]) {
+        result.servingsUnit = match[2].trim();
+      }
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Extract metadata from frontmatter
  */
 function extractMetadata(frontmatter: Record<string, unknown>): ParsedRecipe['metadata'] {
@@ -362,11 +654,18 @@ function extractMetadata(frontmatter: Record<string, unknown>): ParsedRecipe['me
     categories = [frontmatter.category];
   }
 
+  // Handle various key formats for times: camelCase, snake_case, kebab-case
+  const fm = frontmatter as Record<string, unknown>;
+
   return {
-    prepTime: parseTimeToMinutes(frontmatter.prepTime ?? frontmatter.prep_time ?? frontmatter.prep),
-    cookTime: parseTimeToMinutes(frontmatter.cookTime ?? frontmatter.cook_time ?? frontmatter.cook),
+    prepTime: parseTimeToMinutes(
+      fm.prepTime ?? fm.prep_time ?? fm['prep-time'] ?? fm.preptime ?? fm.prep
+    ),
+    cookTime: parseTimeToMinutes(
+      fm.cookTime ?? fm.cook_time ?? fm['cook-time'] ?? fm.cooktime ?? fm.cook
+    ),
     totalTime: parseTimeToMinutes(
-      frontmatter.totalTime ?? frontmatter.total_time ?? frontmatter.total
+      fm.totalTime ?? fm.total_time ?? fm['total-time'] ?? fm.totaltime ?? fm.total ?? fm.time
     ),
     servings,
     servingsUnit: unit,
@@ -377,6 +676,7 @@ function extractMetadata(frontmatter: Record<string, unknown>): ParsedRecipe['me
     categories,
     difficulty: (frontmatter.difficulty as string) ?? null,
     cuisine: (frontmatter.cuisine as string) ?? null,
+    nutrition: null, // Will be populated from content if available
   };
 }
 
@@ -412,7 +712,10 @@ export function extractRecipe(content: string, filename: string): ParsedRecipe {
 
   // Keep raw markdown for instructions (we display markdown)
   // Normalize to numbered steps, restarting at 1 for each section
-  const instructions = normalizeInstructions(nodesToMarkdown(sections.instructions));
+  // Strip nutrition info that may have been included in the instructions section
+  const instructions = stripNutritionFromContent(
+    normalizeInstructions(nodesToMarkdown(sections.instructions))
+  );
 
   // Extract other sections as markdown
   const pairings = sections.pairings.length > 0 ? nodesToMarkdown(sections.pairings) : null;
@@ -434,6 +737,34 @@ export function extractRecipe(content: string, filename: string): ParsedRecipe {
 
   // Extract metadata from frontmatter
   const metadata = extractMetadata(frontmatter);
+
+  // Also try to extract metadata from the raw content (for inline "Prep: 30 min" style)
+  const inlineMetadata = extractInlineMetadata(rawContent);
+
+  // Merge inline metadata with frontmatter metadata (frontmatter takes precedence)
+  if (metadata.prepTime === null && inlineMetadata.prepTime !== null) {
+    metadata.prepTime = inlineMetadata.prepTime;
+  }
+  if (metadata.cookTime === null && inlineMetadata.cookTime !== null) {
+    metadata.cookTime = inlineMetadata.cookTime;
+  }
+  if (metadata.totalTime === null && inlineMetadata.totalTime !== null) {
+    metadata.totalTime = inlineMetadata.totalTime;
+  }
+  if (metadata.servings === null && inlineMetadata.servings !== null) {
+    metadata.servings = inlineMetadata.servings;
+  }
+  if (metadata.servingsUnit === null && inlineMetadata.servingsUnit !== null) {
+    metadata.servingsUnit = inlineMetadata.servingsUnit;
+  }
+
+  // Extract detailed nutrition from the raw content
+  const detailedNutrition = extractDetailedNutrition(rawContent);
+  // Check if any nutrition values were found
+  const hasNutritionData = Object.values(detailedNutrition).some((v) => v !== null);
+  if (hasNutritionData) {
+    metadata.nutrition = detailedNutrition;
+  }
 
   // If no sourceUrl in frontmatter, try to extract from notes
   if (!metadata.sourceUrl && rawNotes) {

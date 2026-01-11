@@ -152,11 +152,18 @@ export function detectSections(ast: Root): DetectedSections {
       const detectedType = matchSectionType(headingText, heading.depth);
 
       // If this is a recognized section header, switch sections
+      // BUT only if it's at the same or higher level than the current section
+      // (sub-headings within a section should stay in that section)
       if (detectedType !== 'other') {
-        currentSection = detectedType;
-        currentSectionDepth = heading.depth;
-        // Don't include the header itself in the content
-        continue;
+        // Only switch sections if this heading is at same or higher level
+        // e.g., "### Prepare" inside "## Instructions" should stay in instructions
+        if (heading.depth <= currentSectionDepth || currentSectionDepth === 0) {
+          currentSection = detectedType;
+          currentSectionDepth = heading.depth;
+          // Don't include the header itself in the content
+          continue;
+        }
+        // Otherwise, this is a sub-heading - include it in the current section
       }
 
       // If this heading is at same or higher level than current section header,

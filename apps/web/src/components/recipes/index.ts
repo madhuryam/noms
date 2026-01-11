@@ -11,3 +11,5 @@ export { PairingsSection } from './PairingsSection';
 export { PairingSelector } from './PairingSelector';
 export { MacroDisplay } from './MacroDisplay';
 export { AddToCalendarModal } from './AddToCalendarModal';
+export { NutritionModal } from './NutritionModal';
+export { ParsingDebugModal } from './ParsingDebugModal';

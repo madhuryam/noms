@@ -1,6 +1,27 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../../lib/recipeProgress';
-import { scaleIngredients, type ScaledIngredient } from '../../lib/ingredientScaling';
+import { useRecipeIngredients, type ParsedIngredient } from '../../hooks';
+import { formatAmount } from '../../lib/ingredientScaling';
+
+// Ingredients that should not be scaled (leaveners, salt, spices in small amounts)
+const NO_SCALE_INGREDIENTS = [
+  'salt',
+  'kosher salt',
+  'sea salt',
+  'table salt',
+  'baking powder',
+  'baking soda',
+  'bicarbonate of soda',
+  'yeast',
+  'active dry yeast',
+  'instant yeast',
+  'cream of tartar',
+];
+
+function shouldNotScale(ingredientName: string): boolean {
+  const lower = ingredientName.toLowerCase();
+  return NO_SCALE_INGREDIENTS.some(item => lower.includes(item));
+}
 
 interface IngredientListProps {
   recipeId: number;
@@ -10,26 +31,88 @@ interface IngredientListProps {
   checkedItems: Set<number>;
 }
 
-interface IngredientSection {
-  title: string | null;
-  items: { ingredient: ScaledIngredient; originalIndex: number }[];
+interface DisplayIngredient {
+  quantity: string | null;
+  unit: string | null;
+  ingredient: string | null;
+  normalizationKey: string | null;
+  extra: string | null;
+  original: string;
+  isGroupHeader: boolean;
+  groupName: string | null;
 }
 
-function groupIntoSections(ingredients: ScaledIngredient[]): IngredientSection[] {
+interface IngredientSection {
+  title: string | null;
+  items: { ingredient: DisplayIngredient; originalIndex: number }[];
+}
+
+/**
+ * Format a parsed ingredient for display.
+ * Format: <quantity> <unit> **<ingredient>** (<extras>)
+ */
+function formatIngredientDisplay(
+  ingredient: ParsedIngredient,
+  scaleFactor: number = 1
+): DisplayIngredient {
+  const parsed = ingredient.parsed;
+
+  // If no parsed data, fall back to raw text as the ingredient
+  if (!parsed) {
+    return {
+      quantity: null,
+      unit: null,
+      ingredient: ingredient.rawText,
+      normalizationKey: ingredient.normalizationKey,
+      extra: null,
+      original: ingredient.rawText,
+      isGroupHeader: false,
+      groupName: ingredient.groupName,
+    };
+  }
+
+  // Handle quantity with scaling
+  let quantityStr: string | null = null;
+  if (parsed.quantity !== null && parsed.quantity > 0) {
+    const ingredientName = parsed.ingredient || '';
+    const canScale = !shouldNotScale(ingredientName);
+    const scaledQuantity = canScale ? parsed.quantity * scaleFactor : parsed.quantity;
+    quantityStr = formatAmount(scaledQuantity);
+  }
+
+  return {
+    quantity: quantityStr,
+    unit: parsed.unitText || null,
+    ingredient: parsed.ingredient || null,
+    normalizationKey: ingredient.normalizationKey,
+    extra: parsed.extra || null,
+    original: ingredient.rawText,
+    isGroupHeader: false,
+    groupName: ingredient.groupName,
+  };
+}
+
+/**
+ * Group ingredients into sections by their groupName.
+ */
+function groupIntoSections(ingredients: DisplayIngredient[]): IngredientSection[] {
   const sections: IngredientSection[] = [];
   let currentSection: IngredientSection = { title: null, items: [] };
+  let lastGroupName: string | null | undefined = undefined;
 
   ingredients.forEach((ingredient, index) => {
-    if (ingredient.isGroupHeader) {
+    // Check if we need to start a new section
+    if (ingredient.groupName !== lastGroupName) {
       // Save current section if it has items
       if (currentSection.items.length > 0 || currentSection.title) {
         sections.push(currentSection);
       }
-      // Start new section
-      currentSection = { title: ingredient.display, items: [] };
-    } else {
-      currentSection.items.push({ ingredient, originalIndex: index });
+      // Start new section with the group name as title
+      currentSection = { title: ingredient.groupName, items: [] };
+      lastGroupName = ingredient.groupName;
     }
+
+    currentSection.items.push({ ingredient, originalIndex: index });
   });
 
   // Don't forget the last section
@@ -40,6 +123,46 @@ function groupIntoSections(ingredients: ScaledIngredient[]): IngredientSection[]
   return sections;
 }
 
+/**
+ * Renders an ingredient name with the normalization key portion bolded.
+ * E.g., "yellow onions" with key "onion" renders as "yellow <b>onion</b>s"
+ */
+function HighlightedIngredient({
+  ingredient,
+  normalizationKey,
+}: {
+  ingredient: string;
+  normalizationKey: string | null;
+}) {
+  // If no normalization key, just return the ingredient as-is
+  if (!normalizationKey) {
+    return <span>{ingredient}</span>;
+  }
+
+  // Find where the normalization key appears in the ingredient (case-insensitive)
+  const lowerIngredient = ingredient.toLowerCase();
+  const lowerKey = normalizationKey.toLowerCase();
+  const keyIndex = lowerIngredient.indexOf(lowerKey);
+
+  // If the key isn't found in the ingredient, just bold the whole thing
+  if (keyIndex === -1) {
+    return <span className="font-semibold">{ingredient}</span>;
+  }
+
+  // Split the ingredient into parts: before, matched, after
+  const before = ingredient.slice(0, keyIndex);
+  const matched = ingredient.slice(keyIndex, keyIndex + normalizationKey.length);
+  const after = ingredient.slice(keyIndex + normalizationKey.length);
+
+  return (
+    <span>
+      {before}
+      <span className="font-semibold">{matched}</span>
+      {after}
+    </span>
+  );
+}
+
 export function IngredientList({
   recipeId,
   ingredientsRaw,
@@ -47,15 +170,31 @@ export function IngredientList({
   onProgressChange,
   checkedItems,
 }: IngredientListProps) {
-  // Parse and scale ingredients
+  // Fetch parsed ingredients from API
+  const { data: parsedIngredients, isLoading } = useRecipeIngredients(recipeId);
+
+  // Format ingredients for display
   const ingredients = useMemo(() => {
-    try {
-      return scaleIngredients(ingredientsRaw, scaleFactor);
-    } catch {
-      console.error('Failed to parse ingredients');
-      return [];
+    if (!parsedIngredients || parsedIngredients.length === 0) {
+      // Fallback: split raw text by newlines if no parsed data
+      if (!ingredientsRaw) return [];
+      return ingredientsRaw
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => ({
+          quantity: null,
+          unit: null,
+          ingredient: line.trim(),
+          normalizationKey: null,
+          extra: null,
+          original: line.trim(),
+          isGroupHeader: line.trim().startsWith('###') || line.trim().startsWith('**'),
+          groupName: null,
+        }));
     }
-  }, [ingredientsRaw, scaleFactor]);
+
+    return parsedIngredients.map(ing => formatIngredientDisplay(ing, scaleFactor));
+  }, [parsedIngredients, ingredientsRaw, scaleFactor]);
 
   const sections = useMemo(() => groupIntoSections(ingredients), [ingredients]);
 
@@ -83,6 +222,21 @@ export function IngredientList({
 
   // Check if there are actual sections (more than one, or first one has a title)
   const hasSections = sections.length > 1 || sections[0]?.title;
+
+  if (isLoading) {
+    return (
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">
+          Ingredients
+        </h2>
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-6 bg-gray-200 dark:bg-onedark-bg-highlight rounded" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (ingredients.length === 0) {
     return (
@@ -172,13 +326,24 @@ export function IngredientList({
                         )}
                       </button>
                       <span
-                        className={`pt-0.5 transition-all ${
+                        title={ingredient.original}
+                        className={`pt-0.5 transition-all cursor-help ${
                           isChecked
                             ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
                             : 'text-gray-700 dark:text-onedark-fg group-hover:text-gray-900 dark:group-hover:text-onedark-fg'
                         }`}
                       >
-                        {ingredient.display}
+                        {ingredient.quantity && <span>{ingredient.quantity} </span>}
+                        {ingredient.unit && <span>{ingredient.unit} </span>}
+                        {ingredient.ingredient && (
+                          <HighlightedIngredient
+                            ingredient={ingredient.ingredient}
+                            normalizationKey={ingredient.normalizationKey}
+                          />
+                        )}
+                        {ingredient.extra && (
+                          <span className="text-gray-500 dark:text-onedark-fg-muted"> ({ingredient.extra})</span>
+                        )}
                       </span>
                     </label>
                   </li>

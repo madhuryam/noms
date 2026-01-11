@@ -1,5 +1,5 @@
 import { parseIngredient } from 'parse-ingredient';
-import type { RootContent, List, ListItem, Paragraph, Text } from 'mdast';
+import type { RootContent, List, ListItem, Paragraph, Text, Heading } from 'mdast';
 
 export interface ParsedIngredient {
   quantity: number | null;
@@ -51,6 +51,39 @@ function extractPreparation(description: string): { name: string; preparation: s
 }
 
 /**
+ * Check if a line is a section/group header
+ */
+function isGroupHeaderLine(line: string): boolean {
+  const trimmed = line.trim();
+
+  // Markdown header style: ### Header or ## Header
+  if (trimmed.startsWith('###') || trimmed.startsWith('## ')) {
+    return true;
+  }
+
+  // Bold style: **Header** or **Header:**
+  if (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':'))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extract clean title from a group header line
+ */
+function extractGroupHeaderTitle(line: string): string {
+  let title = line.trim();
+  // Remove ### prefix
+  title = title.replace(/^#{2,}\s*/, '');
+  // Remove ** wrapper
+  title = title.replace(/^\*\*/, '').replace(/\*\*:?$/, '');
+  // Remove trailing colon
+  title = title.replace(/:$/, '');
+  return title.trim();
+}
+
+/**
  * Parse a single ingredient line
  * Handles various formats including ranges, fractions, and no-quantity items
  */
@@ -67,6 +100,19 @@ export function parseIngredientLine(line: string): ParsedIngredient {
       preparation: null,
       original: line,
       isGroupHeader: false,
+    };
+  }
+
+  // Check for group/section headers first (### Title, **Title**, etc.)
+  if (isGroupHeaderLine(trimmedLine)) {
+    return {
+      quantity: null,
+      quantityMax: null,
+      unit: null,
+      name: extractGroupHeaderTitle(trimmedLine),
+      preparation: null,
+      original: line,
+      isGroupHeader: true,
     };
   }
 
@@ -110,12 +156,31 @@ export function parseIngredientLine(line: string): ParsedIngredient {
 }
 
 /**
+ * Extract text from a heading node (for section headers within ingredients)
+ */
+function extractTextFromHeading(heading: Heading): string {
+  return heading.children
+    .filter((child): child is Text => child.type === 'text')
+    .map((text) => text.value)
+    .join('');
+}
+
+/**
  * Extract text content from an mdast node
+ * Returns an array of lines, where heading nodes are prefixed with ### to mark them as group headers
  */
 function extractTextFromNode(node: RootContent): string[] {
   const lines: string[] = [];
 
-  if (node.type === 'list') {
+  if (node.type === 'heading') {
+    // Handle heading nodes as group headers (e.g., "### For the Sauce")
+    const heading = node as Heading;
+    const text = extractTextFromHeading(heading);
+    if (text) {
+      // Prefix with ### so it's recognized as a group header
+      lines.push(`### ${text}`);
+    }
+  } else if (node.type === 'list') {
     const list = node as List;
     for (const item of list.children) {
       const listItem = item as ListItem;

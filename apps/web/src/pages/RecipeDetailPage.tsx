@@ -10,12 +10,15 @@ import {
   PairingsSection,
   MacroDisplay,
   AddToCalendarModal,
+  NutritionModal,
+  ParsingDebugModal,
 } from '../components/recipes';
 import { calculateRecipeMacros } from '../lib/macroCalculation';
 import { MatchSummaryBadge } from '../components/suggestions';
 import { RecipeDetailSkeleton, ErrorState, EmptyState, EmptyStateIcons, getErrorMessage } from '../components/common';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
 import { DEFAULT_SERVINGS } from '../lib/constants';
+import { extractDetailedNutrition, type DetailedNutrition } from '../lib/parsing/recipe-extractor';
 
 // Hook to manage combined recipe progress (ingredients + instructions)
 function useRecipeProgress(recipeId: number | undefined) {
@@ -74,6 +77,8 @@ export function RecipeDetailPage() {
 
   const [servings, setServings] = useState<number | null>(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showNutritionModal, setShowNutritionModal] = useState(false);
+  const [showParsingDebug, setShowParsingDebug] = useState(false);
 
   // Initialize servings when recipe loads
   const currentServings = servings ?? recipe?.servings ?? DEFAULT_SERVINGS;
@@ -94,6 +99,8 @@ export function RecipeDetailPage() {
         isManual: !!recipe.macros_manual,
         matchedCount: undefined,
         totalCount: undefined,
+        ingredients: undefined,
+        unmatchedIngredients: undefined,
       };
     }
 
@@ -107,8 +114,19 @@ export function RecipeDetailPage() {
       isManual: false,
       matchedCount: calculated.matched_count,
       totalCount: calculated.total_count,
+      ingredients: calculated.ingredients,
+      unmatchedIngredients: calculated.unmatched_ingredients,
     };
   }, [recipe, scaleFactor]);
+
+  // Extract detailed nutrition from markdown content
+  const detailedNutrition = useMemo((): DetailedNutrition | null => {
+    if (!recipe?.markdown_content) return null;
+    const nutrition = extractDetailedNutrition(recipe.markdown_content);
+    // Check if we found any nutrition data
+    const hasAnyData = Object.values(nutrition).some((v) => v !== null);
+    return hasAnyData ? nutrition : null;
+  }, [recipe?.markdown_content]);
 
   const handleDelete = async () => {
     if (!recipeId) return;
@@ -226,33 +244,28 @@ export function RecipeDetailPage() {
         sourceUrl={recipe.source_url}
       />
 
-      {/* Nutrition */}
-      {macros && (macros.calories || macros.protein || macros.carbs || macros.fat) && (
-        <MacroDisplay
-          carbs={macros.carbs}
-          protein={macros.protein}
-          fat={macros.fat}
-          calories={macros.calories}
-          servings={currentServings}
-          isManual={macros.isManual}
-          matchedCount={macros.matchedCount}
-          totalCount={macros.totalCount}
-        />
-      )}
-
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Ingredients (Sidebar on large screens) */}
         <div className="lg:col-span-1">
           <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6 lg:sticky lg:top-24">
             {recipe.ingredients_raw ? (
-              <IngredientList
-                recipeId={recipe.id}
-                ingredientsRaw={recipe.ingredients_raw}
-                scaleFactor={scaleFactor}
-                checkedItems={ingredientsChecked}
-                onProgressChange={updateIngredients}
-              />
+              <>
+                <IngredientList
+                  recipeId={recipe.id}
+                  ingredientsRaw={recipe.ingredients_raw}
+                  scaleFactor={scaleFactor}
+                  checkedItems={ingredientsChecked}
+                  onProgressChange={updateIngredients}
+                />
+                {/* Debug button - temporary for parsing analysis */}
+                <button
+                  onClick={() => setShowParsingDebug(true)}
+                  className="mt-4 text-xs text-gray-400 dark:text-onedark-fg-muted hover:text-gray-600 dark:hover:text-onedark-fg"
+                >
+                  Debug parsing →
+                </button>
+              </>
             ) : (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">
@@ -321,6 +334,23 @@ export function RecipeDetailPage() {
           <PairingsSection recipeId={recipe.id} />
         </div>
       </div>
+
+      {/* Nutrition - at the bottom */}
+      {macros && (
+        <MacroDisplay
+          carbs={macros.carbs}
+          protein={macros.protein}
+          fat={macros.fat}
+          calories={macros.calories}
+          servings={currentServings}
+          isManual={macros.isManual}
+          matchedCount={macros.matchedCount}
+          totalCount={macros.totalCount}
+          ingredients={macros.ingredients}
+          unmatchedIngredients={macros.unmatchedIngredients}
+          onViewDetails={() => setShowNutritionModal(true)}
+        />
+      )}
 
       {/* Action Buttons */}
       <div className="flex items-center justify-between gap-3 pt-6 border-t border-gray-200 dark:border-onedark-bg-highlight">
@@ -403,6 +433,26 @@ export function RecipeDetailPage() {
           recipeTitle={recipe.title}
           defaultServings={recipe.servings ?? DEFAULT_SERVINGS}
           onClose={() => setShowCalendarModal(false)}
+        />
+      )}
+
+      {/* Nutrition Modal */}
+      {showNutritionModal && macros && (
+        <NutritionModal
+          recipeTitle={recipe.title}
+          servings={currentServings}
+          macros={macros}
+          detailedNutrition={detailedNutrition}
+          onClose={() => setShowNutritionModal(false)}
+        />
+      )}
+
+      {/* Parsing Debug Modal */}
+      {showParsingDebug && (
+        <ParsingDebugModal
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          onClose={() => setShowParsingDebug(false)}
         />
       )}
     </div>

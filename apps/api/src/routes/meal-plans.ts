@@ -584,7 +584,7 @@ function parseIngredientLine(line: string): { name: string; quantity: number | n
   }
 
   // Try to extract unit
-  const unitPattern = /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kg\.?|ml\.?|liters?|l\.?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|sticks?|large|medium|small|whole)\s+/i;
+  const unitPattern = /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kg\.?|ml\.?|liters?|l\.?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|sticks?|handfuls?|large|medium|small|whole)\s+/i;
   const unitMatch = rest.match(unitPattern);
 
   let unit: string | null = null;
