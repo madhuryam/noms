@@ -232,8 +232,14 @@ export function normalizeIngredientKey(name: string): string {
 }
 
 /**
- * Check if a single key matches another single key using flexible token-based matching.
- * This allows "onion" to match "red onion" or "onion powder".
+ * Check if a single key matches another single key.
+ *
+ * We use EXACT matching only to avoid false positives like:
+ * - "milk" matching "coconut milk" (coconut milk is not milk)
+ * - "oil" matching "essential oil" (not the same thing)
+ *
+ * For items that should be considered equivalent (like "olive oil" matching "oil"),
+ * use the food_associations table instead.
  */
 function singleKeyMatch(
   key1: string,
@@ -243,21 +249,9 @@ function singleKeyMatch(
     return { matched: false, matchType: 'none' };
   }
 
-  // Exact match
+  // Exact match only
   if (key1 === key2) {
     return { matched: true, matchType: 'exact' };
-  }
-
-  // Token-based flexible matching
-  const tokens1 = key1.split(' ').filter((t) => t.length > 0);
-  const tokens2 = key2.split(' ').filter((t) => t.length > 0);
-
-  // Check if any token from key1 exists in key2 or vice versa
-  const hasSharedToken =
-    tokens1.some((t1) => tokens2.includes(t1)) || tokens2.some((t2) => tokens1.includes(t2));
-
-  if (hasSharedToken) {
-    return { matched: true, matchType: 'flexible' };
   }
 
   return { matched: false, matchType: 'none' };
