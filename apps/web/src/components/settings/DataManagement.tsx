@@ -24,8 +24,10 @@ export function DataManagement() {
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearingRecipes, setIsClearingRecipes] = useState(false);
+  const [isClearingAppData, setIsClearingAppData] = useState(false);
+  const [showClearRecipesConfirm, setShowClearRecipesConfirm] = useState(false);
+  const [showClearAppDataConfirm, setShowClearAppDataConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -99,21 +101,35 @@ export function DataManagement() {
     }
   };
 
-  const handleClear = async () => {
-    setIsClearing(true);
+  const handleClearRecipes = async () => {
+    setIsClearingRecipes(true);
     setError(null);
     try {
-      await api.delete('/api/export/clear');
-      setSuccess('All data cleared successfully');
-      setShowClearConfirm(false);
-      // Invalidate all queries
+      await api.delete('/api/export/clear/recipes');
+      setSuccess('All recipes cleared successfully');
+      setShowClearRecipesConfirm(false);
       queryClient.invalidateQueries();
-      // Reload preview
       loadPreview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clear data');
+      setError(err instanceof Error ? err.message : 'Failed to clear recipes');
     } finally {
-      setIsClearing(false);
+      setIsClearingRecipes(false);
+    }
+  };
+
+  const handleClearAppData = async () => {
+    setIsClearingAppData(true);
+    setError(null);
+    try {
+      await api.delete('/api/export/clear/app-data');
+      setSuccess('App data cleared successfully (pantry, food associations, shelf life)');
+      setShowClearAppDataConfirm(false);
+      queryClient.invalidateQueries();
+      loadPreview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clear app data');
+    } finally {
+      setIsClearingAppData(false);
     }
   };
 
@@ -280,36 +296,79 @@ export function DataManagement() {
 
       {/* Danger Zone */}
       <div className="pt-6 border-t border-gray-200 dark:border-onedark-bg-highlight">
-        <h3 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
-        <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-3">
-          Clear all data from the database. This cannot be undone.
-        </p>
+        <h3 className="text-sm font-medium text-red-600 dark:text-red-400 mb-4">Danger Zone</h3>
 
-        {!showClearConfirm ? (
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors text-sm"
-          >
-            Clear All Data
-          </button>
-        ) : (
-          <div className="flex items-center gap-3">
+        {/* Clear Recipes */}
+        <div className="mb-4">
+          <p className="text-sm text-gray-700 dark:text-onedark-fg mb-1 font-medium">
+            Clear Recipes
+          </p>
+          <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-2">
+            Delete all recipes, tags, meal plans, and recipe images. This cannot be undone.
+          </p>
+
+          {!showClearRecipesConfirm ? (
             <button
-              onClick={handleClear}
-              disabled={isClearing}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              onClick={() => setShowClearRecipesConfirm(true)}
+              className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors text-sm"
             >
-              {isClearing ? 'Clearing...' : 'Yes, Delete Everything'}
+              Clear All Recipes
             </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearRecipes}
+                disabled={isClearingRecipes}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                {isClearingRecipes ? 'Clearing...' : 'Yes, Delete All Recipes'}
+              </button>
+              <button
+                onClick={() => setShowClearRecipesConfirm(false)}
+                disabled={isClearingRecipes}
+                className="px-4 py-2 bg-gray-100 text-gray-700 dark:bg-onedark-bg dark:text-onedark-fg rounded-lg hover:bg-gray-200 dark:hover:bg-onedark-bg-highlight transition-colors text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Clear App Data */}
+        <div>
+          <p className="text-sm text-gray-700 dark:text-onedark-fg mb-1 font-medium">
+            Clear App Data
+          </p>
+          <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-2">
+            Delete pantry inventory, food associations, and shelf life data. Recipes will be kept.
+          </p>
+
+          {!showClearAppDataConfirm ? (
             <button
-              onClick={() => setShowClearConfirm(false)}
-              disabled={isClearing}
-              className="px-4 py-2 bg-gray-100 text-gray-700 dark:bg-onedark-bg dark:text-onedark-fg rounded-lg hover:bg-gray-200 dark:hover:bg-onedark-bg-highlight transition-colors text-sm"
+              onClick={() => setShowClearAppDataConfirm(true)}
+              className="px-4 py-2 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors text-sm"
             >
-              Cancel
+              Clear App Data
             </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearAppData}
+                disabled={isClearingAppData}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                {isClearingAppData ? 'Clearing...' : 'Yes, Delete App Data'}
+              </button>
+              <button
+                onClick={() => setShowClearAppDataConfirm(false)}
+                disabled={isClearingAppData}
+                className="px-4 py-2 bg-gray-100 text-gray-700 dark:bg-onedark-bg dark:text-onedark-fg rounded-lg hover:bg-gray-200 dark:hover:bg-onedark-bg-highlight transition-colors text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

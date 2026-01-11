@@ -1026,6 +1026,83 @@ exportRoutes.delete('/clear', async (c) => {
   }
 });
 
+// DELETE /api/export/clear/recipes - Clear only recipes (and related images)
+exportRoutes.delete('/clear/recipes', async (c) => {
+  try {
+    const db = c.env.DB;
+    const bucket = c.env.IMAGES_BUCKET;
+
+    // Delete recipe images from R2 bucket
+    let cursor: string | undefined;
+    let deletedCount = 0;
+
+    do {
+      const listed = await bucket.list({
+        cursor,
+        limit: 1000,
+        prefix: 'recipes/', // Only delete recipe images
+      });
+
+      if (listed.objects.length > 0) {
+        const keys = listed.objects.map((obj) => obj.key);
+        await Promise.all(keys.map((key) => bucket.delete(key)));
+        deletedCount += keys.length;
+      }
+
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+
+    // Clear recipe-related data only
+    await db.batch([
+      db.prepare('DELETE FROM planned_meals'), // Depends on recipes
+      db.prepare('DELETE FROM meal_plans'),
+      db.prepare('DELETE FROM recipe_pairings'),
+      db.prepare('DELETE FROM recipe_images'),
+      db.prepare('DELETE FROM recipe_ingredients'),
+      db.prepare('DELETE FROM recipe_tags'),
+      db.prepare('DELETE FROM recipes'),
+      db.prepare('DELETE FROM tags'), // Tags are recipe-specific
+    ]);
+
+    return c.json({
+      success: true,
+      message: 'All recipes cleared successfully',
+      imagesDeleted: deletedCount,
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to clear recipes' },
+      500
+    );
+  }
+});
+
+// DELETE /api/export/clear/app-data - Clear app data (pantry, food associations, shelf life) but keep recipes
+exportRoutes.delete('/clear/app-data', async (c) => {
+  try {
+    const db = c.env.DB;
+
+    // Clear app data only (not recipes)
+    await db.batch([
+      db.prepare('DELETE FROM pantry_items'),
+      db.prepare('DELETE FROM food_association_terms'),
+      db.prepare('DELETE FROM food_association_groups'),
+      db.prepare('DELETE FROM shelf_life'),
+      db.prepare('DELETE FROM ingredients'),
+    ]);
+
+    return c.json({
+      success: true,
+      message: 'App data cleared successfully (pantry, food associations, shelf life)',
+    });
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to clear app data' },
+      500
+    );
+  }
+});
+
 // POST /api/export/import-zip - Import from ZIP file (includes images)
 exportRoutes.post('/import-zip', async (c) => {
   try {
