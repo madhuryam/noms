@@ -163,6 +163,10 @@ export function InstructionSteps({
   const checkedCount = checkedItems.size;
   const totalCount = stepItems.length;
 
+  // Find the first unchecked step (current step to highlight)
+  const allSteps = sections.flatMap(s => s.steps);
+  const currentStepIndex = allSteps.find(s => !checkedItems.has(s.originalIndex))?.originalIndex;
+
   if (instructions.length === 0) {
     return (
       <div>
@@ -215,9 +219,17 @@ export function InstructionSteps({
               {section.steps.map((step, stepIndex) => {
                 const isChecked = checkedItems.has(step.originalIndex);
                 const stepNumber = stepIndex + 1;
+                const isCurrentStep = step.originalIndex === currentStepIndex;
 
                 return (
-                  <div key={`${recipeId}-step-${step.originalIndex}`} className="flex gap-4 group">
+                  <div
+                    key={`${recipeId}-step-${step.originalIndex}`}
+                    className={`flex gap-4 group rounded-xl transition-all ${
+                      isCurrentStep
+                        ? 'border-2 border-gray-400 dark:border-onedark-fg-muted bg-white dark:bg-onedark-bg-lighter p-4 shadow-md scale-[1.02] -mx-1'
+                        : ''
+                    }`}
+                  >
                     <div className="flex-shrink-0">
                       <button
                         type="button"
@@ -227,7 +239,9 @@ export function InstructionSteps({
                         className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
                           isChecked
                             ? 'bg-green-500 dark:bg-onedark-green text-white'
-                            : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
+                            : isCurrentStep
+                              ? 'bg-gray-900 dark:bg-onedark-fg text-white dark:text-onedark-bg'
+                              : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
                         }`}
                       >
                         {isChecked ? (
@@ -253,7 +267,9 @@ export function InstructionSteps({
                       className={`pt-1 transition-all ${
                         isChecked
                           ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
-                          : 'text-gray-700 dark:text-onedark-fg'
+                          : isCurrentStep
+                            ? 'text-gray-900 dark:text-onedark-fg font-medium'
+                            : 'text-gray-700 dark:text-onedark-fg'
                       }`}
                     >
                       {step.text}
