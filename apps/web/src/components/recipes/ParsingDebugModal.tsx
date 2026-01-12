@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api';
 
 interface ParsedInfo {
@@ -36,28 +36,28 @@ export function ParsingDebugModal({ recipeId, recipeTitle, onClose }: ParsingDeb
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    async function fetchIngredients() {
-      try {
-        setLoading(true);
-        const response = await api.get<{ ingredients: IngredientResult[] }>(
-          `/api/recipes/${recipeId}/ingredients`
-        );
-        setIngredients(response.ingredients);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch ingredients');
-      } finally {
-        setLoading(false);
-      }
+  const fetchIngredients = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.get<{ ingredients: IngredientResult[] }>(
+        `/api/recipes/${recipeId}/ingredients`
+      );
+      setIngredients(response.ingredients);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch ingredients');
+    } finally {
+      setLoading(false);
     }
-
-    fetchIngredients();
   }, [recipeId]);
+
+  useEffect(() => {
+    fetchIngredients();
+  }, [fetchIngredients]);
 
   const startEditing = (ing: IngredientResult) => {
     setEditingId(ing.id);
-    // Pre-fill with parsed ingredient or extract from normalization key
-    setEditValue(ing.parsed?.ingredient || ing.normalizationKey?.replace(/-/g, ' ') || '');
+    // Pre-fill with the displayed normalization key (what the user sees)
+    setEditValue(ing.normalizationKey || '');
   };
 
   const cancelEditing = () => {
@@ -70,19 +70,26 @@ export function ParsingDebugModal({ recipeId, recipeTitle, onClose }: ParsingDeb
 
     try {
       setSaving(true);
-      const response = await api.patch<{ normalizationKey: string }>(
+      const response = await api.patch<{
+        success: boolean;
+        id: number;
+        ingredientName: string;
+        normalizationKey: string;
+      }>(
         `/api/recipes/${recipeId}/ingredients/${ingredientId}`,
         { ingredientName: editValue.trim() }
       );
 
-      // Update local state
-      setIngredients((prev) =>
-        prev.map((ing) =>
-          ing.id === ingredientId
-            ? { ...ing, normalizationKey: response.normalizationKey }
-            : ing
-        )
-      );
+      if (response.success) {
+        // Update local state directly with the response
+        setIngredients((prevIngredients) =>
+          prevIngredients.map((ing) =>
+            ing.id === ingredientId
+              ? { ...ing, normalizationKey: response.normalizationKey }
+              : ing
+          )
+        );
+      }
 
       setEditingId(null);
       setEditValue('');

@@ -1584,11 +1584,11 @@ recipes.patch('/:id/ingredients/:ingredientId', async (c) => {
       return c.json({ error: 'Ingredient not found' }, 404);
     }
 
-    // Generate normalization key(s) from the provided ingredient name
-    // Handles "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
-    const alternatives = body.ingredientName.split(/\s+or\s+/i).map(s => s.trim()).filter(s => s);
-    const keys = alternatives.map(alt => normalizeIngredientKey(alt)).filter(k => k);
-    const normalizationKey = [...new Set(keys)].join('|');
+    // For manual edits, save the value as-is (just lowercase and trimmed)
+    // This bypasses automatic normalization so user can override stop-word removal
+    // Still handle "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
+    const alternatives = body.ingredientName.split(/\s+or\s+/i).map(s => s.trim().toLowerCase()).filter(s => s);
+    const normalizationKey = [...new Set(alternatives)].join('|');
 
     await c.env.DB.prepare(`
       UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
