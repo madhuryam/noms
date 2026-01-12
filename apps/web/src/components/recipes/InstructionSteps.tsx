@@ -163,9 +163,6 @@ export function InstructionSteps({
   const checkedCount = checkedItems.size;
   const totalCount = stepItems.length;
 
-  // Find the first unchecked step (current step to highlight)
-  const allSteps = sections.flatMap(s => s.steps);
-  const currentStepIndex = allSteps.find(s => !checkedItems.has(s.originalIndex))?.originalIndex;
 
   if (instructions.length === 0) {
     return (
@@ -216,10 +213,14 @@ export function InstructionSteps({
               </h3>
             )}
             <div className="space-y-3">
-              {section.steps.map((step, stepIndex) => {
+              {(() => {
+                // Find the first unchecked step in this section
+                const firstUncheckedInSection = section.steps.find(s => !checkedItems.has(s.originalIndex))?.originalIndex;
+
+                return section.steps.map((step, stepIndex) => {
                 const isChecked = checkedItems.has(step.originalIndex);
                 const stepNumber = stepIndex + 1;
-                const isCurrentStep = step.originalIndex === currentStepIndex;
+                const isCurrentStep = step.originalIndex === firstUncheckedInSection;
 
                 return (
                   <div
@@ -276,7 +277,8 @@ export function InstructionSteps({
                     </p>
                   </div>
                 );
-              })}
+              });
+              })()}
             </div>
           </div>
         ))}
