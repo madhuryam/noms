@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useRecipe, useDeleteRecipe, useRecipeMatch } from '../hooks';
+import { useRecipe, useDeleteRecipe, useRecipeMatch, useWakeLock } from '../hooks';
 import {
   RecipeHeader,
   RecipeMetadata,
@@ -79,6 +79,9 @@ export function RecipeDetailPage() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
   const [showParsingDebug, setShowParsingDebug] = useState(false);
+
+  // Wake lock for cooking mode - keeps screen on
+  const wakeLock = useWakeLock();
 
   // Initialize servings when recipe loads
   const currentServings = servings ?? recipe?.servings ?? DEFAULT_SERVINGS;
@@ -289,6 +292,32 @@ export function RecipeDetailPage() {
                 instructionsRaw={recipe.instructions_raw}
                 checkedItems={instructionsChecked}
                 onProgressChange={updateInstructions}
+                headerAction={
+                  wakeLock.isSupported ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 dark:text-onedark-fg-muted hidden sm:inline">
+                        Keep screen awake
+                      </span>
+                      <button
+                        onClick={wakeLock.toggle}
+                        className={`relative w-8 h-[18px] rounded-full transition-colors ${
+                          wakeLock.isActive
+                            ? 'bg-gray-700 dark:bg-onedark-fg'
+                            : 'bg-gray-300 dark:bg-onedark-bg-highlight'
+                        }`}
+                        role="switch"
+                        aria-checked={wakeLock.isActive}
+                        aria-label="Keep screen awake while cooking"
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-transform ${
+                            wakeLock.isActive ? 'translate-x-[14px]' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  ) : undefined
+                }
               />
             ) : (
               <div>

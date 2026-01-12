@@ -6,6 +6,7 @@ interface InstructionStepsProps {
   instructionsRaw: string;
   onProgressChange?: (checked: Set<number>) => void;
   checkedItems: Set<number>;
+  headerAction?: React.ReactNode;
 }
 
 interface ParsedInstruction {
@@ -137,6 +138,7 @@ export function InstructionSteps({
   instructionsRaw,
   onProgressChange,
   checkedItems,
+  headerAction,
 }: InstructionStepsProps) {
   const instructions = parseInstructions(instructionsRaw);
   const sections = groupIntoSections(instructions);
@@ -190,14 +192,17 @@ export function InstructionSteps({
             </span>
           )}
         </div>
-        {checkedCount > 0 && (
-          <button
-            onClick={clearAll}
-            className="text-sm text-blue-600 dark:text-onedark-blue hover:underline"
-          >
-            Clear all
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {headerAction}
+          {checkedCount > 0 && (
+            <button
+              onClick={clearAll}
+              className="text-sm text-blue-600 dark:text-onedark-blue hover:underline"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Sections */}

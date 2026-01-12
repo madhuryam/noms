@@ -89,3 +89,4 @@ export {
   useDeleteNutrition,
 } from './useNutrition';
 export type { NutritionEntry, NutritionEntryWithSource } from './useNutrition';
+export { useWakeLock } from './useWakeLock';
