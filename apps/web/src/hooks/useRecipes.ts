@@ -11,6 +11,7 @@ export interface RecipeTag {
 
 export interface Recipe {
   id: number;
+  slug: string | null;
   title: string;
   description: string | null;
   image_path: string | null;

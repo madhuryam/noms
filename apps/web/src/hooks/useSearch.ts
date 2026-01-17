@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 
 export interface SearchResult {
   id: number;
+  slug: string | null;
   title: string;
   description: string | null;
   image_path: string | null;
@@ -32,6 +33,7 @@ export interface SearchResponse {
 
 export interface SearchSuggestion {
   id: number;
+  slug: string | null;
   title: string;
   image_path: string | null;
 }

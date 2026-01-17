@@ -156,6 +156,7 @@ search.get('/', async (c) => {
       `
       SELECT
         r.id,
+        r.slug,
         r.title,
         r.description,
         r.image_path,
@@ -232,6 +233,7 @@ search.get('/suggestions', async (c) => {
       `
       SELECT
         r.id,
+        r.slug,
         r.title,
         r.image_path,
         bm25(recipes_fts, 10.0, 1.0, 1.0, 1.0, 1.0) as rank

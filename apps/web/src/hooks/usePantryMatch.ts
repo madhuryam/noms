@@ -4,6 +4,7 @@ import type { RecipeTag } from './useRecipes';
 
 export interface MatchedRecipe {
   id: number;
+  slug: string | null;
   title: string;
   description: string | null;
   image_path: string | null;

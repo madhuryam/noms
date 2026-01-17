@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 
 export interface ShoppingListRecipe {
   recipeId: number;
+  recipeSlug: string | null;
   recipeTitle: string;
   quantity: number | null;
   scaledQuantity: number | null;

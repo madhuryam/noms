@@ -67,9 +67,12 @@ function useRecipeProgress(recipeId: number | undefined) {
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const recipeId = id ? Number(id) : undefined;
+  // Support both numeric ID and slug-based lookups
+  const recipeIdOrSlug = id;
 
-  const { data: recipe, isLoading, isError, error, refetch } = useRecipe(recipeId);
+  const { data: recipe, isLoading, isError, error, refetch } = useRecipe(recipeIdOrSlug);
+  // Once we have the recipe, use its ID for match and progress tracking
+  const recipeId = recipe?.id;
   const { data: matchData } = useRecipeMatch(recipeId);
   const deleteRecipe = useDeleteRecipe();
   const { ingredientsChecked, instructionsChecked, updateIngredients, updateInstructions } =
@@ -386,7 +389,7 @@ export function RecipeDetailPage() {
       <div className="flex items-center justify-between gap-3 pt-6 border-t border-gray-200 dark:border-onedark-bg-highlight">
         <div className="flex items-center gap-3">
           <Link
-            to={`/recipes/${id}/edit`}
+            to={`/recipes/${recipe.slug || recipe.id}/edit`}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

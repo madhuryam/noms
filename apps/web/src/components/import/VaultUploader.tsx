@@ -9,6 +9,7 @@ interface VaultUploaderProps {
 const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 const MARKDOWN_EXTENSION = '.md';
 const IGNORED_FILES = ['pantry staples', 'in my fridge'];
+const IGNORED_FOLDERS = ['.git', '.obsidian', 'node_modules', '.trash'];
 
 function isImageFile(filename: string): boolean {
   const lower = filename.toLowerCase();
@@ -22,6 +23,11 @@ function isMarkdownFile(filename: string): boolean {
 function shouldIgnoreFile(filename: string): boolean {
   const nameWithoutExt = filename.toLowerCase().replace(/\.md$/i, '');
   return IGNORED_FILES.some((ignored) => nameWithoutExt === ignored.toLowerCase());
+}
+
+function isInIgnoredFolder(filePath: string): boolean {
+  const parts = filePath.split('/');
+  return parts.some((part) => IGNORED_FOLDERS.includes(part));
 }
 
 /**
@@ -75,7 +81,11 @@ export function VaultUploader({ onParseComplete }: VaultUploaderProps) {
 
       // First pass: collect all files
       const fileArray = Array.from(files);
-      const relevantFiles = fileArray.filter((f) => isMarkdownFile(f.name) || isImageFile(f.name));
+      const relevantFiles = fileArray.filter((f) => {
+        const path = f.webkitRelativePath || f.name;
+        if (isInIgnoredFolder(path)) return false;
+        return isMarkdownFile(f.name) || isImageFile(f.name);
+      });
 
       setProgress({ current: 0, total: relevantFiles.length, currentFile: '' });
 
@@ -332,6 +342,10 @@ async function readDirectory(directory: FileSystemDirectoryEntry): Promise<File[
       });
       files.push(fileWithPath);
     } else if (entry.isDirectory) {
+      // Skip ignored folders entirely
+      if (IGNORED_FOLDERS.includes(entry.name)) {
+        return;
+      }
       const dirEntry = entry as FileSystemDirectoryEntry;
       const dirReader = dirEntry.createReader();
       // Read ALL entries from subdirectory (not just first batch)

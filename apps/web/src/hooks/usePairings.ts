@@ -10,6 +10,7 @@ export interface Pairing {
   notes: string | null;
   paired_recipe_title?: string;
   paired_recipe_image_path?: string;
+  paired_recipe_slug?: string;
 }
 
 export interface AddPairingInput {

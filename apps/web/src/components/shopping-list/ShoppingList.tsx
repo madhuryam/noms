@@ -683,7 +683,7 @@ function ShoppingListItemRow({
             <>
               {!hasMultipleRecipes ? (
                 <Link
-                  to={`/recipes/${item.recipes[0].recipeId}`}
+                  to={`/recipes/${item.recipes[0].recipeSlug || item.recipes[0].recipeId}`}
                   className="text-sm text-gray-500 dark:text-onedark-fg-muted hover:text-blue-500 dark:hover:text-onedark-blue"
                 >
                   {item.recipes[0].recipeTitle}
@@ -758,7 +758,7 @@ function ShoppingListItemRow({
               className="flex items-center justify-between text-sm"
             >
               <Link
-                to={`/recipes/${recipe.recipeId}`}
+                to={`/recipes/${recipe.recipeSlug || recipe.recipeId}`}
                 className="text-gray-600 dark:text-onedark-fg-muted hover:text-blue-500 dark:hover:text-onedark-blue"
               >
                 {recipe.recipeTitle}

@@ -22,8 +22,8 @@ function LoadingSkeleton() {
 
 export function EditRecipePage() {
   const { id } = useParams<{ id: string }>();
-  const recipeId = id ? Number(id) : undefined;
-  const { data: recipe, isLoading, isError, error } = useRecipe(recipeId);
+  // Support both numeric ID and slug-based lookups
+  const { data: recipe, isLoading, isError, error } = useRecipe(id);
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -106,7 +106,7 @@ export function EditRecipePage() {
         </Link>
         <span className="text-gray-400 dark:text-onedark-fg-muted">/</span>
         <Link
-          to={`/recipes/${id}`}
+          to={`/recipes/${recipe.slug || recipe.id}`}
           className="text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg truncate max-w-[200px]"
         >
           {recipe.title}

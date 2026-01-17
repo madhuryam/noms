@@ -24,7 +24,7 @@ export function MatchedRecipeCard({ recipe }: MatchedRecipeCardProps) {
 
   return (
     <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-400 dark:hover:border-onedark-blue transition-colors">
-      <Link to={`/recipes/${recipe.id}`} className="block">
+      <Link to={`/recipes/${recipe.slug || recipe.id}`} className="block">
         {/* Image */}
         <div className="relative overflow-hidden">
           <RecipeImage

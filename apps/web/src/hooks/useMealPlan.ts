@@ -20,6 +20,7 @@ export interface PlannedMeal {
   notes: string | null;
   is_completed: number;
   // Recipe fields (null for free text entries)
+  recipe_slug: string | null;
   recipe_title: string | null;
   recipe_image: string | null;
   prep_time_minutes: number | null;

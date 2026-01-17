@@ -6,6 +6,7 @@ import type { RecipeTag } from '../../hooks/useRecipes';
 
 interface RecipeCardProps {
   id: number;
+  slug?: string | null;
   title: string;
   description?: string | null;
   imageUrl?: string | null;
@@ -18,6 +19,7 @@ interface RecipeCardProps {
 
 export function RecipeCard({
   id,
+  slug,
   title,
   description,
   imageUrl,
@@ -33,7 +35,7 @@ export function RecipeCard({
   return (
     <>
       <Link
-        to={`/recipes/${id}`}
+        to={`/recipes/${slug || id}`}
         className="group block bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-500 dark:hover:border-onedark-blue hover:shadow-lg transition-all"
       >
         {/* Image */}

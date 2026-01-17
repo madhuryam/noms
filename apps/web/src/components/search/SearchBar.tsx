@@ -68,7 +68,8 @@ export function SearchBar({
       if (e.key === 'Enter') {
         e.preventDefault();
         if (selectedIndex >= 0 && suggestions[selectedIndex]) {
-          navigate(`/recipes/${suggestions[selectedIndex].id}`);
+          const suggestion = suggestions[selectedIndex];
+          navigate(`/recipes/${suggestion.slug || suggestion.id}`);
           setShowSuggestions(false);
         } else {
           handleSearch(query);
@@ -94,8 +95,8 @@ export function SearchBar({
   }, []);
 
   const handleSuggestionClick = useCallback(
-    (id: number) => {
-      navigate(`/recipes/${id}`);
+    (slugOrId: string | number) => {
+      navigate(`/recipes/${slugOrId}`);
       setShowSuggestions(false);
     },
     [navigate]
@@ -187,7 +188,7 @@ export function SearchBar({
           {suggestions.map((suggestion, index) => (
             <button
               key={suggestion.id}
-              onClick={() => handleSuggestionClick(suggestion.id)}
+              onClick={() => handleSuggestionClick(suggestion.slug || suggestion.id)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
                 index === selectedIndex
                   ? 'bg-blue-50 dark:bg-onedark-blue/20'

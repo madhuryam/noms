@@ -97,7 +97,7 @@ mealPlans.get('/current', async (c) => {
     // Get all meals for this plan with recipe info
     const meals = await c.env.DB.prepare(`
       SELECT pm.*,
-        r.id as recipe_id, r.title as recipe_title, r.image_path as recipe_image,
+        r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
@@ -184,7 +184,7 @@ mealPlans.get('/:id', async (c) => {
     // Get all meals with recipe info
     const meals = await c.env.DB.prepare(`
       SELECT pm.*,
-        r.id as recipe_id, r.title as recipe_title, r.image_path as recipe_image,
+        r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
@@ -298,7 +298,7 @@ mealPlans.get('/:id/meals', async (c) => {
   try {
     const meals = await c.env.DB.prepare(`
       SELECT pm.*,
-        r.id as recipe_id, r.title as recipe_title, r.image_path as recipe_image,
+        r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
@@ -390,7 +390,7 @@ mealPlans.post('/:id/meals', async (c) => {
     // Return the new meal with recipe info
     const newMeal = await c.env.DB.prepare(`
       SELECT pm.*,
-        r.id as recipe_id, r.title as recipe_title, r.image_path as recipe_image,
+        r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
@@ -481,7 +481,7 @@ mealPlans.put('/:id/meals/:mealId', async (c) => {
     // Return updated meal with recipe info
     const updated = await c.env.DB.prepare(`
       SELECT pm.*,
-        r.id as recipe_id, r.title as recipe_title, r.image_path as recipe_image,
+        r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
@@ -635,6 +635,7 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         pm.recipe_id,
         pm.scaling_factor,
         pm.planned_date,
+        r.slug as recipe_slug,
         r.title as recipe_title,
         r.ingredients_raw
       FROM planned_meals pm
@@ -669,6 +670,7 @@ mealPlans.get('/:id/shopping-list', async (c) => {
       inPantry: boolean;
       recipes: Array<{
         recipeId: number;
+        recipeSlug: string | null;
         recipeTitle: string;
         quantity: number | null;
         scaledQuantity: number | null;
@@ -683,6 +685,7 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         recipe_id: number;
         scaling_factor: number;
         planned_date: string;
+        recipe_slug: string | null;
         recipe_title: string;
         ingredients_raw: string | null;
       };
@@ -722,6 +725,7 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         // Add recipe reference
         grouped.get(key)!.recipes.push({
           recipeId: meal.recipe_id,
+          recipeSlug: meal.recipe_slug,
           recipeTitle: meal.recipe_title,
           quantity: parsed.quantity,
           scaledQuantity: scaledQty,

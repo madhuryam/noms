@@ -22,6 +22,7 @@ export function RecipeGrid({ recipes, loading = false }: RecipeGridProps) {
         <RecipeCard
           key={recipe.id}
           id={recipe.id}
+          slug={recipe.slug}
           title={recipe.title}
           description={recipe.description}
           imageUrl={recipe.image_path}

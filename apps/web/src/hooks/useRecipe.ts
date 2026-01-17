@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 
 interface Recipe {
   id: number;
+  slug: string | null;
   title: string;
   description: string | null;
   markdown_content: string | null;
@@ -52,14 +53,14 @@ interface UpdateRecipeInput extends Partial<CreateRecipeInput> {
   macros_manual?: boolean | number;
 }
 
-export function useRecipe(id: number | undefined) {
+export function useRecipe(idOrSlug: number | string | undefined) {
   return useQuery({
-    queryKey: ['recipe', id],
+    queryKey: ['recipe', idOrSlug],
     queryFn: async (): Promise<Recipe> => {
-      const response = await api.get<Recipe>(`/api/recipes/${id}`);
+      const response = await api.get<Recipe>(`/api/recipes/${idOrSlug}`);
       return response;
     },
-    enabled: !!id,
+    enabled: !!idOrSlug,
     // Always refetch when component mounts to ensure fresh data
     refetchOnMount: 'always',
     // Shorter stale time for individual recipes since they're frequently edited

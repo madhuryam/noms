@@ -379,10 +379,11 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         }
       }
 
-      // Navigate to the recipe detail page - use recipeId prop as fallback
+      // Navigate to the recipe detail page - prefer slug, fallback to id
+      const targetSlug = recipe?.slug;
       const targetId = recipe?.id ?? recipeId;
-      if (targetId) {
-        navigate(`/recipes/${targetId}`);
+      if (targetSlug || targetId) {
+        navigate(`/recipes/${targetSlug || targetId}`);
       } else {
         navigate('/recipes');
       }

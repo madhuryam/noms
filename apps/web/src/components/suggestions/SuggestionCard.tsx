@@ -3,6 +3,7 @@ import { RecipeImage } from '../common/RecipeImage';
 
 export interface SuggestionRecipe {
   id: number;
+  slug: string | null;
   title: string;
   image_path: string | null;
   prep_time_minutes: number | null;
@@ -19,7 +20,7 @@ export function SuggestionCard({ recipe }: SuggestionCardProps) {
 
   return (
     <Link
-      to={`/recipes/${recipe.id}`}
+      to={`/recipes/${recipe.slug || recipe.id}`}
       className="flex-shrink-0 w-52 snap-start group"
     >
       <div className="h-full bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-400 dark:hover:border-onedark-blue transition-colors">

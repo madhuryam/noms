@@ -79,7 +79,7 @@ export function SearchResults({ results, query }: SearchResultsProps) {
         return (
           <Link
             key={result.id}
-            to={`/recipes/${result.id}`}
+            to={`/recipes/${result.slug || result.id}`}
             className="block bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-gray-300 dark:hover:border-onedark-fg-muted hover:shadow-md transition-all"
           >
             <div className="flex">

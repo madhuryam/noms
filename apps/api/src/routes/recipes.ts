@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
 import { getUnits } from '@jlucaspains/sharp-recipe-parser/src/units.js';
 import { keysMatch, normalizeIngredientKey } from '../lib/ingredient-normalizer';
+import { generateUniqueSlug } from '../lib/slug';
 
 // Add custom units to sharp-recipe-parser
 const englishUnits = getUnits('en');
@@ -345,7 +346,7 @@ recipes.get('/', async (c) => {
 
   try {
     let query = `
-      SELECT DISTINCT r.id, r.title, r.description, r.image_path, r.prep_time_minutes,
+      SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes,
              r.cook_time_minutes, r.servings, r.created_at, r.updated_at
       FROM recipes r
     `;
@@ -547,7 +548,7 @@ recipes.get('/suggestions/daily', async (c) => {
       // Filter by tags
       const placeholders = tagIds.map(() => '?').join(',');
       query = `
-        SELECT DISTINCT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
+        SELECT DISTINCT r.id, r.slug, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
         FROM recipes r
         JOIN recipe_tags rt ON r.id = rt.recipe_id
         WHERE rt.tag_id IN (${placeholders})
@@ -558,7 +559,7 @@ recipes.get('/suggestions/daily', async (c) => {
     } else {
       // No filters - return random recipes from all
       query = `
-        SELECT r.id, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
+        SELECT r.id, r.slug, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
         FROM recipes r
         ORDER BY RANDOM()
         LIMIT 10
@@ -664,12 +665,13 @@ recipes.get('/suggestions/pantry', async (c) => {
 
     // Get all recipes with their ingredients
     const recipesResult = await c.env.DB.prepare(`
-      SELECT r.id, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
+      SELECT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
       FROM recipes r
     `).all();
 
     const recipes = (recipesResult.results ?? []) as Array<{
       id: number;
+      slug: string | null;
       title: string;
       description: string | null;
       image_path: string | null;
@@ -1015,26 +1017,33 @@ recipes.get('/:id/match', async (c) => {
 });
 
 // GET /api/recipes/:id - Get single recipe with tags
+// Supports both numeric ID and string slug lookups
 recipes.get('/:id', async (c) => {
-  const id = Number(c.req.param('id'));
+  const param = c.req.param('id');
+  const isNumeric = /^\d+$/.test(param);
 
   try {
-    const recipe = await c.env.DB.prepare(
-      `
-      SELECT * FROM recipes WHERE id = ?
-    `
-    )
-      .bind(id)
-      .first();
+    let recipe;
+    if (isNumeric) {
+      recipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?')
+        .bind(Number(param))
+        .first();
+    } else {
+      recipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE slug = ?')
+        .bind(param)
+        .first();
+    }
 
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
     }
 
+    const recipeId = (recipe as { id: number }).id;
+
     // Update last_accessed_at (fire and forget - don't wait)
     c.executionCtx.waitUntil(
       c.env.DB.prepare("UPDATE recipes SET last_accessed_at = datetime('now') WHERE id = ?")
-        .bind(id)
+        .bind(recipeId)
         .run()
     );
 
@@ -1048,7 +1057,7 @@ recipes.get('/:id', async (c) => {
       ORDER BY t.is_category DESC, t.name
     `
     )
-      .bind(id)
+      .bind(recipeId)
       .all();
 
     // Get smart tags for this recipe
@@ -1061,7 +1070,7 @@ recipes.get('/:id', async (c) => {
       ORDER BY st.sort_order, st.name
     `
     )
-      .bind(id)
+      .bind(recipeId)
       .all();
 
     // Get images for this recipe
@@ -1073,7 +1082,7 @@ recipes.get('/:id', async (c) => {
       ORDER BY sort_order ASC
     `
     )
-      .bind(id)
+      .bind(recipeId)
       .all();
 
     return c.json({
@@ -1113,16 +1122,20 @@ recipes.post('/', async (c) => {
       return c.json({ error: 'Title is required' }, 400);
     }
 
+    // Generate unique slug from title
+    const slug = await generateUniqueSlug(c.env.DB, title);
+
     const result = await c.env.DB.prepare(
       `
       INSERT INTO recipes (
-        title, markdown_content, description, ingredients_raw, instructions_raw,
+        title, slug, markdown_content, description, ingredients_raw, instructions_raw,
         servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
         title,
+        slug,
         markdown_content ?? null,
         description ?? null,
         ingredients_raw ?? null,
@@ -1335,6 +1348,7 @@ interface Pairing {
   // Joined recipe data (when paired_recipe_id is set)
   paired_recipe_title?: string;
   paired_recipe_image_path?: string;
+  paired_recipe_slug?: string;
 }
 
 // GET /api/recipes/:id/pairings - Get all pairings for a recipe (bidirectional)
@@ -1346,7 +1360,7 @@ recipes.get('/:id/pairings', async (c) => {
     const outgoingResult = await c.env.DB.prepare(`
       SELECT
         p.id, p.recipe_id, p.paired_recipe_id, p.pairing_text, p.pairing_type, p.notes,
-        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path
+        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path, r.slug as paired_recipe_slug
       FROM recipe_pairings p
       LEFT JOIN recipes r ON p.paired_recipe_id = r.id
       WHERE p.recipe_id = ?
@@ -1359,7 +1373,7 @@ recipes.get('/:id/pairings', async (c) => {
       SELECT
         p.id, p.paired_recipe_id as recipe_id, p.recipe_id as paired_recipe_id,
         p.pairing_text, p.pairing_type, p.notes,
-        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path
+        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path, r.slug as paired_recipe_slug
       FROM recipe_pairings p
       LEFT JOIN recipes r ON p.recipe_id = r.id
       WHERE p.paired_recipe_id = ?
@@ -1465,7 +1479,7 @@ recipes.post('/:id/pairings', async (c) => {
     const pairing = await c.env.DB.prepare(`
       SELECT
         p.id, p.recipe_id, p.paired_recipe_id, p.pairing_text, p.pairing_type, p.notes,
-        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path
+        r.title as paired_recipe_title, r.image_path as paired_recipe_image_path, r.slug as paired_recipe_slug
       FROM recipe_pairings p
       LEFT JOIN recipes r ON p.paired_recipe_id = r.id
       WHERE p.id = ?

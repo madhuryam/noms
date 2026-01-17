@@ -56,7 +56,7 @@ function DraggableRecipeCard({ recipe }: DraggableRecipeCardProps) {
       }, 0);
       return;
     }
-    navigate(`/recipes/${recipe.id}`);
+    navigate(`/recipes/${recipe.slug || recipe.id}`);
   };
 
   return (

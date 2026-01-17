@@ -36,7 +36,7 @@ function PairingCard({ pairing }: { pairing: Pairing }) {
   if (pairing.paired_recipe_id && pairing.paired_recipe_title) {
     return (
       <Link
-        to={`/recipes/${pairing.paired_recipe_id}`}
+        to={`/recipes/${pairing.paired_recipe_slug || pairing.paired_recipe_id}`}
         className="group block bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-500 dark:hover:border-onedark-blue hover:shadow-md transition-all"
       >
         <div className="flex gap-3 p-3">

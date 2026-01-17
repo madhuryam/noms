@@ -136,7 +136,7 @@ export function MealSlotCell({
                 {/* Recipe link or plain div for free text */}
                 {isRecipeMeal ? (
                   <Link
-                    to={`/recipes/${meal.recipe_id}`}
+                    to={`/recipes/${meal.recipe_slug || meal.recipe_id}`}
                     className="block p-2 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight transition-colors"
                   >
                     {content}
