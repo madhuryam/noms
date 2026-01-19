@@ -685,16 +685,17 @@ mealPlans.get('/:id/shopping-list', async (c) => {
       .bind(id, startDate, endDate)
       .all();
 
-    // Get pantry items for comparison
+    // Get pantry items for comparison - use normalization_key which matches the normalized ingredient keys
     const pantryResult = await c.env.DB.prepare(`
-      SELECT normalized_name, quantity, unit
+      SELECT normalization_key
       FROM pantry_items
+      WHERE normalization_key IS NOT NULL
     `).all();
 
     const pantryItems = new Set<string>();
     for (const item of pantryResult.results ?? []) {
-      const pi = item as { normalized_name: string };
-      pantryItems.add(pi.normalized_name.toLowerCase());
+      const pi = item as { normalization_key: string };
+      pantryItems.add(pi.normalization_key.toLowerCase());
     }
 
     // Group and aggregate ingredients
