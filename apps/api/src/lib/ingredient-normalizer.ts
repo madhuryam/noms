@@ -121,6 +121,8 @@ const COOKING_STOP_WORDS = new Set([
   'desired',
   'taste',
   'serving',
+  'servings',
+  'per',
   'each',
   'such',
 

@@ -666,20 +666,25 @@ mealPlans.get('/:id/shopping-list', async (c) => {
     const startDate = startDateFilter || plan.start_date;
     const endDate = endDateFilter || plan.end_date;
 
-    // Get all planned meals with their recipes' ingredients_raw
-    const mealsResult = await c.env.DB.prepare(`
+    // Get all planned meals with their recipe ingredients from the recipe_ingredients table
+    // This uses the already-computed normalization_key for the name, and raw_text for parsing quantities
+    const ingredientsResult = await c.env.DB.prepare(`
       SELECT
         pm.recipe_id,
         pm.scaling_factor,
         pm.planned_date,
         r.slug as recipe_slug,
         r.title as recipe_title,
-        r.ingredients_raw
+        ri.normalization_key,
+        ri.raw_text,
+        ri.unit
       FROM planned_meals pm
       JOIN recipes r ON pm.recipe_id = r.id
+      JOIN recipe_ingredients ri ON ri.recipe_id = r.id
       WHERE pm.meal_plan_id = ?
         AND pm.planned_date >= ?
         AND pm.planned_date <= ?
+        AND ri.normalization_key IS NOT NULL
       ORDER BY pm.planned_date
     `)
       .bind(id, startDate, endDate)
@@ -703,83 +708,83 @@ mealPlans.get('/:id/shopping-list', async (c) => {
       name: string;
       normalizedName: string;
       category: string;
-      totalQuantity: number | null;
+      totalMinQuantity: number | null;
+      totalMaxQuantity: number | null;
       unit: string | null;
       inPantry: boolean;
       recipes: Array<{
         recipeId: number;
         recipeSlug: string | null;
         recipeTitle: string;
-        quantity: number | null;
-        scaledQuantity: number | null;
+        minQuantity: number | null;
+        maxQuantity: number | null;
+        scaledMinQuantity: number | null;
+        scaledMaxQuantity: number | null;
         plannedDate: string;
       }>;
     }
 
     const grouped = new Map<string, AggregatedItem>();
 
-    for (const row of mealsResult.results ?? []) {
-      const meal = row as {
+    for (const row of ingredientsResult.results ?? []) {
+      const ing = row as {
         recipe_id: number;
         scaling_factor: number;
         planned_date: string;
         recipe_slug: string | null;
         recipe_title: string;
-        ingredients_raw: string | null;
+        normalization_key: string;
+        raw_text: string;
+        unit: string | null;
       };
 
-      if (!meal.ingredients_raw) continue;
+      const normalizedKey = ing.normalization_key.toLowerCase();
+      if (!normalizedKey) continue;
 
-      // Parse each ingredient line
-      const lines = meal.ingredients_raw.split('\n');
-      for (const line of lines) {
-        const parsed = parseIngredientLine(line);
-        if (!parsed) continue;
+      // Parse raw_text to get quantities (including ranges like "2-3")
+      const parsed = parseIngredientLine(ing.raw_text);
+      const minQty = parsed?.minQuantity ?? null;
+      const maxQty = parsed?.maxQuantity ?? null;
+      const unit = parsed?.unit ?? ing.unit;
+      const scaledMinQty = minQty != null ? minQty * ing.scaling_factor : null;
+      const scaledMaxQty = maxQty != null ? maxQty * ing.scaling_factor : null;
 
-        // Use normalized key for grouping (e.g., "green chilis" and "green chilies" -> "green chili")
-        const normalizedKey = normalizeIngredientKey(parsed.name);
-        if (!normalizedKey) continue;
-
-        const scaledMinQty = parsed.minQuantity != null ? parsed.minQuantity * meal.scaling_factor : null;
-        const scaledMaxQty = parsed.maxQuantity != null ? parsed.maxQuantity * meal.scaling_factor : null;
-
-        if (!grouped.has(normalizedKey)) {
-          grouped.set(normalizedKey, {
-            name: normalizedKey, // Use normalized name for display
-            normalizedName: normalizedKey,
-            category: 'Other', // Could be enhanced with ingredient category lookup
-            totalMinQuantity: scaledMinQty,
-            totalMaxQuantity: scaledMaxQty,
-            unit: parsed.unit,
-            inPantry: pantryItems.has(normalizedKey),
-            recipes: [],
-          });
-        } else {
-          const existing = grouped.get(normalizedKey)!;
-          // Only sum quantities if units match and both have quantities
-          if (scaledMinQty != null && existing.totalMinQuantity != null && existing.unit === parsed.unit) {
-            existing.totalMinQuantity += scaledMinQty;
-            existing.totalMaxQuantity = (existing.totalMaxQuantity ?? 0) + (scaledMaxQty ?? scaledMinQty);
-          } else if (scaledMinQty != null && existing.totalMinQuantity == null) {
-            existing.totalMinQuantity = scaledMinQty;
-            existing.totalMaxQuantity = scaledMaxQty;
-            existing.unit = parsed.unit;
-          }
-          // If units differ, we could track multiple unit types, but for now just keep first
-        }
-
-        // Add recipe reference
-        grouped.get(normalizedKey)!.recipes.push({
-          recipeId: meal.recipe_id,
-          recipeSlug: meal.recipe_slug,
-          recipeTitle: meal.recipe_title,
-          minQuantity: parsed.minQuantity,
-          maxQuantity: parsed.maxQuantity,
-          scaledMinQuantity: scaledMinQty,
-          scaledMaxQuantity: scaledMaxQty,
-          plannedDate: meal.planned_date,
+      if (!grouped.has(normalizedKey)) {
+        grouped.set(normalizedKey, {
+          name: normalizedKey, // Use normalized key for display
+          normalizedName: normalizedKey,
+          category: 'Other', // Could be enhanced with ingredient category lookup
+          totalMinQuantity: scaledMinQty,
+          totalMaxQuantity: scaledMaxQty,
+          unit: unit,
+          inPantry: pantryItems.has(normalizedKey),
+          recipes: [],
         });
+      } else {
+        const existing = grouped.get(normalizedKey)!;
+        // Only sum quantities if units match and both have quantities
+        if (scaledMinQty != null && existing.totalMinQuantity != null && existing.unit === unit) {
+          existing.totalMinQuantity += scaledMinQty;
+          existing.totalMaxQuantity = (existing.totalMaxQuantity ?? 0) + (scaledMaxQty ?? scaledMinQty);
+        } else if (scaledMinQty != null && existing.totalMinQuantity == null) {
+          existing.totalMinQuantity = scaledMinQty;
+          existing.totalMaxQuantity = scaledMaxQty;
+          existing.unit = unit;
+        }
+        // If units differ, we could track multiple unit types, but for now just keep first
       }
+
+      // Add recipe reference
+      grouped.get(normalizedKey)!.recipes.push({
+        recipeId: ing.recipe_id,
+        recipeSlug: ing.recipe_slug,
+        recipeTitle: ing.recipe_title,
+        minQuantity: minQty,
+        maxQuantity: maxQty,
+        scaledMinQuantity: scaledMinQty,
+        scaledMaxQuantity: scaledMaxQty,
+        plannedDate: ing.planned_date,
+      });
     }
 
     // Convert to array and sort alphabetically
