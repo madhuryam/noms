@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api';
 
+interface IngredientParsingModalProps {
+  recipeId: number;
+  recipeTitle: string;
+  onClose: () => void;
+}
+
 interface ParsedInfo {
   quantity: number | null;
   quantityText: string | null;
@@ -22,19 +28,14 @@ interface IngredientResult {
   parsed: ParsedInfo | null;
 }
 
-interface ParsingDebugModalProps {
-  recipeId: number;
-  recipeTitle: string;
-  onClose: () => void;
-}
-
-export function ParsingDebugModal({ recipeId, recipeTitle, onClose }: ParsingDebugModalProps) {
+export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: IngredientParsingModalProps) {
   const [ingredients, setIngredients] = useState<IngredientResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const fetchIngredients = useCallback(async () => {
     try {
@@ -113,11 +114,26 @@ export function ParsingDebugModal({ recipeId, recipeTitle, onClose }: ParsingDeb
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-onedark-bg-highlight flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
-              Ingredient Parsing Debug
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">{recipeTitle}</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
+                Ingredient Parsing
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">{recipeTitle}</p>
+            </div>
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className={`p-1.5 rounded-full transition-colors ${
+                showHelp
+                  ? 'bg-blue-100 text-blue-600 dark:bg-onedark-blue/20 dark:text-onedark-blue'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg hover:bg-gray-100 dark:hover:bg-onedark-bg'
+              }`}
+              title="How parsing works"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
           </div>
           <button
             onClick={onClose}
@@ -146,13 +162,39 @@ export function ParsingDebugModal({ recipeId, recipeTitle, onClose }: ParsingDeb
             </div>
           )}
 
+          {/* Help Panel */}
+          {showHelp && (
+            <div className="mb-4 bg-blue-50 dark:bg-onedark-blue/10 border border-blue-200 dark:border-onedark-blue/30 rounded-lg p-4">
+              <h3 className="font-medium text-blue-900 dark:text-onedark-blue mb-2">How Ingredient Parsing Works</h3>
+              <div className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
+                <p>
+                  Ingredients are parsed using <code className="bg-blue-100 dark:bg-onedark-bg px-1 rounded text-xs">@jlucaspains/sharp-recipe-parser</code>,
+                  which extracts structured data from ingredient text.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <p className="font-medium mb-1">What gets extracted:</p>
+                    <ul className="list-disc list-inside text-xs space-y-0.5">
+                      <li><strong>Quantity</strong> - numeric amounts (1, 1/2, 1.5)</li>
+                      <li><strong>Unit</strong> - measurements (cup, tbsp, oz)</li>
+                      <li><strong>Ingredient</strong> - the main item name</li>
+                      <li><strong>Extra</strong> - preparation notes (diced, melted)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">Normalization Key:</p>
+                    <p className="text-xs">
+                      Used to match ingredients across recipes and with your pantry.
+                      If parsing produces an incorrect key, click the edit button to set it manually.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {!loading && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
-                Using <code className="bg-gray-100 dark:bg-onedark-bg px-1 rounded">@jlucaspains/sharp-recipe-parser</code>.
-                Click on an ingredient name to edit it manually.
-              </p>
-
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-onedark-bg-highlight">
