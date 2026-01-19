@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
 
 type Bindings = {
   DB: D1Database;
@@ -542,6 +543,10 @@ function parseIngredientLine(line: string): { name: string; quantity: number | n
 
   if (!trimmed) return null;
 
+  // Skip markdown headers (### Header, ## Header, **Header**)
+  if (/^#{2,}\s+/.test(trimmed)) return null;
+  if (/^\*\*[^*]+\*\*:?$/.test(trimmed)) return null;
+
   // Skip group headers (all caps or ending with colon)
   if (trimmed.endsWith(':')) return null;
   const words = trimmed.split(/\s+/);
@@ -600,8 +605,12 @@ function parseIngredientLine(line: string): { name: string; quantity: number | n
     name = rest.slice(unitMatch[0].length).trim();
   }
 
-  // Clean up name - remove trailing commas, parenthetical notes
-  name = name.replace(/,.*$/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  // Clean up name - remove leading "of", trailing commas, parenthetical notes
+  name = name
+    .replace(/^of\s+/i, '')  // Remove leading "of" (e.g., "of cilantro" -> "cilantro")
+    .replace(/,.*$/, '')      // Remove everything after comma
+    .replace(/\s*\([^)]*\)\s*$/, '')  // Remove trailing parenthetical
+    .trim();
 
   if (!name) return null;
 
@@ -703,21 +712,24 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         const parsed = parseIngredientLine(line);
         if (!parsed) continue;
 
-        const key = parsed.name.toLowerCase();
+        // Use normalized key for grouping (e.g., "green chilis" and "green chilies" -> "green chili")
+        const normalizedKey = normalizeIngredientKey(parsed.name);
+        if (!normalizedKey) continue;
+
         const scaledQty = parsed.quantity != null ? parsed.quantity * meal.scaling_factor : null;
 
-        if (!grouped.has(key)) {
-          grouped.set(key, {
-            name: parsed.name,
-            normalizedName: key,
+        if (!grouped.has(normalizedKey)) {
+          grouped.set(normalizedKey, {
+            name: normalizedKey, // Use normalized name for display
+            normalizedName: normalizedKey,
             category: 'Other', // Could be enhanced with ingredient category lookup
             totalQuantity: scaledQty,
             unit: parsed.unit,
-            inPantry: pantryItems.has(key),
+            inPantry: pantryItems.has(normalizedKey),
             recipes: [],
           });
         } else {
-          const existing = grouped.get(key)!;
+          const existing = grouped.get(normalizedKey)!;
           // Only sum quantities if units match and both have quantities
           if (scaledQty != null && existing.totalQuantity != null && existing.unit === parsed.unit) {
             existing.totalQuantity += scaledQty;
@@ -725,10 +737,11 @@ mealPlans.get('/:id/shopping-list', async (c) => {
             existing.totalQuantity = scaledQty;
             existing.unit = parsed.unit;
           }
+          // If units differ, we could track multiple unit types, but for now just keep first
         }
 
         // Add recipe reference
-        grouped.get(key)!.recipes.push({
+        grouped.get(normalizedKey)!.recipes.push({
           recipeId: meal.recipe_id,
           recipeSlug: meal.recipe_slug,
           recipeTitle: meal.recipe_title,

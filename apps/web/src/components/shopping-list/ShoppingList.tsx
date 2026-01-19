@@ -446,7 +446,7 @@ export function ShoppingList({
               <span className="font-medium text-gray-900 dark:text-onedark-fg">
                 {overrides.get(activeItem.normalizedName) ??
                   (activeItem.totalQuantity
-                    ? `${formatQuantity(activeItem.totalQuantity, activeItem.unit)} ${activeItem.name}`
+                    ? `${activeItem.name} (${formatQuantity(activeItem.totalQuantity, activeItem.unit)})`
                     : activeItem.name)}
               </span>
             </div>
@@ -535,10 +535,10 @@ function ShoppingListItemRow({
   const [editText, setEditText] = useState('');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
-  // Build display text
+  // Build display text: "ingredient name (quantity unit)" format
   const originalText = (() => {
     const qty = formatQuantity(item.totalQuantity, item.unit);
-    return qty ? `${qty} ${item.name}` : item.name;
+    return qty ? `${item.name} (${qty})` : item.name;
   })();
 
   const displayText = override ?? originalText;
@@ -835,7 +835,7 @@ function ItemPickerModal({
               {items.map((item) => {
                 const isSelected = selected.has(item.normalizedName);
                 const qty = formatQty(item.totalQuantity, item.unit);
-                const displayText = qty ? `${qty} ${item.name}` : item.name;
+                const displayText = qty ? `${item.name} (${qty})` : item.name;
 
                 return (
                   <button
