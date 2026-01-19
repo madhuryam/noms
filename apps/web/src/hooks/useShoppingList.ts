@@ -6,8 +6,10 @@ export interface ShoppingListRecipe {
   recipeId: number;
   recipeSlug: string | null;
   recipeTitle: string;
-  quantity: number | null;
-  scaledQuantity: number | null;
+  minQuantity: number | null;
+  maxQuantity: number | null;
+  scaledMinQuantity: number | null;
+  scaledMaxQuantity: number | null;
   plannedDate: string;
 }
 
@@ -16,7 +18,10 @@ export interface ShoppingListItem {
   name: string;
   normalizedName: string;
   category: string;
-  totalQuantity: number | null;
+  totalMinQuantity: number | null;
+  totalMaxQuantity: number | null;
+  // Legacy field for backwards compatibility
+  totalQuantity?: number | null;
   unit: string | null;
   preparation: string | null;
   isOptional: boolean;
@@ -199,17 +204,45 @@ export function useQuantityOverrides(planId: number | undefined) {
 }
 
 // Format quantity for display
+function formatNumber(quantity: number): string {
+  // Format the number nicely (remove trailing zeros)
+  return Number.isInteger(quantity)
+    ? quantity.toString()
+    : quantity.toFixed(2).replace(/\.?0+$/, '');
+}
+
 export function formatQuantity(quantity: number | null, unit: string | null): string {
   if (quantity == null) return '';
 
-  // Format the number nicely (remove trailing zeros)
-  const formatted = Number.isInteger(quantity)
-    ? quantity.toString()
-    : quantity.toFixed(2).replace(/\.?0+$/, '');
+  const formatted = formatNumber(quantity);
 
   if (!unit) return formatted;
 
   return `${formatted} ${unit}`;
+}
+
+export function formatQuantityRange(
+  minQuantity: number | null,
+  maxQuantity: number | null,
+  unit: string | null
+): string {
+  if (minQuantity == null && maxQuantity == null) return '';
+
+  // If only one is set, or they're the same, format as single value
+  if (minQuantity == null) {
+    return formatQuantity(maxQuantity, unit);
+  }
+  if (maxQuantity == null || minQuantity === maxQuantity) {
+    return formatQuantity(minQuantity, unit);
+  }
+
+  // Format as range
+  const minFormatted = formatNumber(minQuantity);
+  const maxFormatted = formatNumber(maxQuantity);
+
+  if (!unit) return `${minFormatted}-${maxFormatted}`;
+
+  return `${minFormatted}-${maxFormatted} ${unit}`;
 }
 
 // Hook to manage deleted items in localStorage
@@ -642,8 +675,8 @@ export function exportAsText(
 
     for (const item of items) {
       const checked = checkedItems.has(item.normalizedName) ? '[x]' : '[ ]';
-      const qty = formatQuantity(item.totalQuantity, item.unit);
-      const line = qty ? `${checked} ${qty} ${item.name}` : `${checked} ${item.name}`;
+      const qty = formatQuantityRange(item.totalMinQuantity, item.totalMaxQuantity, item.unit);
+      const line = qty ? `${checked} ${item.name} (${qty})` : `${checked} ${item.name}`;
       lines.push(line);
     }
 
@@ -674,8 +707,8 @@ export function exportAsMarkdown(
 
     for (const item of items) {
       const checked = checkedItems.has(item.normalizedName) ? 'x' : ' ';
-      const qty = formatQuantity(item.totalQuantity, item.unit);
-      const line = qty ? `- [${checked}] ${qty} ${item.name}` : `- [${checked}] ${item.name}`;
+      const qty = formatQuantityRange(item.totalMinQuantity, item.totalMaxQuantity, item.unit);
+      const line = qty ? `- [${checked}] ${item.name} (${qty})` : `- [${checked}] ${item.name}`;
       lines.push(line);
     }
 

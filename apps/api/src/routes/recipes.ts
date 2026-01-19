@@ -1605,6 +1605,8 @@ recipes.get('/:id/ingredients', async (c) => {
         normalizationKey: ing.normalization_key,
         parsed: parsed ? {
           quantity: parsed.quantity,
+          minQuantity: parsed.minQuantity,
+          maxQuantity: parsed.maxQuantity,
           quantityText: parsed.quantityText,
           unit: parsed.unit,
           unitText: parsed.unitText,

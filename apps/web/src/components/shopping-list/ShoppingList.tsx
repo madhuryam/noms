@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { ShoppingListCategory, ShoppingListItem, CustomCategory } from '../../hooks';
-import { formatQuantity } from '../../hooks';
+import { formatQuantityRange } from '../../hooks';
 import { CategorySection, UncategorizedSection } from './CategorySection';
 
 interface ShoppingListProps {
@@ -429,7 +429,6 @@ export function ShoppingList({
             setPickingForCategory(null);
           }}
           onClose={() => setPickingForCategory(null)}
-          formatQuantity={formatQuantity}
         />
       )}
 
@@ -445,8 +444,8 @@ export function ShoppingList({
               </span>
               <span className="font-medium text-gray-900 dark:text-onedark-fg">
                 {overrides.get(activeItem.normalizedName) ??
-                  (activeItem.totalQuantity
-                    ? `${activeItem.name} (${formatQuantity(activeItem.totalQuantity, activeItem.unit)})`
+                  (activeItem.totalMinQuantity
+                    ? `${activeItem.name} (${formatQuantityRange(activeItem.totalMinQuantity, activeItem.totalMaxQuantity, activeItem.unit)})`
                     : activeItem.name)}
               </span>
             </div>
@@ -537,7 +536,7 @@ function ShoppingListItemRow({
 
   // Build display text: "ingredient name (quantity unit)" format
   const originalText = (() => {
-    const qty = formatQuantity(item.totalQuantity, item.unit);
+    const qty = formatQuantityRange(item.totalMinQuantity, item.totalMaxQuantity, item.unit);
     return qty ? `${item.name} (${qty})` : item.name;
   })();
 
@@ -763,9 +762,9 @@ function ShoppingListItemRow({
               >
                 {recipe.recipeTitle}
               </Link>
-              {recipe.scaledQuantity != null && (
+              {recipe.scaledMinQuantity != null && (
                 <span className="text-gray-400 dark:text-onedark-fg-muted">
-                  {formatQuantity(recipe.scaledQuantity, item.unit)}
+                  {formatQuantityRange(recipe.scaledMinQuantity, recipe.scaledMaxQuantity, item.unit)}
                 </span>
               )}
             </div>
@@ -782,7 +781,6 @@ interface ItemPickerModalProps {
   categoryName: string;
   onSelect: (normalizedNames: string[]) => void;
   onClose: () => void;
-  formatQuantity: (qty: number | null, unit: string | null) => string;
 }
 
 function ItemPickerModal({
@@ -790,7 +788,6 @@ function ItemPickerModal({
   categoryName,
   onSelect,
   onClose,
-  formatQuantity: formatQty,
 }: ItemPickerModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -834,7 +831,7 @@ function ItemPickerModal({
             <div className="space-y-1">
               {items.map((item) => {
                 const isSelected = selected.has(item.normalizedName);
-                const qty = formatQty(item.totalQuantity, item.unit);
+                const qty = formatQuantityRange(item.totalMinQuantity, item.totalMaxQuantity, item.unit);
                 const displayText = qty ? `${item.name} (${qty})` : item.name;
 
                 return (

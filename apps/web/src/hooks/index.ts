@@ -68,6 +68,7 @@ export {
   usePantryOverrides,
   useMultiSelect,
   formatQuantity,
+  formatQuantityRange,
   exportAsText,
   exportAsMarkdown,
 } from './useShoppingList';

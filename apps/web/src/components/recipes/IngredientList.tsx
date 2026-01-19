@@ -51,6 +51,32 @@ interface IngredientSection {
 }
 
 /**
+ * Format a quantity range for display.
+ * Returns "2-3" for ranges, or just the number for single values.
+ */
+function formatQuantityRange(
+  minQty: number | null,
+  maxQty: number | null,
+  scaleFactor: number
+): string | null {
+  if (minQty === null && maxQty === null) return null;
+
+  const scaledMin = minQty !== null ? minQty * scaleFactor : null;
+  const scaledMax = maxQty !== null ? maxQty * scaleFactor : null;
+
+  // If both are null or same value, format as single
+  if (scaledMin === null) {
+    return scaledMax !== null ? formatAmount(scaledMax) : null;
+  }
+  if (scaledMax === null || scaledMin === scaledMax) {
+    return formatAmount(scaledMin);
+  }
+
+  // Format as range
+  return `${formatAmount(scaledMin)}-${formatAmount(scaledMax)}`;
+}
+
+/**
  * Format a parsed ingredient for display.
  * Format: <quantity> <unit> **<ingredient>** (<extras>)
  */
@@ -75,12 +101,18 @@ function formatIngredientDisplay(
     };
   }
 
-  // Handle quantity with scaling
+  // Handle quantity with scaling - use range if available
   let quantityStr: string | null = null;
-  if (parsed.quantity !== null && parsed.quantity > 0) {
-    const ingredientName = parsed.ingredient || '';
-    const canScale = !shouldNotScale(ingredientName);
-    const scaledQuantity = canScale ? parsed.quantity * scaleFactor : parsed.quantity;
+  const ingredientName = parsed.ingredient || '';
+  const canScale = !shouldNotScale(ingredientName);
+  const effectiveScale = canScale ? scaleFactor : 1;
+
+  // Check if we have range quantities
+  if (parsed.minQuantity !== null || parsed.maxQuantity !== null) {
+    quantityStr = formatQuantityRange(parsed.minQuantity, parsed.maxQuantity, effectiveScale);
+  } else if (parsed.quantity !== null && parsed.quantity > 0) {
+    // Fall back to single quantity
+    const scaledQuantity = parsed.quantity * effectiveScale;
     quantityStr = formatAmount(scaledQuantity);
   }
 

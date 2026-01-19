@@ -125,6 +125,8 @@ export interface ParsedIngredient {
   normalizationKey: string | null;
   parsed: {
     quantity: number | null;
+    minQuantity: number | null;
+    maxQuantity: number | null;
     quantityText: string;
     unit: string;
     unitText: string;

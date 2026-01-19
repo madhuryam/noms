@@ -535,7 +535,40 @@ mealPlans.delete('/:id/meals/:mealId', async (c) => {
 });
 
 // Helper to parse ingredient line for shopping list
-function parseIngredientLine(line: string): { name: string; quantity: number | null; unit: string | null } | null {
+function parseAmount(amountStr: string): number | null {
+  const fractionMap: Record<string, number> = {
+    '½': 0.5, '⅓': 1/3, '⅔': 2/3, '¼': 0.25, '¾': 0.75,
+    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
+  };
+
+  const str = amountStr.trim();
+
+  // Check for unicode fractions
+  for (const [frac, value] of Object.entries(fractionMap)) {
+    if (str.includes(frac)) {
+      const parts = str.split(frac);
+      const whole = parts[0].trim();
+      return whole ? parseInt(whole, 10) + value : value;
+    }
+  }
+
+  // Mixed fraction: "1 1/2"
+  const mixedMatch = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixedMatch) {
+    return parseInt(mixedMatch[1]) + parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]);
+  }
+
+  // Simple fraction: "1/2"
+  if (/^\d+\/\d+$/.test(str)) {
+    const [num, den] = str.split('/').map(Number);
+    return num / den;
+  }
+
+  // Plain number
+  return parseFloat(str) || null;
+}
+
+function parseIngredientLine(line: string): { name: string; minQuantity: number | null; maxQuantity: number | null; unit: string | null } | null {
   const trimmed = line.trim()
     .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
     .replace(/^[-*]\s+/, '')
@@ -555,41 +588,31 @@ function parseIngredientLine(line: string): { name: string; quantity: number | n
     return null;
   }
 
-  // Try to parse quantity at start
-  const fractionMap: Record<string, number> = {
-    '½': 0.5, '⅓': 1/3, '⅔': 2/3, '¼': 0.25, '¾': 0.75,
-    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
-  };
+  // Single amount pattern (no range)
+  const singleAmountPart = '(?:\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+\\.?\\d*\\s*[½⅓⅔¼¾⅛⅜⅝⅞]?|[½⅓⅔¼¾⅛⅜⅝⅞])';
 
-  const amountPattern = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅛⅜⅝⅞]?|[½⅓⅔¼¾⅛⅜⅝⅞])\s*/;
-  const amountMatch = trimmed.match(amountPattern);
+  // Range pattern: "2-3", "2 - 3", "2 to 3", "2 or 3"
+  const rangePattern = new RegExp(`^(${singleAmountPart})\\s*(?:-|–|to|or)\\s*(${singleAmountPart})\\s*`, 'i');
+  const singlePattern = new RegExp(`^(${singleAmountPart})\\s*`);
 
-  let quantity: number | null = null;
+  let minQuantity: number | null = null;
+  let maxQuantity: number | null = null;
   let rest = trimmed;
 
-  if (amountMatch) {
-    const amountStr = amountMatch[1].trim();
-    rest = trimmed.slice(amountMatch[0].length).trim();
-
-    // Parse amount
-    for (const [frac, value] of Object.entries(fractionMap)) {
-      if (amountStr.includes(frac)) {
-        const parts = amountStr.split(frac);
-        const whole = parts[0].trim();
-        quantity = whole ? parseInt(whole, 10) + value : value;
-        break;
-      }
-    }
-    if (quantity === null) {
-      const mixedMatch = amountStr.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-      if (mixedMatch) {
-        quantity = parseInt(mixedMatch[1]) + parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]);
-      } else if (/^\d+\/\d+$/.test(amountStr)) {
-        const [num, den] = amountStr.split('/').map(Number);
-        quantity = num / den;
-      } else {
-        quantity = parseFloat(amountStr) || null;
-      }
+  // Try range first
+  const rangeMatch = trimmed.match(rangePattern);
+  if (rangeMatch) {
+    minQuantity = parseAmount(rangeMatch[1]);
+    maxQuantity = parseAmount(rangeMatch[2]);
+    rest = trimmed.slice(rangeMatch[0].length).trim();
+  } else {
+    // Try single amount
+    const singleMatch = trimmed.match(singlePattern);
+    if (singleMatch) {
+      const qty = parseAmount(singleMatch[1]);
+      minQuantity = qty;
+      maxQuantity = qty;
+      rest = trimmed.slice(singleMatch[0].length).trim();
     }
   }
 
@@ -614,7 +637,7 @@ function parseIngredientLine(line: string): { name: string; quantity: number | n
 
   if (!name) return null;
 
-  return { name, quantity, unit };
+  return { name, minQuantity, maxQuantity, unit };
 }
 
 // GET /api/meal-plans/:id/shopping-list - Generate shopping list for a meal plan
@@ -716,14 +739,16 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         const normalizedKey = normalizeIngredientKey(parsed.name);
         if (!normalizedKey) continue;
 
-        const scaledQty = parsed.quantity != null ? parsed.quantity * meal.scaling_factor : null;
+        const scaledMinQty = parsed.minQuantity != null ? parsed.minQuantity * meal.scaling_factor : null;
+        const scaledMaxQty = parsed.maxQuantity != null ? parsed.maxQuantity * meal.scaling_factor : null;
 
         if (!grouped.has(normalizedKey)) {
           grouped.set(normalizedKey, {
             name: normalizedKey, // Use normalized name for display
             normalizedName: normalizedKey,
             category: 'Other', // Could be enhanced with ingredient category lookup
-            totalQuantity: scaledQty,
+            totalMinQuantity: scaledMinQty,
+            totalMaxQuantity: scaledMaxQty,
             unit: parsed.unit,
             inPantry: pantryItems.has(normalizedKey),
             recipes: [],
@@ -731,10 +756,12 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         } else {
           const existing = grouped.get(normalizedKey)!;
           // Only sum quantities if units match and both have quantities
-          if (scaledQty != null && existing.totalQuantity != null && existing.unit === parsed.unit) {
-            existing.totalQuantity += scaledQty;
-          } else if (scaledQty != null && existing.totalQuantity == null) {
-            existing.totalQuantity = scaledQty;
+          if (scaledMinQty != null && existing.totalMinQuantity != null && existing.unit === parsed.unit) {
+            existing.totalMinQuantity += scaledMinQty;
+            existing.totalMaxQuantity = (existing.totalMaxQuantity ?? 0) + (scaledMaxQty ?? scaledMinQty);
+          } else if (scaledMinQty != null && existing.totalMinQuantity == null) {
+            existing.totalMinQuantity = scaledMinQty;
+            existing.totalMaxQuantity = scaledMaxQty;
             existing.unit = parsed.unit;
           }
           // If units differ, we could track multiple unit types, but for now just keep first
@@ -745,8 +772,10 @@ mealPlans.get('/:id/shopping-list', async (c) => {
           recipeId: meal.recipe_id,
           recipeSlug: meal.recipe_slug,
           recipeTitle: meal.recipe_title,
-          quantity: parsed.quantity,
-          scaledQuantity: scaledQty,
+          minQuantity: parsed.minQuantity,
+          maxQuantity: parsed.maxQuantity,
+          scaledMinQuantity: scaledMinQty,
+          scaledMaxQuantity: scaledMaxQty,
           plannedDate: meal.planned_date,
         });
       }
