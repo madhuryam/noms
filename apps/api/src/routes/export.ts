@@ -15,6 +15,7 @@ const exportRoutes = new Hono<{ Bindings: Bindings }>();
 interface ExportedRecipe {
   id: number;
   title: string;
+  slug: string | null;
   source_path: string | null;
   source_url: string | null;
   markdown_content: string | null;
@@ -32,9 +33,15 @@ interface ExportedRecipe {
   last_cooked_at: string | null;
   last_accessed_at: string | null;
   cook_count: number;
+  // Nutrition data
+  carbs_total: number | null;
+  protein_total: number | null;
+  fat_total: number | null;
+  calories_total: number | null;
+  macros_manual: number | null;
   // Related data
   tags: { id: number; name: string; display_name: string | null; color: string | null; is_category: number }[];
-  images: { id: number; path: string; alt: string | null; sort_order: number }[];
+  images: { id: number; path: string; alt: string | null; sort_order: number; created_at: string | null }[];
   ingredients: {
     id: number;
     ingredient_id: number | null;
@@ -46,6 +53,7 @@ interface ExportedRecipe {
     is_optional: number;
     group_name: string | null;
     sort_order: number;
+    normalization_key: string | null;
   }[];
   pairings: {
     id: number;
@@ -78,6 +86,35 @@ interface FullExportData {
     normalized_name: string;
     category: string | null;
   }[];
+  // Ingredient Nutrition (user customizations)
+  ingredientNutrition: {
+    id: number;
+    ingredient_name: string;
+    carbs_per_100g: number | null;
+    protein_per_100g: number | null;
+    fat_per_100g: number | null;
+    calories_per_100g: number | null;
+    usda_fdc_id: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+  }[];
+  // Unit Conversions (user customizations - excludes seeded defaults)
+  unitConversions: {
+    id: number;
+    ingredient_category: string;
+    ingredient_pattern: string | null;
+    from_unit: string;
+    to_unit: string;
+    factor: number;
+    notes: string | null;
+  }[];
+  // Pantry Categories
+  pantryCategories: {
+    id: number;
+    name: string;
+    location: string;
+    sort_order: number;
+  }[];
   // Pantry
   pantryItems: {
     id: number;
@@ -90,6 +127,9 @@ interface FullExportData {
     expiration_date: string | null;
     is_staple: number;
     needs_refill: number;
+    normalization_key: string | null;
+    category_id: number | null;
+    original_name: string | null;
   }[];
   // Meal Planning
   mealPlans: {
@@ -409,7 +449,7 @@ async function getFullRecipe(db: D1Database, recipeId: number): Promise<Exported
   // Get images
   const imagesResult = await db
     .prepare(`
-      SELECT id, path, alt, sort_order
+      SELECT id, path, alt, sort_order, created_at
       FROM recipe_images
       WHERE recipe_id = ?
       ORDER BY sort_order ASC
@@ -418,10 +458,10 @@ async function getFullRecipe(db: D1Database, recipeId: number): Promise<Exported
     .all();
   recipe.images = (imagesResult.results || []) as ExportedRecipe['images'];
 
-  // Get ingredients
+  // Get ingredients (including normalization_key for persistence)
   const ingredientsResult = await db
     .prepare(`
-      SELECT id, ingredient_id, quantity, unit, raw_text, preparation, notes, is_optional, group_name, sort_order
+      SELECT id, ingredient_id, quantity, unit, raw_text, preparation, notes, is_optional, group_name, sort_order, normalization_key
       FROM recipe_ingredients
       WHERE recipe_id = ?
       ORDER BY sort_order ASC
@@ -524,9 +564,24 @@ exportRoutes.get('/data', async (c) => {
       .prepare('SELECT id, name, name_plural, normalized_name, category FROM ingredients ORDER BY name')
       .all();
 
-    // Get all pantry items
+    // Get all ingredient nutrition (user customizations)
+    const ingredientNutritionResult = await db
+      .prepare('SELECT id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at FROM ingredient_nutrition ORDER BY ingredient_name')
+      .all();
+
+    // Get all unit conversions (includes seeded defaults - they'll be re-seeded on fresh install)
+    const unitConversionsResult = await db
+      .prepare('SELECT id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes FROM unit_conversions ORDER BY id')
+      .all();
+
+    // Get all pantry categories
+    const pantryCategoriesResult = await db
+      .prepare('SELECT id, name, location, sort_order FROM pantry_categories ORDER BY location, sort_order')
+      .all();
+
+    // Get all pantry items (including all fields)
     const pantryResult = await db
-      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill FROM pantry_items ORDER BY name')
+      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name FROM pantry_items ORDER BY name')
       .all();
 
     // Get all meal plans
@@ -573,11 +628,14 @@ exportRoutes.get('/data', async (c) => {
     }
 
     const exportData: FullExportData = {
-      version: '1.0.0',
+      version: '1.1.0',
       exportedAt: new Date().toISOString(),
       recipes,
       tags: (tagsResult.results || []) as FullExportData['tags'],
       ingredients: (ingredientsResult.results || []) as FullExportData['ingredients'],
+      ingredientNutrition: (ingredientNutritionResult.results || []) as FullExportData['ingredientNutrition'],
+      unitConversions: (unitConversionsResult.results || []) as FullExportData['unitConversions'],
+      pantryCategories: (pantryCategoriesResult.results || []) as FullExportData['pantryCategories'],
       pantryItems: (pantryResult.results || []) as FullExportData['pantryItems'],
       mealPlans: (mealPlansResult.results || []) as FullExportData['mealPlans'],
       mealSlots: (mealSlotsResult.results || []) as FullExportData['mealSlots'],
@@ -679,6 +737,9 @@ exportRoutes.post('/import', async (c) => {
     const stats = {
       tags: 0,
       ingredients: 0,
+      ingredientNutrition: 0,
+      unitConversions: 0,
+      pantryCategories: 0,
       recipes: 0,
       pantryItems: 0,
       mealPlans: 0,
@@ -713,9 +774,12 @@ exportRoutes.post('/import', async (c) => {
       db.prepare('DELETE FROM recipe_tags'),
       db.prepare('DELETE FROM recipes'),
       db.prepare('DELETE FROM pantry_items'),
+      db.prepare('DELETE FROM pantry_categories'),
       db.prepare('DELETE FROM food_association_terms'),
       db.prepare('DELETE FROM food_association_groups'),
       db.prepare('DELETE FROM shelf_life'),
+      db.prepare('DELETE FROM ingredient_nutrition'),
+      db.prepare('DELETE FROM unit_conversions'),
       db.prepare('DELETE FROM ingredients'),
       db.prepare('DELETE FROM tags'),
     ]);
@@ -742,21 +806,56 @@ exportRoutes.post('/import', async (c) => {
       stats.ingredients = importData.ingredients.length;
     }
 
+    // Import ingredient nutrition (user customizations)
+    if (importData.ingredientNutrition?.length) {
+      const nutritionStmts = importData.ingredientNutrition.map((item) =>
+        db
+          .prepare(`INSERT INTO ingredient_nutrition (id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(item.id, item.ingredient_name, n(item.carbs_per_100g), n(item.protein_per_100g), n(item.fat_per_100g), n(item.calories_per_100g), n(item.usda_fdc_id), n(item.created_at), n(item.updated_at))
+      );
+      await runBatched(nutritionStmts);
+      stats.ingredientNutrition = importData.ingredientNutrition.length;
+    }
+
+    // Import unit conversions
+    if (importData.unitConversions?.length) {
+      const convStmts = importData.unitConversions.map((conv) =>
+        db
+          .prepare('INSERT INTO unit_conversions (id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .bind(conv.id, conv.ingredient_category, n(conv.ingredient_pattern), conv.from_unit, conv.to_unit, conv.factor, n(conv.notes))
+      );
+      await runBatched(convStmts);
+      stats.unitConversions = importData.unitConversions.length;
+    }
+
+    // Import pantry categories (before pantry items since they reference them)
+    if (importData.pantryCategories?.length) {
+      const catStmts = importData.pantryCategories.map((cat) =>
+        db
+          .prepare('INSERT INTO pantry_categories (id, name, location, sort_order) VALUES (?, ?, ?, ?)')
+          .bind(cat.id, cat.name, cat.location, cat.sort_order)
+      );
+      await runBatched(catStmts);
+      stats.pantryCategories = importData.pantryCategories.length;
+    }
+
     // Import recipes - batch the base recipes first
     if (importData.recipes?.length) {
       const recipeStmts = importData.recipes.map((recipe) =>
         db
           .prepare(`
             INSERT INTO recipes (
-              id, title, source_path, source_url, markdown_content, description,
+              id, title, slug, source_path, source_url, markdown_content, description,
               ingredients_raw, instructions_raw, notes, prep_time_minutes, cook_time_minutes,
               servings, servings_unit, image_path, created_at, updated_at,
-              last_cooked_at, last_accessed_at, cook_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              last_cooked_at, last_accessed_at, cook_count,
+              carbs_total, protein_total, fat_total, calories_total, macros_manual
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `)
           .bind(
             recipe.id,
             recipe.title,
+            n(recipe.slug),
             n(recipe.source_path),
             n(recipe.source_url),
             n(recipe.markdown_content),
@@ -773,7 +872,12 @@ exportRoutes.post('/import', async (c) => {
             n(recipe.updated_at),
             n(recipe.last_cooked_at),
             n(recipe.last_accessed_at),
-            recipe.cook_count ?? 0
+            recipe.cook_count ?? 0,
+            n(recipe.carbs_total),
+            n(recipe.protein_total),
+            n(recipe.fat_total),
+            n(recipe.calories_total),
+            n(recipe.macros_manual)
           )
       );
       await runBatched(recipeStmts);
@@ -796,14 +900,14 @@ exportRoutes.post('/import', async (c) => {
       for (const recipe of importData.recipes) {
         for (const img of recipe.images || []) {
           recipeImgStmts.push(
-            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?, ?)')
-              .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order ?? 0)
+            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+              .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order ?? 0, n(img.created_at))
           );
         }
       }
       await runBatched(recipeImgStmts);
 
-      // Batch recipe ingredients
+      // Batch recipe ingredients (including normalization_key for persistence)
       const recipeIngStmts: D1PreparedStatement[] = [];
       for (const recipe of importData.recipes) {
         for (const ing of recipe.ingredients || []) {
@@ -811,8 +915,8 @@ exportRoutes.post('/import', async (c) => {
             db.prepare(`
               INSERT INTO recipe_ingredients (
                 id, recipe_id, ingredient_id, quantity, unit, raw_text,
-                preparation, notes, is_optional, group_name, sort_order
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                preparation, notes, is_optional, group_name, sort_order, normalization_key
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
               .bind(
                 ing.id,
@@ -825,7 +929,8 @@ exportRoutes.post('/import', async (c) => {
                 n(ing.notes),
                 ing.is_optional ?? 0,
                 n(ing.group_name),
-                ing.sort_order ?? 0
+                ing.sort_order ?? 0,
+                n(ing.normalization_key)
               )
           );
         }
@@ -847,13 +952,13 @@ exportRoutes.post('/import', async (c) => {
       await runBatched(pairingStmts);
     }
 
-    // Import pantry items
+    // Import pantry items (including all fields)
     if (importData.pantryItems?.length) {
       const pantryStmts = importData.pantryItems.map((item) =>
         db.prepare(`
           INSERT INTO pantry_items (
-            id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
             item.id,
@@ -865,7 +970,10 @@ exportRoutes.post('/import', async (c) => {
             n(item.location),
             n(item.expiration_date),
             item.is_staple ?? 0,
-            (item as { needs_refill?: number }).needs_refill ?? 0
+            item.needs_refill ?? 0,
+            n(item.normalization_key),
+            n(item.category_id),
+            n(item.original_name)
           )
       );
       await runBatched(pantryStmts);
@@ -1137,6 +1245,9 @@ exportRoutes.post('/import-zip', async (c) => {
     const stats = {
       tags: 0,
       ingredients: 0,
+      ingredientNutrition: 0,
+      unitConversions: 0,
+      pantryCategories: 0,
       recipes: 0,
       pantryItems: 0,
       mealPlans: 0,
@@ -1172,9 +1283,12 @@ exportRoutes.post('/import-zip', async (c) => {
       db.prepare('DELETE FROM recipe_tags'),
       db.prepare('DELETE FROM recipes'),
       db.prepare('DELETE FROM pantry_items'),
+      db.prepare('DELETE FROM pantry_categories'),
       db.prepare('DELETE FROM food_association_terms'),
       db.prepare('DELETE FROM food_association_groups'),
       db.prepare('DELETE FROM shelf_life'),
+      db.prepare('DELETE FROM ingredient_nutrition'),
+      db.prepare('DELETE FROM unit_conversions'),
       db.prepare('DELETE FROM ingredients'),
       db.prepare('DELETE FROM tags'),
     ]);
@@ -1225,24 +1339,57 @@ exportRoutes.post('/import-zip', async (c) => {
       stats.ingredients = importData.ingredients.length;
     }
 
+    // Import ingredient nutrition (user customizations)
+    if (importData.ingredientNutrition?.length) {
+      const nutritionStmts = importData.ingredientNutrition.map((item) =>
+        db.prepare(`INSERT INTO ingredient_nutrition (id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(item.id, item.ingredient_name, n(item.carbs_per_100g), n(item.protein_per_100g), n(item.fat_per_100g), n(item.calories_per_100g), n(item.usda_fdc_id), n(item.created_at), n(item.updated_at))
+      );
+      await runBatched(nutritionStmts);
+      stats.ingredientNutrition = importData.ingredientNutrition.length;
+    }
+
+    // Import unit conversions
+    if (importData.unitConversions?.length) {
+      const convStmts = importData.unitConversions.map((conv) =>
+        db.prepare('INSERT INTO unit_conversions (id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .bind(conv.id, conv.ingredient_category, n(conv.ingredient_pattern), conv.from_unit, conv.to_unit, conv.factor, n(conv.notes))
+      );
+      await runBatched(convStmts);
+      stats.unitConversions = importData.unitConversions.length;
+    }
+
+    // Import pantry categories (before pantry items since they reference them)
+    if (importData.pantryCategories?.length) {
+      const catStmts = importData.pantryCategories.map((cat) =>
+        db.prepare('INSERT INTO pantry_categories (id, name, location, sort_order) VALUES (?, ?, ?, ?)')
+          .bind(cat.id, cat.name, cat.location, cat.sort_order)
+      );
+      await runBatched(catStmts);
+      stats.pantryCategories = importData.pantryCategories.length;
+    }
+
     // Import recipes
     if (importData.recipes?.length) {
       const recipeStmts = importData.recipes.map((recipe) =>
         db.prepare(`
           INSERT INTO recipes (
-            id, title, source_path, source_url, markdown_content, description,
+            id, title, slug, source_path, source_url, markdown_content, description,
             ingredients_raw, instructions_raw, notes, prep_time_minutes, cook_time_minutes,
             servings, servings_unit, image_path, created_at, updated_at,
-            last_cooked_at, last_accessed_at, cook_count
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            last_cooked_at, last_accessed_at, cook_count,
+            carbs_total, protein_total, fat_total, calories_total, macros_manual
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
-            recipe.id, recipe.title, n(recipe.source_path), n(recipe.source_url),
+            recipe.id, recipe.title, n(recipe.slug), n(recipe.source_path), n(recipe.source_url),
             n(recipe.markdown_content), n(recipe.description), n(recipe.ingredients_raw),
             n(recipe.instructions_raw), n(recipe.notes), n(recipe.prep_time_minutes),
             n(recipe.cook_time_minutes), n(recipe.servings), n(recipe.servings_unit),
             n(recipe.image_path), n(recipe.created_at), n(recipe.updated_at),
-            n(recipe.last_cooked_at), n(recipe.last_accessed_at), recipe.cook_count ?? 0
+            n(recipe.last_cooked_at), n(recipe.last_accessed_at), recipe.cook_count ?? 0,
+            n(recipe.carbs_total), n(recipe.protein_total), n(recipe.fat_total),
+            n(recipe.calories_total), n(recipe.macros_manual)
           )
       );
       await runBatched(recipeStmts);
@@ -1265,14 +1412,14 @@ exportRoutes.post('/import-zip', async (c) => {
       for (const recipe of importData.recipes) {
         for (const img of recipe.images || []) {
           recipeImageStmts.push(
-            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order) VALUES (?, ?, ?, ?, ?)')
-              .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order)
+            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+              .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order, n(img.created_at))
           );
         }
       }
       await runBatched(recipeImageStmts);
 
-      // Batch recipe ingredients
+      // Batch recipe ingredients (including normalization_key for persistence)
       const recipeIngStmts: D1PreparedStatement[] = [];
       for (const recipe of importData.recipes) {
         for (const ing of recipe.ingredients || []) {
@@ -1280,13 +1427,13 @@ exportRoutes.post('/import-zip', async (c) => {
             db.prepare(`
               INSERT INTO recipe_ingredients (
                 id, recipe_id, ingredient_id, quantity, unit, raw_text,
-                preparation, notes, is_optional, group_name, sort_order
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                preparation, notes, is_optional, group_name, sort_order, normalization_key
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
               .bind(
                 ing.id, recipe.id, n(ing.ingredient_id), n(ing.quantity), n(ing.unit),
                 ing.raw_text, n(ing.preparation), n(ing.notes), ing.is_optional,
-                n(ing.group_name), ing.sort_order
+                n(ing.group_name), ing.sort_order, n(ing.normalization_key)
               )
           );
         }
@@ -1309,14 +1456,14 @@ exportRoutes.post('/import-zip', async (c) => {
       await runBatched(pairingStmts);
     }
 
-    // Import pantry items
+    // Import pantry items (including all fields)
     if (importData.pantryItems?.length) {
       const pantryStmts = importData.pantryItems.map((item) =>
         db.prepare(`
-          INSERT INTO pantry_items (id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO pantry_items (id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
-          .bind(item.id, n(item.ingredient_id), item.name, item.normalized_name, n(item.quantity), n(item.unit), n(item.location), n(item.expiration_date), item.is_staple ?? 0, (item as { needs_refill?: number }).needs_refill ?? 0)
+          .bind(item.id, n(item.ingredient_id), item.name, item.normalized_name, n(item.quantity), n(item.unit), n(item.location), n(item.expiration_date), item.is_staple ?? 0, item.needs_refill ?? 0, n(item.normalization_key), n(item.category_id), n(item.original_name))
       );
       await runBatched(pantryStmts);
       stats.pantryItems = importData.pantryItems.length;
