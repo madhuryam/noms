@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { usePantrySuggestions } from '../hooks';
+import { usePantrySuggestions, useTags, useSmartTags } from '../hooks';
 import { MatchedRecipeCard } from '../components/suggestions';
 
 type LocationFilter = 'all' | 'pantry' | 'pantry,fridge' | 'pantry,fridge,freezer';
@@ -8,11 +8,18 @@ type LocationFilter = 'all' | 'pantry' | 'pantry,fridge' | 'pantry,fridge,freeze
 export function WhatCanIMakePage() {
   const [maxMissing, setMaxMissing] = useState(3);
   const [locations, setLocations] = useState<LocationFilter>('all');
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [selectedSmartTagIds, setSelectedSmartTagIds] = useState<number[]>([]);
+
+  const { data: tags } = useTags();
+  const { data: smartTags } = useSmartTags();
 
   const { data, isLoading, error } = usePantrySuggestions({
     maxMissing,
     limit: 50,
     locations,
+    tagIds: selectedTagIds,
+    smartTagIds: selectedSmartTagIds,
   });
 
   const recipes = data?.recipes ?? [];
@@ -48,14 +55,14 @@ export function WhatCanIMakePage() {
             <input
               type="range"
               min="0"
-              max="5"
+              max="10"
               value={maxMissing}
               onChange={(e) => setMaxMissing(Number(e.target.value))}
               className="w-full h-2 bg-gray-200 dark:bg-onedark-bg-highlight rounded-lg appearance-none cursor-pointer accent-blue-600"
             />
             <div className="flex justify-between text-xs text-gray-400 dark:text-onedark-fg-muted mt-1">
               <span>Perfect match</span>
-              <span>5 missing</span>
+              <span>10 missing</span>
             </div>
           </div>
 
@@ -73,6 +80,60 @@ export function WhatCanIMakePage() {
               <option value="pantry,fridge">Pantry + Fridge</option>
               <option value="pantry,fridge,freezer">Pantry + Fridge + Freezer</option>
               <option value="all">All inventory</option>
+            </select>
+          </div>
+
+          {/* Tag filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg mb-2">
+              Filter by tag
+            </label>
+            <select
+              value={
+                selectedTagIds.length === 1
+                  ? `tag:${selectedTagIds[0]}`
+                  : selectedSmartTagIds.length === 1
+                    ? `smart:${selectedSmartTagIds[0]}`
+                    : ''
+              }
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  setSelectedTagIds([]);
+                  setSelectedSmartTagIds([]);
+                } else if (value.startsWith('tag:')) {
+                  setSelectedTagIds([parseInt(value.slice(4), 10)]);
+                  setSelectedSmartTagIds([]);
+                } else if (value.startsWith('smart:')) {
+                  setSelectedTagIds([]);
+                  setSelectedSmartTagIds([parseInt(value.slice(6), 10)]);
+                }
+              }}
+              className="px-3 py-2 border border-gray-300 dark:border-onedark-bg-highlight rounded-lg bg-white dark:bg-onedark-bg text-sm text-gray-900 dark:text-onedark-fg"
+            >
+              <option value="">All recipes</option>
+              {tags && tags.length > 0 && (
+                <optgroup label="Tags">
+                  {[...tags]
+                    .sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name))
+                    .map((tag) => (
+                      <option key={`tag-${tag.id}`} value={`tag:${tag.id}`}>
+                        {tag.display_name || tag.name}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              {smartTags && smartTags.length > 0 && (
+                <optgroup label="Smart Tags">
+                  {[...smartTags]
+                    .sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name))
+                    .map((tag) => (
+                      <option key={`smart-${tag.id}`} value={`smart:${tag.id}`}>
+                        {tag.display_name || tag.name}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
             </select>
           </div>
         </div>

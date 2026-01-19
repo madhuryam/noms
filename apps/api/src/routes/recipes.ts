@@ -596,10 +596,28 @@ recipes.get('/suggestions/daily', async (c) => {
 });
 
 // GET /api/recipes/suggestions/pantry - Get recipes matching pantry contents
+// Query params:
+//   - maxMissing: max number of missing ingredients (default 3, max 10)
+//   - limit: max number of results (default 20, max 50)
+//   - locations: 'pantry', 'fridge', 'freezer', 'all', or comma-separated
+//   - tags: comma-separated tag IDs to filter recipes
+//   - smartTags: comma-separated smart tag IDs to filter recipes
 recipes.get('/suggestions/pantry', async (c) => {
   const maxMissing = Math.min(Number(c.req.query('maxMissing')) || 3, 10);
   const limit = Math.min(Number(c.req.query('limit')) || 20, 50);
   const includeLocations = c.req.query('locations') || 'all'; // 'pantry', 'fridge', 'freezer', 'all'
+  const tagsParam = c.req.query('tags');
+  const smartTagsParam = c.req.query('smartTags');
+
+  // Parse tag IDs
+  const tagIds = tagsParam
+    ? tagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+    : [];
+
+  // Parse smart tag IDs
+  const smartTagIds = smartTagsParam
+    ? smartTagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+    : [];
 
   try {
     // Get all pantry items based on location filter
@@ -663,11 +681,38 @@ recipes.get('/suggestions/pantry', async (c) => {
       associations.get(t1)!.add(t2);
     }
 
-    // Get all recipes with their ingredients
-    const recipesResult = await c.env.DB.prepare(`
-      SELECT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
-      FROM recipes r
-    `).all();
+    // Get all recipes with their ingredients, optionally filtered by tags or smart tags
+    let recipesQuery: string;
+    const recipeBindings: number[] = [];
+
+    if (tagIds.length > 0) {
+      // Filter by regular tags - recipe must have at least one of the specified tags
+      const placeholders = tagIds.map(() => '?').join(',');
+      recipesQuery = `
+        SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
+        FROM recipes r
+        JOIN recipe_tags rt ON r.id = rt.recipe_id
+        WHERE rt.tag_id IN (${placeholders})
+      `;
+      recipeBindings.push(...tagIds);
+    } else if (smartTagIds.length > 0) {
+      // Filter by smart tags - recipe must have at least one of the specified smart tags
+      const placeholders = smartTagIds.map(() => '?').join(',');
+      recipesQuery = `
+        SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
+        FROM recipes r
+        JOIN recipe_smart_tags rst ON r.id = rst.recipe_id
+        WHERE rst.smart_tag_id IN (${placeholders})
+      `;
+      recipeBindings.push(...smartTagIds);
+    } else {
+      recipesQuery = `
+        SELECT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
+        FROM recipes r
+      `;
+    }
+
+    const recipesResult = await c.env.DB.prepare(recipesQuery).bind(...recipeBindings).all();
 
     const recipes = (recipesResult.results ?? []) as Array<{
       id: number;

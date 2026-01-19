@@ -28,19 +28,27 @@ interface PantrySuggestionsOptions {
   maxMissing?: number;
   limit?: number;
   locations?: string; // 'all', 'pantry', 'fridge', 'freezer', or comma-separated
+  tagIds?: number[]; // Filter by tag IDs
+  smartTagIds?: number[]; // Filter by smart tag IDs
 }
 
 export function usePantrySuggestions(options: PantrySuggestionsOptions = {}) {
-  const { maxMissing = 3, limit = 20, locations = 'all' } = options;
+  const { maxMissing = 3, limit = 20, locations = 'all', tagIds = [], smartTagIds = [] } = options;
 
   return useQuery({
-    queryKey: ['pantry-suggestions', maxMissing, limit, locations],
+    queryKey: ['pantry-suggestions', maxMissing, limit, locations, tagIds, smartTagIds],
     queryFn: async (): Promise<PantrySuggestionsResponse> => {
       const params = new URLSearchParams({
         maxMissing: maxMissing.toString(),
         limit: limit.toString(),
         locations,
       });
+      if (tagIds.length > 0) {
+        params.set('tags', tagIds.join(','));
+      }
+      if (smartTagIds.length > 0) {
+        params.set('smartTags', smartTagIds.join(','));
+      }
       return api.get<PantrySuggestionsResponse>(`/api/recipes/suggestions/pantry?${params}`);
     },
     staleTime: 60 * 1000, // 1 minute
