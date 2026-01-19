@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
 import { getUnits } from '@jlucaspains/sharp-recipe-parser/src/units.js';
 import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
+import { generateUniqueSlug } from '../lib/slug';
 
 // Add custom units to sharp-recipe-parser
 const englishUnits = getUnits('en');
@@ -505,17 +506,21 @@ importRoutes.post('/vault', async (c) => {
         nutrition.calories || nutrition.protein || nutrition.carbs || nutrition.fat
       );
 
+      // Generate unique slug for the recipe
+      const slug = await generateUniqueSlug(c.env.DB, recipe.title);
+
       // Insert the recipe first to get the ID
       const recipeResult = await c.env.DB.prepare(
         `INSERT INTO recipes (
-          title, source_path, source_url, markdown_content, description,
+          title, slug, source_path, source_url, markdown_content, description,
           ingredients_raw, instructions_raw, notes,
           prep_time_minutes, cook_time_minutes, servings, servings_unit,
           calories_total, protein_total, carbs_total, fat_total, macros_manual
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           recipe.title,
+          slug,
           recipe.filePath,
           sourceUrl,
           recipe.rawContent,
@@ -837,6 +842,38 @@ importRoutes.post('/backfill-normalization', async (c) => {
     return c.json(
       {
         error: error instanceof Error ? error.message : 'Failed to backfill normalization keys',
+      },
+      500
+    );
+  }
+});
+
+// POST /api/import/backfill-slugs - Generate slugs for recipes that don't have them
+importRoutes.post('/backfill-slugs', async (c) => {
+  try {
+    let updated = 0;
+
+    // Get all recipes without slugs
+    const recipes = await c.env.DB.prepare(
+      'SELECT id, title FROM recipes WHERE slug IS NULL OR slug = ""'
+    ).all();
+
+    for (const recipe of (recipes.results ?? []) as Array<{ id: number; title: string }>) {
+      const slug = await generateUniqueSlug(c.env.DB, recipe.title, recipe.id);
+      await c.env.DB.prepare('UPDATE recipes SET slug = ? WHERE id = ?')
+        .bind(slug, recipe.id)
+        .run();
+      updated++;
+    }
+
+    return c.json({
+      success: true,
+      recipes_updated: updated,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to backfill slugs',
       },
       500
     );

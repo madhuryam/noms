@@ -1761,8 +1761,26 @@ exportRoutes.get('/vault', async (c) => {
       }
     }
 
+    // Get ingredient nutrition (user customizations)
+    const ingredientNutritionResult = await db
+      .prepare('SELECT id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at FROM ingredient_nutrition ORDER BY ingredient_name')
+      .all();
+    const ingredientNutrition = (ingredientNutritionResult.results || []) as FullExportData['ingredientNutrition'];
+
+    // Get unit conversions
+    const unitConversionsResult = await db
+      .prepare('SELECT id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes FROM unit_conversions ORDER BY id')
+      .all();
+    const unitConversions = (unitConversionsResult.results || []) as FullExportData['unitConversions'];
+
+    // Get pantry categories
+    const pantryCategoriesResult = await db
+      .prepare('SELECT id, name, location, sort_order FROM pantry_categories ORDER BY location, sort_order')
+      .all();
+    const pantryCategories = (pantryCategoriesResult.results || []) as FullExportData['pantryCategories'];
+
     const pantryResult = await db
-      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill FROM pantry_items ORDER BY name')
+      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name FROM pantry_items ORDER BY name')
       .all();
     const pantryItems = (pantryResult.results || []) as FullExportData['pantryItems'];
 
@@ -1880,11 +1898,14 @@ exportRoutes.get('/vault', async (c) => {
     }
 
     const backupData: FullExportData = {
-      version: '1.0.0',
+      version: '1.1.0',
       exportedAt: new Date().toISOString(),
       recipes,
       tags,
       ingredients,
+      ingredientNutrition,
+      unitConversions,
+      pantryCategories,
       pantryItems,
       mealPlans,
       mealSlots,
