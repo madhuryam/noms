@@ -1156,6 +1156,7 @@ recipes.post('/', async (c) => {
       description,
       ingredients_raw,
       instructions_raw,
+      prep_instructions_raw,
       servings,
       servings_unit,
       prep_time_minutes,
@@ -1174,8 +1175,8 @@ recipes.post('/', async (c) => {
       `
       INSERT INTO recipes (
         title, slug, markdown_content, description, ingredients_raw, instructions_raw,
-        servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -1185,6 +1186,7 @@ recipes.post('/', async (c) => {
         description ?? null,
         ingredients_raw ?? null,
         normalizeInstructions(instructions_raw),
+        prep_instructions_raw ?? null,
         servings ?? null,
         servings_unit ?? 'servings',
         prep_time_minutes ?? null,
@@ -1249,6 +1251,7 @@ recipes.put('/:id', async (c) => {
       'description',
       'ingredients_raw',
       'instructions_raw',
+      'prep_instructions_raw',
       'servings',
       'servings_unit',
       'prep_time_minutes',

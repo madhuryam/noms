@@ -149,6 +149,7 @@ interface FormData {
   description: string;
   ingredients_raw: string;
   instructions_raw: string;
+  prep_instructions_raw: string;
   servings: string;
   prep_time_minutes: string;
   cook_time_minutes: string;
@@ -182,6 +183,7 @@ interface RecipeFormProps {
     description: string | null;
     ingredients_raw: string | null;
     instructions_raw: string | null;
+    prep_instructions_raw: string | null;
     servings: number | null;
     prep_time_minutes: number | null;
     cook_time_minutes: number | null;
@@ -236,6 +238,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     description: '',
     ingredients_raw: '',
     instructions_raw: '',
+    prep_instructions_raw: '',
     servings: String(DEFAULT_SERVINGS),
     prep_time_minutes: '',
     cook_time_minutes: '',
@@ -262,6 +265,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
   const [instructionSections, setInstructionSections] = useState<EditorSection[]>(() =>
     parseToSections('')
   );
+  const [prepSections, setPrepSections] = useState<EditorSection[]>(() =>
+    parseToSections('')
+  );
 
   // Update formData when sections change
   const updateIngredientsFromSections = useCallback((sections: EditorSection[]) => {
@@ -274,6 +280,11 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     setFormData((prev) => ({ ...prev, instructions_raw: sectionsToRaw(sections) }));
   }, []);
 
+  const updatePrepFromSections = useCallback((sections: EditorSection[]) => {
+    setPrepSections(sections);
+    setFormData((prev) => ({ ...prev, prep_instructions_raw: sectionsToRaw(sections) }));
+  }, []);
+
   // Populate form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData) {
@@ -282,6 +293,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         description: initialData.description ?? '',
         ingredients_raw: initialData.ingredients_raw ?? '',
         instructions_raw: initialData.instructions_raw ?? '',
+        prep_instructions_raw: initialData.prep_instructions_raw ?? '',
         servings: String(initialData.servings ?? DEFAULT_SERVINGS),
         prep_time_minutes: initialData.prep_time_minutes?.toString() ?? '',
         cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
@@ -295,6 +307,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       setSelectedTags(initialData.tags ?? []);
       setIngredientSections(parseToSections(initialData.ingredients_raw ?? ''));
       setInstructionSections(parseToSections(initialData.instructions_raw ?? ''));
+      setPrepSections(parseToSections(initialData.prep_instructions_raw ?? ''));
       setCurrentImagePath(initialData.image_path ?? null);
       setMacrosManual(!!initialData.macros_manual);
     }
@@ -352,6 +365,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       description: formData.description.trim() || null,
       ingredients_raw: deduplicateIngredients(formData.ingredients_raw.trim()),
       instructions_raw: formData.instructions_raw.trim(),
+      prep_instructions_raw: formData.prep_instructions_raw.trim() || null,
       servings: formData.servings ? Number(formData.servings) : DEFAULT_SERVINGS,
       prep_time_minutes: formData.prep_time_minutes
         ? Number(formData.prep_time_minutes)
@@ -963,6 +977,89 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 rows={4}
                 placeholder="Enter instructions, one step per line..."
                 className="w-full px-3 py-2 text-sm rounded border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Prep Steps (for meal prep) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg">
+            Prep Steps <span className="text-xs text-gray-400 dark:text-onedark-fg-muted font-normal">(optional - for meal planning)</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              updatePrepFromSections([
+                ...prepSections,
+                { id: generateId(), title: '', content: '' },
+              ]);
+            }}
+            className="text-sm text-amber-600 dark:text-onedark-yellow hover:text-amber-700 dark:hover:text-onedark-yellow/80 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Section
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-500 dark:text-onedark-fg-muted">
+          Steps that can be done ahead of time (e.g., marinating, chopping vegetables)
+        </p>
+
+        <div className="space-y-4">
+          {prepSections.map((section) => (
+            <div
+              key={section.id}
+              className="bg-amber-50 dark:bg-onedark-yellow/10 rounded-lg p-4 space-y-3 border border-amber-200 dark:border-onedark-yellow/30"
+            >
+              {/* Section Header */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={section.title}
+                  onChange={(e) => {
+                    const updated = prepSections.map((s) =>
+                      s.id === section.id ? { ...s, title: e.target.value } : s
+                    );
+                    updatePrepFromSections(updated);
+                  }}
+                  placeholder="Section name (optional, e.g., Day Before)"
+                  className="flex-1 px-3 py-1.5 text-sm font-medium rounded border border-amber-200 dark:border-onedark-yellow/30 bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-onedark-yellow dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
+                />
+                {prepSections.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updatePrepFromSections(
+                        prepSections.filter((s) => s.id !== section.id)
+                      );
+                    }}
+                    className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-onedark-red transition-colors"
+                    title="Remove section"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Prep Content */}
+              <textarea
+                value={section.content}
+                onChange={(e) => {
+                  const updated = prepSections.map((s) =>
+                    s.id === section.id ? { ...s, content: e.target.value } : s
+                  );
+                  updatePrepFromSections(updated);
+                }}
+                rows={3}
+                placeholder="Enter prep steps, one per line...&#10;Marinate chicken overnight&#10;Chop vegetables"
+                className="w-full px-3 py-2 text-sm rounded border border-amber-200 dark:border-onedark-yellow/30 bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-onedark-yellow dark:text-onedark-fg placeholder:text-gray-300 dark:placeholder:text-onedark-bg-highlight"
               />
             </div>
           ))}

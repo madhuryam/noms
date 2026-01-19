@@ -99,6 +99,7 @@ mealPlans.get('/current', async (c) => {
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
+        r.prep_instructions_raw,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
       LEFT JOIN recipes r ON pm.recipe_id = r.id
@@ -186,6 +187,7 @@ mealPlans.get('/:id', async (c) => {
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
+        r.prep_instructions_raw,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
       LEFT JOIN recipes r ON pm.recipe_id = r.id
@@ -300,6 +302,7 @@ mealPlans.get('/:id/meals', async (c) => {
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
+        r.prep_instructions_raw,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
       LEFT JOIN recipes r ON pm.recipe_id = r.id
@@ -392,6 +395,7 @@ mealPlans.post('/:id/meals', async (c) => {
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
+        r.prep_instructions_raw,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
       LEFT JOIN recipes r ON pm.recipe_id = r.id
@@ -483,6 +487,7 @@ mealPlans.put('/:id/meals/:mealId', async (c) => {
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
+        r.prep_instructions_raw,
         ms.name as slot_name, ms.display_name as slot_display_name
       FROM planned_meals pm
       LEFT JOIN recipes r ON pm.recipe_id = r.id

@@ -9,6 +9,7 @@ interface Recipe {
   markdown_content: string | null;
   ingredients_raw: string | null;
   instructions_raw: string | null;
+  prep_instructions_raw: string | null;
   image_path: string | null;
   prep_time_minutes: number | null;
   cook_time_minutes: number | null;

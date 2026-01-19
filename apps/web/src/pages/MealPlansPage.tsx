@@ -21,7 +21,7 @@ import {
   exportAsMarkdown,
   type PlannedMeal,
 } from '../hooks';
-import { WeekCalendar, AddMealModal, MealPlanControls, type MealSelection } from '../components/meal-plans';
+import { WeekCalendar, AddMealModal, MealPlanControls, PrepView, type MealSelection } from '../components/meal-plans';
 import { ShoppingList } from '../components/shopping-list';
 
 // Get the start of the week (Monday) for a given date
@@ -37,9 +37,10 @@ function getWeekStart(date: Date): Date {
 
 export function MealPlansPage() {
   // Tab state - persist in localStorage
-  const [activeTab, setActiveTab] = useState<'calendar' | 'shopping'>(() => {
+  const [activeTab, setActiveTab] = useState<'calendar' | 'prep' | 'shopping'>(() => {
     const stored = localStorage.getItem('meal-plans-active-tab');
-    return stored === 'shopping' ? 'shopping' : 'calendar';
+    if (stored === 'shopping' || stored === 'prep') return stored;
+    return 'calendar';
   });
 
   // Persist tab changes to localStorage
@@ -267,6 +268,11 @@ export function MealPlansPage() {
     );
   }, [planData?.meals, startDateKey, endDateKey]);
 
+  // Count meals with prep instructions
+  const prepTaskCount = useMemo(() => {
+    return weekMeals.filter((meal) => meal.prep_instructions_raw).length;
+  }, [weekMeals]);
+
   const isLoading = isPlansLoading || isPlanLoading || createPlan.isPending;
 
   // Export handlers for shopping list
@@ -304,10 +310,11 @@ export function MealPlansPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         shoppingItemCount={shoppingData ? shoppingData.totalItems - checkedCount : 0}
+        prepTaskCount={prepTaskCount}
       />
 
       {/* Tab content */}
-      {activeTab === 'calendar' ? (
+      {activeTab === 'calendar' && (
         <>
           {/* Calendar or Empty State */}
           {slots.length === 0 && isPlansLoading ? (
@@ -342,7 +349,13 @@ export function MealPlansPage() {
             </>
           )}
         </>
-      ) : (
+      )}
+
+      {activeTab === 'prep' && (
+        <PrepView meals={weekMeals} planId={activePlanId} weekDates={weekDates} />
+      )}
+
+      {activeTab === 'shopping' && (
         <>
           {/* Shopping list controls */}
           {shoppingData && (

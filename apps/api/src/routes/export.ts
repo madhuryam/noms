@@ -22,6 +22,7 @@ interface ExportedRecipe {
   description: string | null;
   ingredients_raw: string | null;
   instructions_raw: string | null;
+  prep_instructions_raw: string | null;
   notes: string | null;
   prep_time_minutes: number | null;
   cook_time_minutes: number | null;
@@ -846,11 +847,11 @@ exportRoutes.post('/import', async (c) => {
           .prepare(`
             INSERT INTO recipes (
               id, title, slug, source_path, source_url, markdown_content, description,
-              ingredients_raw, instructions_raw, notes, prep_time_minutes, cook_time_minutes,
+              ingredients_raw, instructions_raw, prep_instructions_raw, notes, prep_time_minutes, cook_time_minutes,
               servings, servings_unit, image_path, created_at, updated_at,
               last_cooked_at, last_accessed_at, cook_count,
               carbs_total, protein_total, fat_total, calories_total, macros_manual
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `)
           .bind(
             recipe.id,
@@ -862,6 +863,7 @@ exportRoutes.post('/import', async (c) => {
             n(recipe.description),
             n(recipe.ingredients_raw),
             recipe.instructions_raw ? formatInstructions(recipe.instructions_raw) : null,
+            n(recipe.prep_instructions_raw),
             n(recipe.notes),
             n(recipe.prep_time_minutes),
             n(recipe.cook_time_minutes),
@@ -1375,16 +1377,16 @@ exportRoutes.post('/import-zip', async (c) => {
         db.prepare(`
           INSERT INTO recipes (
             id, title, slug, source_path, source_url, markdown_content, description,
-            ingredients_raw, instructions_raw, notes, prep_time_minutes, cook_time_minutes,
+            ingredients_raw, instructions_raw, prep_instructions_raw, notes, prep_time_minutes, cook_time_minutes,
             servings, servings_unit, image_path, created_at, updated_at,
             last_cooked_at, last_accessed_at, cook_count,
             carbs_total, protein_total, fat_total, calories_total, macros_manual
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
             recipe.id, recipe.title, n(recipe.slug), n(recipe.source_path), n(recipe.source_url),
             n(recipe.markdown_content), n(recipe.description), n(recipe.ingredients_raw),
-            n(recipe.instructions_raw), n(recipe.notes), n(recipe.prep_time_minutes),
+            n(recipe.instructions_raw), n(recipe.prep_instructions_raw), n(recipe.notes), n(recipe.prep_time_minutes),
             n(recipe.cook_time_minutes), n(recipe.servings), n(recipe.servings_unit),
             n(recipe.image_path), n(recipe.created_at), n(recipe.updated_at),
             n(recipe.last_cooked_at), n(recipe.last_accessed_at), recipe.cook_count ?? 0,

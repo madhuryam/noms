@@ -513,10 +513,10 @@ importRoutes.post('/vault', async (c) => {
       const recipeResult = await c.env.DB.prepare(
         `INSERT INTO recipes (
           title, slug, source_path, source_url, markdown_content, description,
-          ingredients_raw, instructions_raw, notes,
+          ingredients_raw, instructions_raw, prep_instructions_raw, notes,
           prep_time_minutes, cook_time_minutes, servings, servings_unit,
           calories_total, protein_total, carbs_total, fat_total, macros_manual
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           recipe.title,
@@ -527,6 +527,7 @@ importRoutes.post('/vault', async (c) => {
           cleanedDescription,
           ingredientsRaw,
           cleanedInstructions,
+          recipe.prep ?? null,
           cleanedNotes,
           recipe.metadata?.prepTime ?? null,
           recipe.metadata?.cookTime ?? null,

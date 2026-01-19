@@ -26,6 +26,7 @@ export interface PlannedMeal {
   prep_time_minutes: number | null;
   cook_time_minutes: number | null;
   recipe_servings: number | null;
+  prep_instructions_raw: string | null;
   slot_name: string;
   slot_display_name: string;
 }

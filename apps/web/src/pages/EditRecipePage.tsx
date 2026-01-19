@@ -131,6 +131,7 @@ export function EditRecipePage() {
             description: recipe.description,
             ingredients_raw: recipe.ingredients_raw,
             instructions_raw: recipe.instructions_raw,
+            prep_instructions_raw: recipe.prep_instructions_raw,
             servings: recipe.servings,
             prep_time_minutes: recipe.prep_time_minutes,
             cook_time_minutes: recipe.cook_time_minutes,

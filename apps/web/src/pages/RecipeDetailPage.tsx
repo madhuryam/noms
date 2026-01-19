@@ -7,6 +7,7 @@ import {
   RecipeTags,
   IngredientList,
   InstructionSteps,
+  PrepSteps,
   PairingsSection,
   MacroDisplay,
   AddToCalendarModal,
@@ -20,10 +21,11 @@ import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recip
 import { DEFAULT_SERVINGS } from '../lib/constants';
 import { extractDetailedNutrition, type DetailedNutrition } from '../lib/parsing/recipe-extractor';
 
-// Hook to manage combined recipe progress (ingredients + instructions)
+// Hook to manage combined recipe progress (ingredients + instructions + prep)
 function useRecipeProgress(recipeId: number | undefined) {
   const [ingredientsChecked, setIngredientsChecked] = useState<Set<number>>(new Set());
   const [instructionsChecked, setInstructionsChecked] = useState<Set<number>>(new Set());
+  const [prepChecked, setPrepChecked] = useState<Set<number>>(new Set());
 
   // Clean up expired entries on mount
   useEffect(() => {
@@ -33,34 +35,46 @@ function useRecipeProgress(recipeId: number | undefined) {
   // Load progress when recipe changes
   useEffect(() => {
     if (recipeId === undefined) return;
-    const { ingredients, instructions } = loadProgress(recipeId);
+    const { ingredients, instructions, prep } = loadProgress(recipeId);
     setIngredientsChecked(ingredients);
     setInstructionsChecked(instructions);
+    setPrepChecked(prep);
   }, [recipeId]);
 
   const updateIngredients = useCallback(
     (newChecked: Set<number>) => {
       if (recipeId === undefined) return;
       setIngredientsChecked(newChecked);
-      saveProgress(recipeId, newChecked, instructionsChecked);
+      saveProgress(recipeId, newChecked, instructionsChecked, prepChecked);
     },
-    [recipeId, instructionsChecked]
+    [recipeId, instructionsChecked, prepChecked]
   );
 
   const updateInstructions = useCallback(
     (newChecked: Set<number>) => {
       if (recipeId === undefined) return;
       setInstructionsChecked(newChecked);
-      saveProgress(recipeId, ingredientsChecked, newChecked);
+      saveProgress(recipeId, ingredientsChecked, newChecked, prepChecked);
     },
-    [recipeId, ingredientsChecked]
+    [recipeId, ingredientsChecked, prepChecked]
+  );
+
+  const updatePrep = useCallback(
+    (newChecked: Set<number>) => {
+      if (recipeId === undefined) return;
+      setPrepChecked(newChecked);
+      saveProgress(recipeId, ingredientsChecked, instructionsChecked, newChecked);
+    },
+    [recipeId, ingredientsChecked, instructionsChecked]
   );
 
   return {
     ingredientsChecked,
     instructionsChecked,
+    prepChecked,
     updateIngredients,
     updateInstructions,
+    updatePrep,
   };
 }
 
@@ -75,7 +89,7 @@ export function RecipeDetailPage() {
   const recipeId = recipe?.id;
   const { data: matchData } = useRecipeMatch(recipeId);
   const deleteRecipe = useDeleteRecipe();
-  const { ingredientsChecked, instructionsChecked, updateIngredients, updateInstructions } =
+  const { ingredientsChecked, instructionsChecked, prepChecked, updateIngredients, updateInstructions, updatePrep } =
     useRecipeProgress(recipeId);
 
   const [servings, setServings] = useState<number | null>(null);
@@ -249,6 +263,18 @@ export function RecipeDetailPage() {
         onServingsChange={setServings}
         sourceUrl={recipe.source_url}
       />
+
+      {/* Prep Steps - for meal planning */}
+      {recipe.prep_instructions_raw && (
+        <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-amber-200 dark:border-onedark-yellow/30 p-6">
+          <PrepSteps
+            recipeId={recipe.id}
+            prepRaw={recipe.prep_instructions_raw}
+            checkedItems={prepChecked}
+            onProgressChange={updatePrep}
+          />
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

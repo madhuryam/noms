@@ -10,9 +10,10 @@ interface MealPlanControlsProps {
   planName?: string | null;
   isLoading?: boolean;
   mealCount?: number;
-  activeTab: 'calendar' | 'shopping';
-  onTabChange: (tab: 'calendar' | 'shopping') => void;
+  activeTab: 'calendar' | 'prep' | 'shopping';
+  onTabChange: (tab: 'calendar' | 'prep' | 'shopping') => void;
   shoppingItemCount?: number;
+  prepTaskCount?: number;
 }
 
 const MONTH_NAMES = [
@@ -34,6 +35,7 @@ export function MealPlanControls({
   activeTab,
   onTabChange,
   shoppingItemCount = 0,
+  prepTaskCount = 0,
 }: MealPlanControlsProps) {
   // Format the date range for display
   const formatDateRange = () => {
@@ -72,6 +74,26 @@ export function MealPlanControls({
             }`}
           >
             {planName || 'Meal Plan'}
+          </button>
+          <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
+          <button
+            onClick={() => onTabChange('prep')}
+            className={`text-2xl font-bold transition-colors flex items-center gap-2 ${
+              activeTab === 'prep'
+                ? 'text-amber-600 dark:text-onedark-yellow'
+                : 'text-gray-400 dark:text-onedark-fg-muted hover:text-gray-600 dark:hover:text-onedark-fg'
+            }`}
+          >
+            Prep
+            {prepTaskCount > 0 && (
+              <span className={`text-sm font-normal px-1.5 py-0.5 rounded-full ${
+                activeTab === 'prep'
+                  ? 'bg-amber-100 dark:bg-onedark-yellow/20'
+                  : 'bg-gray-100 dark:bg-onedark-bg-highlight'
+              }`}>
+                {prepTaskCount}
+              </span>
+            )}
           </button>
           <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
           <button

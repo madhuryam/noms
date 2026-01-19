@@ -6,6 +6,7 @@ const EXPIRATION_MS = RECIPE_PROGRESS_EXPIRATION_MS;
 interface StoredProgress {
   ingredients: number[];
   instructions: number[];
+  prep: number[];
   timestamp: number;
 }
 
@@ -20,11 +21,12 @@ function isExpired(timestamp: number): boolean {
 export function loadProgress(recipeId: number): {
   ingredients: Set<number>;
   instructions: Set<number>;
+  prep: Set<number>;
 } {
   try {
     const stored = localStorage.getItem(getStorageKey(recipeId));
     if (!stored) {
-      return { ingredients: new Set(), instructions: new Set() };
+      return { ingredients: new Set(), instructions: new Set(), prep: new Set() };
     }
 
     const data: StoredProgress = JSON.parse(stored);
@@ -32,27 +34,29 @@ export function loadProgress(recipeId: number): {
     // Check if expired
     if (isExpired(data.timestamp)) {
       localStorage.removeItem(getStorageKey(recipeId));
-      return { ingredients: new Set(), instructions: new Set() };
+      return { ingredients: new Set(), instructions: new Set(), prep: new Set() };
     }
 
     return {
       ingredients: new Set(data.ingredients || []),
       instructions: new Set(data.instructions || []),
+      prep: new Set(data.prep || []),
     };
   } catch {
     // If parsing fails, return empty state
-    return { ingredients: new Set(), instructions: new Set() };
+    return { ingredients: new Set(), instructions: new Set(), prep: new Set() };
   }
 }
 
 export function saveProgress(
   recipeId: number,
   ingredients: Set<number>,
-  instructions: Set<number>
+  instructions: Set<number>,
+  prep: Set<number> = new Set()
 ): void {
   try {
-    // If both are empty, remove the entry entirely
-    if (ingredients.size === 0 && instructions.size === 0) {
+    // If all are empty, remove the entry entirely
+    if (ingredients.size === 0 && instructions.size === 0 && prep.size === 0) {
       localStorage.removeItem(getStorageKey(recipeId));
       return;
     }
@@ -60,6 +64,7 @@ export function saveProgress(
     const data: StoredProgress = {
       ingredients: [...ingredients],
       instructions: [...instructions],
+      prep: [...prep],
       timestamp: Date.now(),
     };
 
