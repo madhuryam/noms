@@ -116,13 +116,19 @@ export function AddToCalendarModal({
             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-4">
-          Adding: <span className="font-medium text-gray-900 dark:text-onedark-fg">{recipeTitle}</span>
+          Adding:{' '}
+          <span className="font-medium text-gray-900 dark:text-onedark-fg">{recipeTitle}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -195,9 +201,7 @@ export function AddToCalendarModal({
             </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-onedark-red">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600 dark:text-onedark-red">{error}</p>}
 
           {/* Action buttons */}
           <div className="flex justify-end gap-3 pt-2">
@@ -216,15 +220,31 @@ export function AddToCalendarModal({
               {isAdding ? (
                 <>
                   <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Adding...
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
                   </svg>
                   Add to Calendar
                 </>

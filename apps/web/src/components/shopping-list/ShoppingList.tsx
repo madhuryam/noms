@@ -10,11 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { ShoppingListCategory, ShoppingListItem, CustomCategory } from '../../hooks';
 import { formatQuantityRange } from '../../hooks';
@@ -185,9 +181,7 @@ export function ShoppingList({
 
           // Merge the new category order into the global order
           // Keep items from other categories in their positions, update this category's items
-          const otherItems = allItemNames.filter(
-            (name) => !categoryItemNames.includes(name)
-          );
+          const otherItems = allItemNames.filter((name) => !categoryItemNames.includes(name));
           // Combine: other items + reordered category items (preserving relative global order)
           const newOrder = [...otherItems, ...newCategoryOrder];
           onReorderItems(newOrder);
@@ -303,7 +297,12 @@ export function ShoppingList({
             className="flex items-center gap-2 w-full p-3 text-sm text-gray-500 dark:text-onedark-fg-muted hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight rounded-lg border-2 border-dashed border-gray-200 dark:border-onedark-bg-highlight transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add Category
           </button>
@@ -368,8 +367,18 @@ export function ShoppingList({
                       onClick={() => setPickingForCategory(cat.id)}
                       className="flex items-center gap-1 text-sm text-gray-400 hover:text-blue-500 mt-2"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
                       </svg>
                       Add items
                     </button>
@@ -422,10 +431,13 @@ export function ShoppingList({
           categoryName={
             pickingForCategory === 'uncategorized'
               ? 'Uncategorized'
-              : customCategories.find((c) => c.id === pickingForCategory)?.name ?? ''
+              : (customCategories.find((c) => c.id === pickingForCategory)?.name ?? '')
           }
           onSelect={(names) => {
-            onAssignItems(names, pickingForCategory === 'uncategorized' ? null : pickingForCategory);
+            onAssignItems(
+              names,
+              pickingForCategory === 'uncategorized' ? null : pickingForCategory
+            );
             setPickingForCategory(null);
           }}
           onClose={() => setPickingForCategory(null)}
@@ -439,7 +451,12 @@ export function ShoppingList({
             <div className="flex items-center gap-2">
               <span className="text-gray-400">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 8h16M4 16h16"
+                  />
                 </svg>
               </span>
               <span className="font-medium text-gray-900 dark:text-onedark-fg">
@@ -472,14 +489,7 @@ interface SortableShoppingListItemRowProps {
 }
 
 function SortableShoppingListItemRow(props: SortableShoppingListItemRowProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.item.normalizedName,
   });
 
@@ -489,11 +499,7 @@ function SortableShoppingListItemRow(props: SortableShoppingListItemRowProps) {
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={isDragging ? 'opacity-50 z-50 relative' : ''}
-    >
+    <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-50 z-50 relative' : ''}>
       <ShoppingListItemRow {...props} dragHandleProps={{ ...attributes, ...listeners }} />
     </div>
   );
@@ -611,7 +617,12 @@ function ShoppingListItemRow({
           title="Drag to move"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 8h16M4 16h16"
+            />
           </svg>
         </button>
 
@@ -626,7 +637,12 @@ function ShoppingListItemRow({
         >
           {isChecked && (
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           )}
         </button>
@@ -699,7 +715,12 @@ function ShoppingListItemRow({
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </button>
               )}
@@ -732,7 +753,12 @@ function ShoppingListItemRow({
               title="Edit"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
               </svg>
             </button>
             <button
@@ -741,7 +767,12 @@ function ShoppingListItemRow({
               title="Remove from list"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -764,7 +795,11 @@ function ShoppingListItemRow({
               </Link>
               {recipe.scaledMinQuantity != null && (
                 <span className="text-gray-400 dark:text-onedark-fg-muted">
-                  {formatQuantityRange(recipe.scaledMinQuantity, recipe.scaledMaxQuantity, item.unit)}
+                  {formatQuantityRange(
+                    recipe.scaledMinQuantity,
+                    recipe.scaledMaxQuantity,
+                    item.unit
+                  )}
                 </span>
               )}
             </div>
@@ -783,12 +818,7 @@ interface ItemPickerModalProps {
   onClose: () => void;
 }
 
-function ItemPickerModal({
-  items,
-  categoryName,
-  onSelect,
-  onClose,
-}: ItemPickerModalProps) {
+function ItemPickerModal({ items, categoryName, onSelect, onClose }: ItemPickerModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggleItem = (name: string) => {
@@ -831,7 +861,11 @@ function ItemPickerModal({
             <div className="space-y-1">
               {items.map((item) => {
                 const isSelected = selected.has(item.normalizedName);
-                const qty = formatQuantityRange(item.totalMinQuantity, item.totalMaxQuantity, item.unit);
+                const qty = formatQuantityRange(
+                  item.totalMinQuantity,
+                  item.totalMaxQuantity,
+                  item.unit
+                );
                 const displayText = qty ? `${item.name} (${qty})` : item.name;
 
                 return (
@@ -852,8 +886,18 @@ function ItemPickerModal({
                       }`}
                     >
                       {isSelected && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       )}
                     </div>

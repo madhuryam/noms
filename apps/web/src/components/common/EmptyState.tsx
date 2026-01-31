@@ -158,7 +158,8 @@ export function EmptyState({
     return null;
   };
 
-  const iconSize = variant === 'compact' ? 'w-10 h-10' : variant === 'full' ? 'w-20 h-20' : 'w-16 h-16';
+  const iconSize =
+    variant === 'compact' ? 'w-10 h-10' : variant === 'full' ? 'w-20 h-20' : 'w-16 h-16';
   const padding = variant === 'compact' ? 'p-6' : variant === 'full' ? 'p-12' : 'p-8';
 
   return (

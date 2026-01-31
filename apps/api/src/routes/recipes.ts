@@ -3,6 +3,7 @@ import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
 import { getUnits } from '@jlucaspains/sharp-recipe-parser/src/units.js';
 import { keysMatch, normalizeIngredientKey } from '../lib/ingredient-normalizer';
 import { generateUniqueSlug } from '../lib/slug';
+import type { UserContext } from '../middleware';
 
 // Add custom units to sharp-recipe-parser
 const englishUnits = getUnits('en');
@@ -31,6 +32,10 @@ type Bindings = {
   IMAGES_BUCKET: R2Bucket;
 };
 
+type Variables = {
+  user: UserContext;
+};
+
 interface ParsedIngredientResult {
   quantity: number | null;
   quantityText: string;
@@ -43,7 +48,18 @@ interface ParsedIngredientResult {
 }
 
 // Sizes that sharp-recipe-parser strips from ingredients
-const INGREDIENT_SIZES = ['small', 'medium', 'large', 'extra-large', 'extra large', 'xl', 'jumbo', 'mini', 'tiny', 'big'];
+const INGREDIENT_SIZES = [
+  'small',
+  'medium',
+  'large',
+  'extra-large',
+  'extra large',
+  'xl',
+  'jumbo',
+  'mini',
+  'tiny',
+  'big',
+];
 
 /**
  * Extract content that sharp-recipe-parser strips out but we want to keep as extras.
@@ -135,19 +151,44 @@ function preprocessPlusNotation(rawText: string): string {
 
     // Common measurement units - if before+ only has these + numbers, the ingredient is after +
     const units = new Set([
-      'cup', 'cups', 'tbsp', 'tsp', 'tablespoon', 'tablespoons',
-      'teaspoon', 'teaspoons', 'ounce', 'ounces', 'oz', 'pound', 'pounds',
-      'lb', 'lbs', 'gram', 'grams', 'g', 'kg', 'ml', 'l', 'quart', 'quarts',
-      'pint', 'pints', 'gallon', 'gallons', 'large', 'medium', 'small', 'whole',
+      'cup',
+      'cups',
+      'tbsp',
+      'tsp',
+      'tablespoon',
+      'tablespoons',
+      'teaspoon',
+      'teaspoons',
+      'ounce',
+      'ounces',
+      'oz',
+      'pound',
+      'pounds',
+      'lb',
+      'lbs',
+      'gram',
+      'grams',
+      'g',
+      'kg',
+      'ml',
+      'l',
+      'quart',
+      'quarts',
+      'pint',
+      'pints',
+      'gallon',
+      'gallons',
+      'large',
+      'medium',
+      'small',
+      'whole',
     ]);
 
     // Check if the part before + contains an ingredient word (not just qty/unit)
     const words = beforePlus.toLowerCase().split(/\s+/);
-    const hasIngredientWord = words.some(word => {
+    const hasIngredientWord = words.some((word) => {
       const cleaned = word.replace(/[^\w]/g, '');
-      return cleaned.length >= 2 &&
-             !/^\d+$/.test(cleaned) &&
-             !units.has(cleaned);
+      return cleaned.length >= 2 && !/^\d+$/.test(cleaned) && !units.has(cleaned);
     });
 
     if (hasIngredientWord) {
@@ -158,7 +199,8 @@ function preprocessPlusNotation(rawText: string): string {
   }
 
   // Fall back to removing "+ quantity unit" patterns (for cases like "2 cups + 2 tbsp flour")
-  const plusPattern = /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
+  const plusPattern =
+    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
   let cleaned = rawText.replace(plusPattern, ' ');
 
   // Also remove standalone parenthetical weight measurements like (265g)
@@ -190,7 +232,10 @@ function extractIngredientName(rawText: string): string {
   // Remove leading numbers, fractions, and ranges
   text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
   // Remove common units
-  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i, '');
+  text = text.replace(
+    /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i,
+    ''
+  );
   text = text.replace(/^of\s+/i, '');
 
   return stripExtraSuffixes(text.trim());
@@ -220,9 +265,9 @@ function extractIngredientAlternatives(rawText: string): string[] {
 
   // Clean up each alternative
   return alternatives
-    .map(alt => alt.trim())
-    .filter(alt => alt.length > 0)
-    .map(alt => stripExtraSuffixes(alt));
+    .map((alt) => alt.trim())
+    .filter((alt) => alt.length > 0)
+    .map((alt) => stripExtraSuffixes(alt));
 }
 
 /**
@@ -235,8 +280,8 @@ function generateNormalizationKeys(rawText: string): string {
 
   // Generate a normalization key for each alternative
   const keys = alternatives
-    .map(alt => normalizeIngredientKey(alt))
-    .filter(key => key.length > 0);
+    .map((alt) => normalizeIngredientKey(alt))
+    .filter((key) => key.length > 0);
 
   // Remove duplicates and join with pipe
   const uniqueKeys = [...new Set(keys)];
@@ -327,10 +372,11 @@ function normalizeInstructions(text: string | null): string | null {
   return result.join('\n').trim() || null;
 }
 
-const recipes = new Hono<{ Bindings: Bindings }>();
+const recipes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // GET /api/recipes - List all recipes with pagination and tag filtering
 recipes.get('/', async (c) => {
+  const { userId } = c.get('user');
   const limit = Math.min(Number(c.req.query('limit')) || 20, 100);
   const offset = Number(c.req.query('offset')) || 0;
   const tagsParam = c.req.query('tags'); // comma-separated tag names or ids
@@ -353,7 +399,9 @@ recipes.get('/', async (c) => {
     let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
     const bindings: unknown[] = [];
     const countBindings: unknown[] = [];
-    const whereConditions: string[] = [];
+    const whereConditions: string[] = ['r.user_id = ?'];
+    bindings.push(userId);
+    countBindings.push(userId);
 
     // Handle regular tag filtering
     if (tagsParam) {
@@ -440,8 +488,26 @@ recipes.get('/', async (c) => {
 
     // Get tags for each recipe
     const recipeIds = (results.results ?? []).map((r) => (r as { id: number }).id);
-    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; is_category: number }>> = {};
-    let recipeSmartTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; description: string | null }>> = {};
+    let recipeTags: Record<
+      number,
+      Array<{
+        id: number;
+        name: string;
+        display_name: string;
+        color: string | null;
+        is_category: number;
+      }>
+    > = {};
+    let recipeSmartTags: Record<
+      number,
+      Array<{
+        id: number;
+        name: string;
+        display_name: string;
+        color: string | null;
+        description: string | null;
+      }>
+    > = {};
 
     if (recipeIds.length > 0) {
       const placeholders = recipeIds.map(() => '?').join(',');
@@ -460,7 +526,14 @@ recipes.get('/', async (c) => {
 
       // Group tags by recipe_id
       for (const row of tagsResult.results ?? []) {
-        const r = row as { recipe_id: number; id: number; name: string; display_name: string; color: string | null; is_category: number };
+        const r = row as {
+          recipe_id: number;
+          id: number;
+          name: string;
+          display_name: string;
+          color: string | null;
+          is_category: number;
+        };
         if (!recipeTags[r.recipe_id]) {
           recipeTags[r.recipe_id] = [];
         }
@@ -487,7 +560,14 @@ recipes.get('/', async (c) => {
 
       // Group smart tags by recipe_id
       for (const row of smartTagsResult.results ?? []) {
-        const r = row as { recipe_id: number; id: number; name: string; display_name: string; color: string | null; description: string | null };
+        const r = row as {
+          recipe_id: number;
+          id: number;
+          name: string;
+          display_name: string;
+          color: string | null;
+          description: string | null;
+        };
         if (!recipeSmartTags[r.recipe_id]) {
           recipeSmartTags[r.recipe_id] = [];
         }
@@ -534,15 +614,20 @@ recipes.get('/', async (c) => {
 //   - tags: comma-separated tag IDs (optional)
 // If no filters provided, returns random recipes from all recipes
 recipes.get('/suggestions/daily', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const tagsParam = c.req.query('tags');
 
     const tagIds = tagsParam
-      ? tagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+      ? tagsParam
+          .split(',')
+          .map((id) => parseInt(id.trim(), 10))
+          .filter((id) => !isNaN(id))
       : [];
 
     let query: string;
-    const bindings: number[] = [];
+    const bindings: (number | number)[] = [];
 
     if (tagIds.length > 0) {
       // Filter by tags
@@ -551,22 +636,26 @@ recipes.get('/suggestions/daily', async (c) => {
         SELECT DISTINCT r.id, r.slug, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
         FROM recipes r
         JOIN recipe_tags rt ON r.id = rt.recipe_id
-        WHERE rt.tag_id IN (${placeholders})
+        WHERE r.user_id = ? AND rt.tag_id IN (${placeholders})
         ORDER BY RANDOM()
         LIMIT 10
       `;
-      bindings.push(...tagIds);
+      bindings.push(userId, ...tagIds);
     } else {
       // No filters - return random recipes from all
       query = `
         SELECT r.id, r.slug, r.title, r.image_path, r.prep_time_minutes, r.cook_time_minutes
         FROM recipes r
+        WHERE r.user_id = ?
         ORDER BY RANDOM()
         LIMIT 10
       `;
+      bindings.push(userId);
     }
 
-    const results = await c.env.DB.prepare(query).bind(...bindings).all();
+    const results = await c.env.DB.prepare(query)
+      .bind(...bindings)
+      .all();
 
     // Sort results to show recipes with images first
     const recipes = (results.results ?? []) as Array<{
@@ -603,6 +692,7 @@ recipes.get('/suggestions/daily', async (c) => {
 //   - tags: comma-separated tag IDs to filter recipes
 //   - smartTags: comma-separated smart tag IDs to filter recipes
 recipes.get('/suggestions/pantry', async (c) => {
+  const { userId } = c.get('user');
   const maxMissing = Math.min(Number(c.req.query('maxMissing')) || 3, 10);
   const limit = Math.min(Number(c.req.query('limit')) || 20, 50);
   const includeLocations = c.req.query('locations') || 'all'; // 'pantry', 'fridge', 'freezer', 'all'
@@ -611,31 +701,40 @@ recipes.get('/suggestions/pantry', async (c) => {
 
   // Parse tag IDs
   const tagIds = tagsParam
-    ? tagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+    ? tagsParam
+        .split(',')
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((id) => !isNaN(id))
     : [];
 
   // Parse smart tag IDs
   const smartTagIds = smartTagsParam
-    ? smartTagsParam.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+    ? smartTagsParam
+        .split(',')
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((id) => !isNaN(id))
     : [];
 
   try {
-    // Get all pantry items based on location filter
+    // Get all pantry items based on location filter (user-scoped)
     let pantryQuery = `
       SELECT p.id, p.ingredient_id, p.normalized_name, p.normalization_key, i.normalized_name as ingredient_normalized_name
       FROM pantry_items p
       LEFT JOIN ingredients i ON p.ingredient_id = i.id
+      WHERE p.user_id = ?
     `;
-    const pantryBindings: string[] = [];
+    const pantryBindings: (string | number)[] = [userId];
 
     if (includeLocations !== 'all') {
-      const locations = includeLocations.split(',').map(l => l.trim());
+      const locations = includeLocations.split(',').map((l) => l.trim());
       const placeholders = locations.map(() => '?').join(',');
-      pantryQuery += ` WHERE p.location IN (${placeholders})`;
+      pantryQuery += ` AND p.location IN (${placeholders})`;
       pantryBindings.push(...locations);
     }
 
-    const pantryResult = await c.env.DB.prepare(pantryQuery).bind(...pantryBindings).all();
+    const pantryResult = await c.env.DB.prepare(pantryQuery)
+      .bind(...pantryBindings)
+      .all();
     const pantryItems = (pantryResult.results ?? []) as Array<{
       id: number;
       ingredient_id: number | null;
@@ -663,16 +762,21 @@ recipes.get('/suggestions/pantry', async (c) => {
     }
 
     // Get food associations for expanded matching
-    const associationsResult = await c.env.DB.prepare(`
+    const associationsResult = await c.env.DB.prepare(
+      `
       SELECT t1.term as term1, t2.term as term2
       FROM food_association_terms t1
       JOIN food_association_terms t2 ON t1.group_id = t2.group_id
       WHERE t1.term != t2.term
-    `).all();
+    `
+    ).all();
 
     // Build association map
     const associations = new Map<string, Set<string>>();
-    for (const row of (associationsResult.results ?? []) as Array<{ term1: string; term2: string }>) {
+    for (const row of (associationsResult.results ?? []) as Array<{
+      term1: string;
+      term2: string;
+    }>) {
       const t1 = row.term1.toLowerCase();
       const t2 = row.term2.toLowerCase();
       if (!associations.has(t1)) {
@@ -712,7 +816,9 @@ recipes.get('/suggestions/pantry', async (c) => {
       `;
     }
 
-    const recipesResult = await c.env.DB.prepare(recipesQuery).bind(...recipeBindings).all();
+    const recipesResult = await c.env.DB.prepare(recipesQuery)
+      .bind(...recipeBindings)
+      .all();
 
     const recipes = (recipesResult.results ?? []) as Array<{
       id: number;
@@ -727,7 +833,7 @@ recipes.get('/suggestions/pantry', async (c) => {
 
     // For each recipe, get ingredients and calculate match
     const recipeMatches: Array<{
-      recipe: typeof recipes[0];
+      recipe: (typeof recipes)[0];
       matched_count: number;
       total_count: number;
       match_percent: number;
@@ -736,12 +842,14 @@ recipes.get('/suggestions/pantry', async (c) => {
     }> = [];
 
     for (const recipe of recipes) {
-      const ingredientsResult = await c.env.DB.prepare(`
+      const ingredientsResult = await c.env.DB.prepare(
+        `
         SELECT ri.ingredient_id, ri.raw_text, ri.is_optional, ri.normalization_key, i.normalized_name
         FROM recipe_ingredients ri
         LEFT JOIN ingredients i ON ri.ingredient_id = i.id
         WHERE ri.recipe_id = ?
-      `)
+      `
+      )
         .bind(recipe.id)
         .all();
 
@@ -754,7 +862,7 @@ recipes.get('/suggestions/pantry', async (c) => {
       }>;
 
       // Only count required ingredients
-      const requiredIngredients = ingredients.filter(i => i.is_optional !== 1);
+      const requiredIngredients = ingredients.filter((i) => i.is_optional !== 1);
 
       if (requiredIngredients.length === 0) {
         continue; // Skip recipes with no ingredients
@@ -839,21 +947,39 @@ recipes.get('/suggestions/pantry', async (c) => {
     const limitedResults = recipeMatches.slice(0, limit);
 
     // Get tags for the recipes
-    const recipeIds = limitedResults.map(r => r.recipe.id);
-    let recipeTags: Record<number, Array<{ id: number; name: string; display_name: string; color: string | null; is_category: number }>> = {};
+    const recipeIds = limitedResults.map((r) => r.recipe.id);
+    let recipeTags: Record<
+      number,
+      Array<{
+        id: number;
+        name: string;
+        display_name: string;
+        color: string | null;
+        is_category: number;
+      }>
+    > = {};
 
     if (recipeIds.length > 0) {
       const placeholders = recipeIds.map(() => '?').join(',');
-      const tagsResult = await c.env.DB.prepare(`
+      const tagsResult = await c.env.DB.prepare(
+        `
         SELECT rt.recipe_id, t.id, t.name, t.display_name, t.color, t.is_category
         FROM recipe_tags rt
         JOIN tags t ON rt.tag_id = t.id
         WHERE rt.recipe_id IN (${placeholders})
-      `)
+      `
+      )
         .bind(...recipeIds)
         .all();
 
-      for (const row of (tagsResult.results ?? []) as Array<{ recipe_id: number; id: number; name: string; display_name: string; color: string | null; is_category: number }>) {
+      for (const row of (tagsResult.results ?? []) as Array<{
+        recipe_id: number;
+        id: number;
+        name: string;
+        display_name: string;
+        color: string | null;
+        is_category: number;
+      }>) {
         if (!recipeTags[row.recipe_id]) {
           recipeTags[row.recipe_id] = [];
         }
@@ -868,7 +994,7 @@ recipes.get('/suggestions/pantry', async (c) => {
     }
 
     return c.json({
-      recipes: limitedResults.map(match => ({
+      recipes: limitedResults.map((match) => ({
         ...match.recipe,
         tags: recipeTags[match.recipe.id] ?? [],
         matched_count: match.matched_count,
@@ -891,35 +1017,41 @@ recipes.get('/suggestions/pantry', async (c) => {
 
 // GET /api/recipes/:id/match - Get ingredient match info for a single recipe
 recipes.get('/:id/match', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
   const includeLocations = c.req.query('locations') || 'all';
 
   try {
-    // Check recipe exists
-    const recipe = await c.env.DB.prepare('SELECT id, title FROM recipes WHERE id = ?')
-      .bind(id)
+    // Check recipe exists and belongs to user
+    const recipe = await c.env.DB.prepare(
+      'SELECT id, title FROM recipes WHERE id = ? AND user_id = ?'
+    )
+      .bind(id, userId)
       .first();
 
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
     }
 
-    // Get pantry items
+    // Get pantry items (user-scoped)
     let pantryQuery = `
       SELECT p.id, p.ingredient_id, p.normalized_name, p.normalization_key, p.name, i.normalized_name as ingredient_normalized_name
       FROM pantry_items p
       LEFT JOIN ingredients i ON p.ingredient_id = i.id
+      WHERE p.user_id = ?
     `;
-    const pantryBindings: string[] = [];
+    const pantryBindings: (string | number)[] = [userId];
 
     if (includeLocations !== 'all') {
-      const locations = includeLocations.split(',').map(l => l.trim());
+      const locations = includeLocations.split(',').map((l) => l.trim());
       const placeholders = locations.map(() => '?').join(',');
-      pantryQuery += ` WHERE p.location IN (${placeholders})`;
+      pantryQuery += ` AND p.location IN (${placeholders})`;
       pantryBindings.push(...locations);
     }
 
-    const pantryResult = await c.env.DB.prepare(pantryQuery).bind(...pantryBindings).all();
+    const pantryResult = await c.env.DB.prepare(pantryQuery)
+      .bind(...pantryBindings)
+      .all();
     const pantryItems = (pantryResult.results ?? []) as Array<{
       id: number;
       ingredient_id: number | null;
@@ -947,15 +1079,20 @@ recipes.get('/:id/match', async (c) => {
     }
 
     // Get food associations
-    const associationsResult = await c.env.DB.prepare(`
+    const associationsResult = await c.env.DB.prepare(
+      `
       SELECT t1.term as term1, t2.term as term2
       FROM food_association_terms t1
       JOIN food_association_terms t2 ON t1.group_id = t2.group_id
       WHERE t1.term != t2.term
-    `).all();
+    `
+    ).all();
 
     const associations = new Map<string, Set<string>>();
-    for (const row of (associationsResult.results ?? []) as Array<{ term1: string; term2: string }>) {
+    for (const row of (associationsResult.results ?? []) as Array<{
+      term1: string;
+      term2: string;
+    }>) {
       const t1 = row.term1.toLowerCase();
       const t2 = row.term2.toLowerCase();
       if (!associations.has(t1)) {
@@ -965,13 +1102,15 @@ recipes.get('/:id/match', async (c) => {
     }
 
     // Get recipe ingredients
-    const ingredientsResult = await c.env.DB.prepare(`
+    const ingredientsResult = await c.env.DB.prepare(
+      `
       SELECT ri.id, ri.ingredient_id, ri.raw_text, ri.is_optional, ri.group_name, ri.sort_order, ri.normalization_key, i.normalized_name
       FROM recipe_ingredients ri
       LEFT JOIN ingredients i ON ri.ingredient_id = i.id
       WHERE ri.recipe_id = ?
       ORDER BY ri.sort_order ASC
-    `)
+    `
+    )
       .bind(id)
       .all();
 
@@ -986,7 +1125,7 @@ recipes.get('/:id/match', async (c) => {
       normalized_name: string | null;
     }>;
 
-    const ingredientMatches = ingredients.map(ing => {
+    const ingredientMatches = ingredients.map((ing) => {
       let isMatched = false;
       let matchedPantryItem: string | null = null;
 
@@ -1040,8 +1179,8 @@ recipes.get('/:id/match', async (c) => {
       };
     });
 
-    const requiredIngredients = ingredientMatches.filter(i => !i.is_optional);
-    const matchedCount = requiredIngredients.filter(i => i.have_ingredient).length;
+    const requiredIngredients = ingredientMatches.filter((i) => !i.is_optional);
+    const matchedCount = requiredIngredients.filter((i) => i.have_ingredient).length;
     const totalCount = requiredIngredients.length;
 
     return c.json({
@@ -1064,18 +1203,19 @@ recipes.get('/:id/match', async (c) => {
 // GET /api/recipes/:id - Get single recipe with tags
 // Supports both numeric ID and string slug lookups
 recipes.get('/:id', async (c) => {
+  const { userId } = c.get('user');
   const param = c.req.param('id');
   const isNumeric = /^\d+$/.test(param);
 
   try {
     let recipe;
     if (isNumeric) {
-      recipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?')
-        .bind(Number(param))
+      recipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ? AND user_id = ?')
+        .bind(Number(param), userId)
         .first();
     } else {
-      recipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE slug = ?')
-        .bind(param)
+      recipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE slug = ? AND user_id = ?')
+        .bind(param, userId)
         .first();
     }
 
@@ -1148,6 +1288,8 @@ recipes.get('/:id', async (c) => {
 
 // POST /api/recipes - Create recipe
 recipes.post('/', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const body = await c.req.json();
     const {
@@ -1174,12 +1316,13 @@ recipes.post('/', async (c) => {
     const result = await c.env.DB.prepare(
       `
       INSERT INTO recipes (
-        title, slug, markdown_content, description, ingredients_raw, instructions_raw,
+        user_id, title, slug, markdown_content, description, ingredients_raw, instructions_raw,
         prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
+        userId,
         title,
         slug,
         markdown_content ?? null,
@@ -1197,7 +1340,7 @@ recipes.post('/', async (c) => {
 
     const recipeId = result.meta.last_row_id as number;
 
-    // Create recipe_ingredients with normalization keys for matching
+    // Create recipe_ingredients with normalization keys and parsed quantities for matching
     if (ingredients_raw) {
       const parsedIngredients = parseIngredientsRaw(ingredients_raw);
       let sortOrder = 0;
@@ -1206,11 +1349,26 @@ recipes.post('/', async (c) => {
         // Generate normalization key(s) - handles "or" alternatives
         const normalizationKey = generateNormalizationKeys(ing.rawText);
 
+        // Parse the ingredient line to extract quantity/unit data
+        const parsed = parseIngredientLine(ing.rawText);
+        const minQty = parsed?.minQuantity ?? parsed?.quantity ?? null;
+        const maxQty = parsed?.maxQuantity ?? parsed?.quantity ?? null;
+        const unit = parsed?.unit || null;
+
         await c.env.DB.prepare(
-          `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key)
-           VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key, min_quantity, max_quantity, unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-          .bind(recipeId, ing.rawText, ing.groupName, sortOrder++, normalizationKey)
+          .bind(
+            recipeId,
+            ing.rawText,
+            ing.groupName,
+            sortOrder++,
+            normalizationKey,
+            minQty,
+            maxQty,
+            unit
+          )
           .run();
       }
     }
@@ -1232,13 +1390,16 @@ recipes.post('/', async (c) => {
 
 // PUT /api/recipes/:id - Update recipe
 recipes.put('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
     const body = await c.req.json();
 
-    // Check if recipe exists
-    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?').bind(id).first();
+    // Check if recipe exists and belongs to user
+    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .first();
 
     if (!existing) {
       return c.json({ error: 'Recipe not found' }, 404);
@@ -1301,11 +1462,9 @@ recipes.put('/:id', async (c) => {
     // If ingredients_raw was updated, regenerate recipe_ingredients for matching
     if (body.ingredients_raw !== undefined) {
       // Delete existing recipe_ingredients
-      await c.env.DB.prepare('DELETE FROM recipe_ingredients WHERE recipe_id = ?')
-        .bind(id)
-        .run();
+      await c.env.DB.prepare('DELETE FROM recipe_ingredients WHERE recipe_id = ?').bind(id).run();
 
-      // Parse and insert new ingredients with normalization keys
+      // Parse and insert new ingredients with normalization keys and quantities
       if (body.ingredients_raw) {
         const parsedIngredients = parseIngredientsRaw(body.ingredients_raw);
         let sortOrder = 0;
@@ -1314,11 +1473,26 @@ recipes.put('/:id', async (c) => {
           // Generate normalization key(s) - handles "or" alternatives
           const normalizationKey = generateNormalizationKeys(ing.rawText);
 
+          // Parse the ingredient line to extract quantity/unit data
+          const parsed = parseIngredientLine(ing.rawText);
+          const minQty = parsed?.minQuantity ?? parsed?.quantity ?? null;
+          const maxQty = parsed?.maxQuantity ?? parsed?.quantity ?? null;
+          const unit = parsed?.unit || null;
+
           await c.env.DB.prepare(
-            `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key)
-             VALUES (?, ?, ?, ?, ?)`
+            `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key, min_quantity, max_quantity, unit)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
           )
-            .bind(id, ing.rawText, ing.groupName, sortOrder++, normalizationKey)
+            .bind(
+              id,
+              ing.rawText,
+              ing.groupName,
+              sortOrder++,
+              normalizationKey,
+              minQty,
+              maxQty,
+              unit
+            )
             .run();
         }
       }
@@ -1339,16 +1513,21 @@ recipes.put('/:id', async (c) => {
 
 // DELETE /api/recipes/:id - Delete recipe
 recipes.delete('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?').bind(id).first();
+    const existing = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .first();
 
     if (!existing) {
       return c.json({ error: 'Recipe not found' }, 404);
     }
 
-    await c.env.DB.prepare('DELETE FROM recipes WHERE id = ?').bind(id).run();
+    await c.env.DB.prepare('DELETE FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .run();
 
     return c.json({ success: true, id });
   } catch (error) {
@@ -1361,15 +1540,29 @@ recipes.delete('/:id', async (c) => {
   }
 });
 
-// DELETE /api/recipes - Delete ALL recipes (for testing only)
+// DELETE /api/recipes - Delete ALL recipes for current user
 recipes.delete('/', async (c) => {
+  const { userId } = c.get('user');
+
   try {
-    // Delete in correct order to respect foreign keys
-    await c.env.DB.prepare('DELETE FROM recipe_ingredients').run();
-    await c.env.DB.prepare('DELETE FROM recipe_tags').run();
-    await c.env.DB.prepare('DELETE FROM recipes').run();
-    // Also clean up orphaned tags
-    await c.env.DB.prepare('DELETE FROM tags').run();
+    // Delete in correct order to respect foreign keys (user-scoped)
+    await c.env.DB.prepare(
+      `
+      DELETE FROM recipe_ingredients WHERE recipe_id IN (SELECT id FROM recipes WHERE user_id = ?)
+    `
+    )
+      .bind(userId)
+      .run();
+    await c.env.DB.prepare(
+      `
+      DELETE FROM recipe_tags WHERE recipe_id IN (SELECT id FROM recipes WHERE user_id = ?)
+    `
+    )
+      .bind(userId)
+      .run();
+    await c.env.DB.prepare('DELETE FROM recipes WHERE user_id = ?').bind(userId).run();
+    // Also clean up user's orphaned tags
+    await c.env.DB.prepare('DELETE FROM tags WHERE user_id = ?').bind(userId).run();
 
     return c.json({ success: true, message: 'All recipes deleted' });
   } catch (error) {
@@ -1401,23 +1594,36 @@ interface Pairing {
 
 // GET /api/recipes/:id/pairings - Get all pairings for a recipe (bidirectional)
 recipes.get('/:id/pairings', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
+    // Verify recipe exists and belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
     // Get pairings where this recipe is the source
-    const outgoingResult = await c.env.DB.prepare(`
+    const outgoingResult = await c.env.DB.prepare(
+      `
       SELECT
         p.id, p.recipe_id, p.paired_recipe_id, p.pairing_text, p.pairing_type, p.notes,
         r.title as paired_recipe_title, r.image_path as paired_recipe_image_path, r.slug as paired_recipe_slug
       FROM recipe_pairings p
       LEFT JOIN recipes r ON p.paired_recipe_id = r.id
       WHERE p.recipe_id = ?
-    `)
+    `
+    )
       .bind(id)
       .all<Pairing>();
 
     // Get pairings where this recipe is the target (reverse direction)
-    const incomingResult = await c.env.DB.prepare(`
+    const incomingResult = await c.env.DB.prepare(
+      `
       SELECT
         p.id, p.paired_recipe_id as recipe_id, p.recipe_id as paired_recipe_id,
         p.pairing_text, p.pairing_type, p.notes,
@@ -1425,7 +1631,8 @@ recipes.get('/:id/pairings', async (c) => {
       FROM recipe_pairings p
       LEFT JOIN recipes r ON p.recipe_id = r.id
       WHERE p.paired_recipe_id = ?
-    `)
+    `
+    )
       .bind(id)
       .all<Pairing>();
 
@@ -1434,12 +1641,12 @@ recipes.get('/:id/pairings', async (c) => {
     const incoming = incomingResult.results || [];
 
     // Create a set of paired recipe IDs from outgoing to avoid duplicates
-    const outgoingPairedIds = new Set(outgoing.map(p => p.paired_recipe_id));
+    const outgoingPairedIds = new Set(outgoing.map((p) => p.paired_recipe_id));
 
     // Add incoming pairings that aren't already in outgoing
     const combined = [
       ...outgoing,
-      ...incoming.filter(p => !outgoingPairedIds.has(p.paired_recipe_id))
+      ...incoming.filter((p) => !outgoingPairedIds.has(p.paired_recipe_id)),
     ];
 
     return c.json(combined);
@@ -1453,6 +1660,7 @@ recipes.get('/:id/pairings', async (c) => {
 
 // POST /api/recipes/:id/pairings - Add a pairing
 recipes.post('/:id/pairings', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
@@ -1474,19 +1682,21 @@ recipes.post('/:id/pairings', async (c) => {
       return c.json({ error: 'pairing_type is required' }, 400);
     }
 
-    // Check if recipe exists
-    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
-      .bind(id)
+    // Check if recipe exists and belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
       .first();
 
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
     }
 
-    // If paired_recipe_id provided, verify it exists
+    // If paired_recipe_id provided, verify it exists and belongs to user
     if (paired_recipe_id) {
-      const pairedRecipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
-        .bind(paired_recipe_id)
+      const pairedRecipe = await c.env.DB.prepare(
+        'SELECT id FROM recipes WHERE id = ? AND user_id = ?'
+      )
+        .bind(paired_recipe_id, userId)
         .first();
 
       if (!pairedRecipe) {
@@ -1501,10 +1711,12 @@ recipes.post('/:id/pairings', async (c) => {
 
     // Check for duplicate pairing
     if (paired_recipe_id) {
-      const existing = await c.env.DB.prepare(`
+      const existing = await c.env.DB.prepare(
+        `
         SELECT id FROM recipe_pairings
         WHERE recipe_id = ? AND paired_recipe_id = ? AND pairing_type = ?
-      `)
+      `
+      )
         .bind(id, paired_recipe_id, pairing_type)
         .first();
 
@@ -1514,47 +1726,60 @@ recipes.post('/:id/pairings', async (c) => {
     }
 
     // Insert the pairing
-    const result = await c.env.DB.prepare(`
+    const result = await c.env.DB.prepare(
+      `
       INSERT INTO recipe_pairings (recipe_id, paired_recipe_id, pairing_text, pairing_type, notes)
       VALUES (?, ?, ?, ?, ?)
-    `)
+    `
+    )
       .bind(id, paired_recipe_id ?? null, pairing_text ?? null, pairing_type, notes ?? null)
       .run();
 
     const newPairingId = result.meta.last_row_id;
 
     // Fetch the created pairing with joined data
-    const pairing = await c.env.DB.prepare(`
+    const pairing = await c.env.DB.prepare(
+      `
       SELECT
         p.id, p.recipe_id, p.paired_recipe_id, p.pairing_text, p.pairing_type, p.notes,
         r.title as paired_recipe_title, r.image_path as paired_recipe_image_path, r.slug as paired_recipe_slug
       FROM recipe_pairings p
       LEFT JOIN recipes r ON p.paired_recipe_id = r.id
       WHERE p.id = ?
-    `)
+    `
+    )
       .bind(newPairingId)
       .first<Pairing>();
 
     return c.json(pairing, 201);
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to add pairing' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to add pairing' }, 500);
   }
 });
 
 // DELETE /api/recipes/:id/pairings/:pairingId - Remove a pairing
 recipes.delete('/:id/pairings/:pairingId', async (c) => {
+  const { userId } = c.get('user');
   const recipeId = Number(c.req.param('id'));
   const pairingId = Number(c.req.param('pairingId'));
 
   try {
+    // Verify recipe belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(recipeId, userId)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
     // Verify the pairing exists and belongs to this recipe (or is a reverse pairing)
-    const pairing = await c.env.DB.prepare(`
+    const pairing = await c.env.DB.prepare(
+      `
       SELECT id FROM recipe_pairings
       WHERE id = ? AND (recipe_id = ? OR paired_recipe_id = ?)
-    `)
+    `
+    )
       .bind(pairingId, recipeId, recipeId)
       .first();
 
@@ -1562,9 +1787,7 @@ recipes.delete('/:id/pairings/:pairingId', async (c) => {
       return c.json({ error: 'Pairing not found' }, 404);
     }
 
-    await c.env.DB.prepare('DELETE FROM recipe_pairings WHERE id = ?')
-      .bind(pairingId)
-      .run();
+    await c.env.DB.prepare('DELETE FROM recipe_pairings WHERE id = ?').bind(pairingId).run();
 
     return c.json({ success: true, id: pairingId });
   } catch (error) {
@@ -1577,15 +1800,27 @@ recipes.delete('/:id/pairings/:pairingId', async (c) => {
 
 // GET /api/recipes/:id/ingredients - Get all ingredients with parsing info
 recipes.get('/:id/ingredients', async (c) => {
+  const { userId } = c.get('user');
   const recipeId = Number(c.req.param('id'));
 
   try {
-    const ingredients = await c.env.DB.prepare(`
+    // Verify recipe belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(recipeId, userId)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
+    const ingredients = await c.env.DB.prepare(
+      `
       SELECT id, raw_text, quantity, unit, preparation, group_name, sort_order, normalization_key
       FROM recipe_ingredients
       WHERE recipe_id = ?
       ORDER BY sort_order
-    `)
+    `
+    )
       .bind(recipeId)
       .all();
 
@@ -1603,16 +1838,18 @@ recipes.get('/:id/ingredients', async (c) => {
         groupName: ing.group_name,
         sortOrder: ing.sort_order,
         normalizationKey: ing.normalization_key,
-        parsed: parsed ? {
-          quantity: parsed.quantity,
-          minQuantity: parsed.minQuantity,
-          maxQuantity: parsed.maxQuantity,
-          quantityText: parsed.quantityText,
-          unit: parsed.unit,
-          unitText: parsed.unitText,
-          ingredient: parsed.ingredient,
-          extra: parsed.extra,
-        } : null,
+        parsed: parsed
+          ? {
+              quantity: parsed.quantity,
+              minQuantity: parsed.minQuantity,
+              maxQuantity: parsed.maxQuantity,
+              quantityText: parsed.quantityText,
+              unit: parsed.unit,
+              unitText: parsed.unitText,
+              ingredient: parsed.ingredient,
+              extra: parsed.extra,
+            }
+          : null,
       };
     });
 
@@ -1627,6 +1864,7 @@ recipes.get('/:id/ingredients', async (c) => {
 
 // PATCH /api/recipes/:id/ingredients/:ingredientId - Update ingredient normalization
 recipes.patch('/:id/ingredients/:ingredientId', async (c) => {
+  const { userId } = c.get('user');
   const recipeId = Number(c.req.param('id'));
   const ingredientId = Number(c.req.param('ingredientId'));
 
@@ -1637,10 +1875,21 @@ recipes.patch('/:id/ingredients/:ingredientId', async (c) => {
       return c.json({ error: 'ingredientName is required' }, 400);
     }
 
+    // Verify recipe belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(recipeId, userId)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
     // Verify ingredient exists and belongs to this recipe
-    const existing = await c.env.DB.prepare(`
+    const existing = await c.env.DB.prepare(
+      `
       SELECT id FROM recipe_ingredients WHERE id = ? AND recipe_id = ?
-    `)
+    `
+    )
       .bind(ingredientId, recipeId)
       .first();
 
@@ -1651,12 +1900,17 @@ recipes.patch('/:id/ingredients/:ingredientId', async (c) => {
     // For manual edits, save the value as-is (just lowercase and trimmed)
     // This bypasses automatic normalization so user can override stop-word removal
     // Still handle "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
-    const alternatives = body.ingredientName.split(/\s+or\s+/i).map(s => s.trim().toLowerCase()).filter(s => s);
+    const alternatives = body.ingredientName
+      .split(/\s+or\s+/i)
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s);
     const normalizationKey = [...new Set(alternatives)].join('|');
 
-    await c.env.DB.prepare(`
+    await c.env.DB.prepare(
+      `
       UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
-    `)
+    `
+    )
       .bind(normalizationKey, ingredientId)
       .run();
 

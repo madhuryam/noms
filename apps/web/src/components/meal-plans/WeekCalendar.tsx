@@ -13,7 +13,20 @@ interface WeekCalendarProps {
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 export function WeekCalendar({
   weekDates,
@@ -53,14 +66,10 @@ export function WeekCalendar({
                 <div
                   key={dateKey}
                   className={`p-3 text-center border-r border-gray-200 dark:border-onedark-bg-highlight last:border-r-0 ${
-                    isToday
-                      ? 'bg-blue-50 dark:bg-onedark-blue/20'
-                      : 'bg-gray-50 dark:bg-onedark-bg'
+                    isToday ? 'bg-blue-50 dark:bg-onedark-blue/20' : 'bg-gray-50 dark:bg-onedark-bg'
                   }`}
                 >
-                  <div className="text-xs text-gray-500 dark:text-onedark-fg-muted">
-                    {dayName}
-                  </div>
+                  <div className="text-xs text-gray-500 dark:text-onedark-fg-muted">{dayName}</div>
                   <div
                     className={`text-lg font-semibold ${
                       isToday

@@ -8,7 +8,11 @@ interface AssociationGroupModalProps {
   editingGroup: AssociationGroup | null;
 }
 
-export function AssociationGroupModal({ isOpen, onClose, editingGroup }: AssociationGroupModalProps) {
+export function AssociationGroupModal({
+  isOpen,
+  onClose,
+  editingGroup,
+}: AssociationGroupModalProps) {
   const [name, setName] = useState('');
   const [terms, setTerms] = useState<string[]>([]);
   const [termInput, setTermInput] = useState('');
@@ -43,19 +47,22 @@ export function AssociationGroupModal({ isOpen, onClose, editingGroup }: Associa
     }
   }, [isOpen]);
 
-  const addTerms = useCallback((input: string) => {
-    // Split by comma and process each term
-    const newTerms = input
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => t && !terms.some((existing) => existing.toLowerCase() === t.toLowerCase()));
+  const addTerms = useCallback(
+    (input: string) => {
+      // Split by comma and process each term
+      const newTerms = input
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t && !terms.some((existing) => existing.toLowerCase() === t.toLowerCase()));
 
-    if (newTerms.length > 0) {
-      setTerms([...terms, ...newTerms]);
-      setTermInput('');
-      setError(null);
-    }
-  }, [terms]);
+      if (newTerms.length > 0) {
+        setTerms([...terms, ...newTerms]);
+        setTermInput('');
+        setError(null);
+      }
+    },
+    [terms]
+  );
 
   const addTerm = useCallback(() => {
     if (termInput.trim()) {
@@ -94,7 +101,9 @@ export function AssociationGroupModal({ isOpen, onClose, editingGroup }: Associa
       const newTerms = termInput
         .split(',')
         .map((t) => t.trim())
-        .filter((t) => t && !finalTerms.some((existing) => existing.toLowerCase() === t.toLowerCase()));
+        .filter(
+          (t) => t && !finalTerms.some((existing) => existing.toLowerCase() === t.toLowerCase())
+        );
       finalTerms = [...finalTerms, ...newTerms];
     }
 
@@ -126,10 +135,7 @@ export function AssociationGroupModal({ isOpen, onClose, editingGroup }: Associa
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 transition-opacity"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
@@ -144,7 +150,12 @@ export function AssociationGroupModal({ isOpen, onClose, editingGroup }: Associa
               className="p-1 text-gray-400 hover:text-gray-600 dark:text-onedark-fg-muted dark:hover:text-onedark-fg rounded transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -188,8 +199,18 @@ export function AssociationGroupModal({ isOpen, onClose, editingGroup }: Associa
                         onClick={() => removeTerm(term)}
                         className="hover:text-blue-900 dark:hover:text-onedark-fg"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     </span>
@@ -201,7 +222,9 @@ export function AssociationGroupModal({ isOpen, onClose, editingGroup }: Associa
                   onChange={(e) => setTermInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onBlur={addTerm}
-                  placeholder={terms.length === 0 ? "batata, kartoffel, pomme de terre..." : "Add more..."}
+                  placeholder={
+                    terms.length === 0 ? 'batata, kartoffel, pomme de terre...' : 'Add more...'
+                  }
                   className="w-full bg-transparent text-gray-900 dark:text-onedark-fg placeholder-gray-400 dark:placeholder-onedark-fg-muted focus:outline-none text-sm"
                 />
               </div>

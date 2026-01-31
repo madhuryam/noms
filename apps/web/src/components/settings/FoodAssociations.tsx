@@ -80,9 +80,7 @@ export function FoodAssociations() {
                 className="flex items-start justify-between p-3 bg-gray-50 dark:bg-onedark-bg rounded-lg"
               >
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-gray-900 dark:text-onedark-fg">
-                    {group.name}
-                  </h3>
+                  <h3 className="font-medium text-gray-900 dark:text-onedark-fg">{group.name}</h3>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {group.terms.map((term) => (
                       <span
@@ -154,7 +152,12 @@ export function FoodAssociations() {
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 dark:bg-onedark-blue text-white text-sm rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               Add Your First Association
             </button>

@@ -39,9 +39,10 @@ export function TagSelector({
 
   // Show "Create" option if no exact match and onCreateTag is provided
   const showCreateOption =
-    onCreateTag && inputValue.trim() && !exactMatch && !selectedTags.some(
-      (t) => t.name.toLowerCase() === inputValue.toLowerCase().trim()
-    );
+    onCreateTag &&
+    inputValue.trim() &&
+    !exactMatch &&
+    !selectedTags.some((t) => t.name.toLowerCase() === inputValue.toLowerCase().trim());
 
   const totalOptions = filteredTags.length + (showCreateOption ? 1 : 0);
 
@@ -177,8 +178,18 @@ export function TagSelector({
                   : 'hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight'
               }`}
             >
-              <svg className="w-4 h-4 text-green-600 dark:text-onedark-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <svg
+                className="w-4 h-4 text-green-600 dark:text-onedark-green"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               <span className="text-gray-700 dark:text-onedark-fg">
                 Create "<span className="font-medium">{inputValue.trim()}</span>"

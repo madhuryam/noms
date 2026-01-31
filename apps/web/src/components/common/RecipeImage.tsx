@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
+const API_URL =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
 
 interface RecipeImageProps {
   imagePath?: string | null;
@@ -17,8 +18,7 @@ interface RecipeImageProps {
 function generatePlaceholderSvg(title: string): string {
   // Truncate title if too long
   const maxLength = 24;
-  const displayTitle =
-    title.length > maxLength ? title.substring(0, maxLength - 1) + '…' : title;
+  const displayTitle = title.length > maxLength ? title.substring(0, maxLength - 1) + '…' : title;
 
   // Escape HTML entities in title
   const escapedTitle = displayTitle

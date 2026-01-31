@@ -1,4 +1,10 @@
-import { FoodAssociations, SuggestionsSettings, ShelfLifeSettings, DataManagement } from '../components/settings';
+import {
+  FoodAssociations,
+  SuggestionsSettings,
+  ShelfLifeSettings,
+  DataManagement,
+  UserSettings,
+} from '../components/settings';
 
 export function SettingsPage() {
   return (
@@ -10,6 +16,9 @@ export function SettingsPage() {
           Configure your recipe app preferences
         </p>
       </div>
+
+      {/* Account Section */}
+      <UserSettings />
 
       {/* Daily Suggestions Section */}
       <SuggestionsSettings />

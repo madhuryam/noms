@@ -114,12 +114,7 @@ function groupIntoSections(steps: ParsedStep[]): PrepSection[] {
   return sections;
 }
 
-export function PrepSteps({
-  recipeId,
-  prepRaw,
-  onProgressChange,
-  checkedItems,
-}: PrepStepsProps) {
+export function PrepSteps({ recipeId, prepRaw, onProgressChange, checkedItems }: PrepStepsProps) {
   const steps = parsePrep(prepRaw);
   const sections = groupIntoSections(steps);
 
@@ -141,7 +136,7 @@ export function PrepSteps({
   }, [onProgressChange]);
 
   // Count only non-section items for progress
-  const stepItems = steps.filter(s => !s.isSection);
+  const stepItems = steps.filter((s) => !s.isSection);
   const checkedCount = checkedItems.size;
   const totalCount = stepItems.length;
 
@@ -185,9 +180,11 @@ export function PrepSteps({
         {sections.map((section, sectionIndex) => (
           <div
             key={`${recipeId}-prep-section-${sectionIndex}`}
-            className={hasSections
-              ? 'bg-amber-50 dark:bg-onedark-yellow/10 rounded-lg p-4 border border-amber-200 dark:border-onedark-yellow/30'
-              : 'bg-amber-50 dark:bg-onedark-yellow/10 rounded-lg p-4 border border-amber-200 dark:border-onedark-yellow/30'}
+            className={
+              hasSections
+                ? 'bg-amber-50 dark:bg-onedark-yellow/10 rounded-lg p-4 border border-amber-200 dark:border-onedark-yellow/30'
+                : 'bg-amber-50 dark:bg-onedark-yellow/10 rounded-lg p-4 border border-amber-200 dark:border-onedark-yellow/30'
+            }
           >
             {section.title && (
               <h3 className="text-sm font-semibold text-amber-700 dark:text-onedark-yellow uppercase tracking-wide mb-3">
@@ -209,7 +206,11 @@ export function PrepSteps({
                         type="button"
                         onClick={() => toggleItem(step.originalIndex)}
                         aria-pressed={isChecked}
-                        aria-label={isChecked ? `Uncheck prep step ${stepNumber}` : `Check prep step ${stepNumber}`}
+                        aria-label={
+                          isChecked
+                            ? `Uncheck prep step ${stepNumber}`
+                            : `Check prep step ${stepNumber}`
+                        }
                         className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
                           isChecked
                             ? 'bg-amber-500 dark:bg-onedark-yellow text-white dark:text-onedark-bg'

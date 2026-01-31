@@ -17,8 +17,7 @@ const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 function generatePlaceholderSvg(title: string): string {
   // Truncate title if too long
   const maxLength = 24;
-  const displayTitle =
-    title.length > maxLength ? title.substring(0, maxLength - 1) + '…' : title;
+  const displayTitle = title.length > maxLength ? title.substring(0, maxLength - 1) + '…' : title;
 
   // Escape HTML entities in title
   const escapedTitle = displayTitle

@@ -57,12 +57,7 @@ export function TagsPage() {
   return (
     <div className="space-y-6">
       {/* Recipe Tag Selector Modal */}
-      {selectedTag && (
-        <RecipeTagSelector
-          tag={selectedTag}
-          onClose={() => setSelectedTag(null)}
-        />
-      )}
+      {selectedTag && <RecipeTagSelector tag={selectedTag} onClose={() => setSelectedTag(null)} />}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -161,7 +156,12 @@ export function TagsPage() {
                 title={tag.description || undefined}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
                 </svg>
                 {tag.display_name}
                 <span
@@ -185,7 +185,8 @@ export function TagsPage() {
             Custom Tags
           </h2>
           <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
-            Click a tag to view its recipes. Use edit to modify and manage recipes, merge to combine tags, or delete to remove.
+            Click a tag to view its recipes. Use edit to modify and manage recipes, merge to combine
+            tags, or delete to remove.
           </p>
         </div>
         <TagManager

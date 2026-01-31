@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { SearchBar } from '../search';
+import { useUser } from '../../hooks';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -8,9 +9,16 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const location = useLocation();
   const isSearchPage = location.pathname === '/search';
+  const { data: user } = useUser();
+
+  // Get display name or fallback to first part of email
+  const displayName = user?.displayName || user?.email?.split('@')[0] || '';
 
   return (
-    <header className="sticky top-0 z-10 bg-white dark:bg-onedark-bg-lighter border-b border-gray-200 dark:border-onedark-bg-highlight" role="banner">
+    <header
+      className="sticky top-0 z-10 bg-white dark:bg-onedark-bg-lighter border-b border-gray-200 dark:border-onedark-bg-highlight"
+      role="banner"
+    >
       <div className="flex items-center justify-between h-16 px-4">
         {/* Mobile menu button */}
         <button
@@ -19,7 +27,13 @@ export function Header({ onMenuClick }: HeaderProps) {
           aria-label="Open navigation menu"
           aria-expanded="false"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -30,7 +44,10 @@ export function Header({ onMenuClick }: HeaderProps) {
         </button>
 
         {/* Logo / App Title - hidden on desktop since sidebar shows it */}
-        <Link to="/" className="flex items-center gap-2 lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter rounded">
+        <Link
+          to="/"
+          className="flex items-center gap-2 lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter rounded"
+        >
           <span className="text-xl font-bold text-gray-800 dark:text-onedark-blue">Noms</span>
         </Link>
 
@@ -41,15 +58,22 @@ export function Header({ onMenuClick }: HeaderProps) {
           </div>
         )}
 
-        {/* Mobile search button - hidden on search page */}
-        {!isSearchPage && (
-          <div className="flex items-center gap-2">
+        {/* Right side actions */}
+        <div className="flex items-center gap-2">
+          {/* Mobile search button - hidden on search page */}
+          {!isSearchPage && (
             <Link
               to="/search"
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight sm:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter"
               aria-label="Search recipes"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -58,8 +82,26 @@ export function Header({ onMenuClick }: HeaderProps) {
                 />
               </svg>
             </Link>
-          </div>
-        )}
+          )}
+
+          {/* User menu */}
+          {displayName && (
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg-lighter"
+              title="Account settings"
+            >
+              <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-sm font-medium hidden md:block max-w-[120px] truncate">
+                {displayName}
+              </span>
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

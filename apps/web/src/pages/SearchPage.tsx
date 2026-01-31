@@ -31,7 +31,10 @@ export function SearchPage() {
   const expandedTerms = data?.expandedTerms || [];
 
   // Only check spelling when we have no results
-  const { data: spellCheckData } = useSpellCheck(query, total === 0 && !isLoading && query.length >= 2);
+  const { data: spellCheckData } = useSpellCheck(
+    query,
+    total === 0 && !isLoading && query.length >= 2
+  );
   const spellSuggestions = spellCheckData?.suggestions || [];
 
   return (
@@ -81,7 +84,8 @@ export function SearchPage() {
                 {total} {total === 1 ? 'result' : 'results'} for "{query}"
                 {expandedTerms.length > 0 && (
                   <span className="text-gray-400 dark:text-onedark-fg-muted">
-                    {' '}(also: {expandedTerms.join(', ')})
+                    {' '}
+                    (also: {expandedTerms.join(', ')})
                   </span>
                 )}
                 {isFetching && (

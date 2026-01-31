@@ -131,12 +131,7 @@ export function RecipeMetadata({
           rel="noopener noreferrer"
           className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-onedark-bg-highlight rounded-lg text-gray-600 dark:text-onedark-fg-muted hover:bg-gray-200 dark:hover:bg-onedark-bg hover:text-gray-900 dark:hover:text-onedark-fg transition-colors"
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

@@ -27,12 +27,7 @@ export function IngredientMatchIndicator({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={3}
-            d="M5 13l4 4L19 7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
         </svg>
       </span>
     );
@@ -50,12 +45,7 @@ export function IngredientMatchIndicator({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M20 12H4"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
         </svg>
       </span>
     );
@@ -95,14 +85,18 @@ export function MatchSummaryBadge({
   totalCount,
 }: MatchSummaryBadgeProps) {
   const getColor = (percent: number) => {
-    if (percent >= 80) return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+    if (percent >= 80)
+      return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
     if (percent >= 60) return 'bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-400';
-    if (percent >= 40) return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
+    if (percent >= 40)
+      return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
     return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400';
   };
 
   return (
-    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${getColor(matchPercent)}`}>
+    <div
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${getColor(matchPercent)}`}
+    >
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"

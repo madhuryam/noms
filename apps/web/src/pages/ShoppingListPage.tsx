@@ -27,12 +27,15 @@ export function ShoppingListPage() {
   const endDateParam = searchParams.get('endDate') || undefined;
 
   const { data, isLoading, error } = useShoppingList(planId, startDateParam, endDateParam);
-  const { checkedItems, toggleItem, clearAll, checkAll, checkedCount } =
-    useCheckedItems(planId);
+  const { checkedItems, toggleItem, clearAll, checkAll, checkedCount } = useCheckedItems(planId);
   const { overrides, setOverride, clearOverride } = useQuantityOverrides(planId);
   const { deletedItems, deleteItem, restoreItem } = useDeletedItems(planId);
-  const { categories: customCategories, addCategory, updateCategory, deleteCategory } =
-    useCustomCategories(planId);
+  const {
+    categories: customCategories,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+  } = useCustomCategories(planId);
   const { itemCategories, assignItem, assignItems } = useItemCategories(planId);
   const { itemOrder, reorderItems } = useItemOrder(planId);
   const { togglePantryStatus, getEffectivePantryStatus } = usePantryOverrides(planId);

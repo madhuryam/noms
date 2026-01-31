@@ -18,9 +18,7 @@ export function SuggestionsBar({ recipes, onRefresh, isRefreshing = false }: Sug
     if (!container) return;
 
     setCanScrollLeft(container.scrollLeft > 0);
-    setCanScrollRight(
-      container.scrollLeft < container.scrollWidth - container.clientWidth - 1
-    );
+    setCanScrollRight(container.scrollLeft < container.scrollWidth - container.clientWidth - 1);
   };
 
   useEffect(() => {
@@ -86,12 +84,24 @@ export function SuggestionsBar({ recipes, onRefresh, isRefreshing = false }: Sug
         <button
           onClick={() => scroll('left')}
           className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-onedark-bg-lighter border border-gray-200 dark:border-onedark-bg-highlight rounded-full shadow-lg items-center justify-center transition-opacity hidden lg:flex ${
-            canScrollLeft ? 'opacity-100 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight' : 'opacity-0 pointer-events-none'
+            canScrollLeft
+              ? 'opacity-100 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight'
+              : 'opacity-0 pointer-events-none'
           }`}
           aria-label="Scroll left"
         >
-          <svg className="w-5 h-5 text-gray-600 dark:text-onedark-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <svg
+            className="w-5 h-5 text-gray-600 dark:text-onedark-fg"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
 
@@ -99,11 +109,18 @@ export function SuggestionsBar({ recipes, onRefresh, isRefreshing = false }: Sug
         <button
           onClick={() => scroll('right')}
           className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white dark:bg-onedark-bg-lighter border border-gray-200 dark:border-onedark-bg-highlight rounded-full shadow-lg items-center justify-center transition-opacity hidden lg:flex ${
-            canScrollRight ? 'opacity-100 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight' : 'opacity-0 pointer-events-none'
+            canScrollRight
+              ? 'opacity-100 hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight'
+              : 'opacity-0 pointer-events-none'
           }`}
           aria-label="Scroll right"
         >
-          <svg className="w-5 h-5 text-gray-600 dark:text-onedark-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-5 h-5 text-gray-600 dark:text-onedark-fg"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>

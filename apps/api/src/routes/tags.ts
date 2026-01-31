@@ -1,16 +1,23 @@
 import { Hono } from 'hono';
+import type { UserContext } from '../middleware';
 
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
 };
 
-const tags = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+  user: UserContext;
+};
+
+const tags = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // GET /api/tags - List all tags with calculated usage_count
 tags.get('/', async (c) => {
+  const { userId } = c.get('user');
+
   try {
-    // Calculate actual usage count from recipe_tags join
+    // Calculate actual usage count from recipe_tags join (user-scoped)
     const results = await c.env.DB.prepare(
       `
       SELECT
@@ -22,10 +29,13 @@ tags.get('/', async (c) => {
         COUNT(rt.recipe_id) as usage_count
       FROM tags t
       LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
+      WHERE t.user_id = ?
       GROUP BY t.id
       ORDER BY t.is_category DESC, usage_count DESC, t.name
     `
-    ).all();
+    )
+      .bind(userId)
+      .all();
 
     return c.json({ tags: results.results });
   } catch (error) {
@@ -39,7 +49,10 @@ tags.get('/', async (c) => {
 });
 
 // GET /api/tags/smart - List all smart tags with calculated usage_count
+// Smart tags are system-wide (not user-scoped) but usage counts are based on user's recipes
 tags.get('/smart', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const results = await c.env.DB.prepare(
       `
@@ -54,10 +67,13 @@ tags.get('/smart', async (c) => {
         COUNT(rst.recipe_id) as usage_count
       FROM smart_tags st
       LEFT JOIN recipe_smart_tags rst ON st.id = rst.smart_tag_id
+      LEFT JOIN recipes r ON rst.recipe_id = r.id AND r.user_id = ?
       GROUP BY st.id
       ORDER BY st.sort_order, st.name
     `
-    ).all();
+    )
+      .bind(userId)
+      .all();
 
     return c.json({ smart_tags: results.results });
   } catch (error) {
@@ -70,43 +86,67 @@ tags.get('/smart', async (c) => {
   }
 });
 
-// POST /api/tags/smart/recalculate - Recalculate all smart tag assignments
+// POST /api/tags/smart/recalculate - Recalculate all smart tag assignments for user's recipes
 tags.post('/smart/recalculate', async (c) => {
-  try {
-    // Clear all existing smart tag assignments
-    await c.env.DB.prepare('DELETE FROM recipe_smart_tags').run();
+  const { userId } = c.get('user');
 
-    // Re-populate Quick Meals
-    await c.env.DB.prepare(`
+  try {
+    // Clear existing smart tag assignments for user's recipes
+    await c.env.DB.prepare(
+      `
+      DELETE FROM recipe_smart_tags
+      WHERE recipe_id IN (SELECT id FROM recipes WHERE user_id = ?)
+    `
+    )
+      .bind(userId)
+      .run();
+
+    // Re-populate Quick Meals for user's recipes
+    await c.env.DB.prepare(
+      `
       INSERT INTO recipe_smart_tags (recipe_id, smart_tag_id)
       SELECT r.id, st.id
       FROM recipes r, smart_tags st
-      WHERE st.name = 'quick-meals'
+      WHERE r.user_id = ?
+        AND st.name = 'quick-meals'
         AND COALESCE(r.prep_time_minutes, 0) + COALESCE(r.cook_time_minutes, 0) > 0
         AND COALESCE(r.prep_time_minutes, 0) + COALESCE(r.cook_time_minutes, 0) < 20
-    `).run();
+    `
+    )
+      .bind(userId)
+      .run();
 
-    // Re-populate High Protein
-    await c.env.DB.prepare(`
+    // Re-populate High Protein for user's recipes
+    await c.env.DB.prepare(
+      `
       INSERT INTO recipe_smart_tags (recipe_id, smart_tag_id)
       SELECT r.id, st.id
       FROM recipes r, smart_tags st
-      WHERE st.name = 'high-protein'
+      WHERE r.user_id = ?
+        AND st.name = 'high-protein'
         AND r.protein_total IS NOT NULL
         AND r.servings IS NOT NULL
         AND r.servings > 0
         AND (r.protein_total / r.servings) > 25
-    `).run();
+    `
+    )
+      .bind(userId)
+      .run();
 
-    // Get updated counts
-    const results = await c.env.DB.prepare(`
+    // Get updated counts for user's recipes
+    const results = await c.env.DB.prepare(
+      `
       SELECT
         st.name,
         COUNT(rst.recipe_id) as count
       FROM smart_tags st
       LEFT JOIN recipe_smart_tags rst ON st.id = rst.smart_tag_id
+      LEFT JOIN recipes r ON rst.recipe_id = r.id AND r.user_id = ?
       GROUP BY st.id
-    `).all();
+    `
+    )
+      .bind(userId)
+      .all();
 
     return c.json({
       success: true,
@@ -125,6 +165,8 @@ tags.post('/smart/recalculate', async (c) => {
 
 // POST /api/tags - Create tag
 tags.post('/', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const body = await c.req.json();
     const { name, display_name, color } = body;
@@ -136,9 +178,9 @@ tags.post('/', async (c) => {
     // Normalize tag name (lowercase, trimmed)
     const normalizedName = name.toLowerCase().trim();
 
-    // Check if tag already exists
-    const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ?')
-      .bind(normalizedName)
+    // Check if tag already exists for this user
+    const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ? AND user_id = ?')
+      .bind(normalizedName, userId)
       .first();
 
     if (existing) {
@@ -147,11 +189,11 @@ tags.post('/', async (c) => {
 
     const result = await c.env.DB.prepare(
       `
-      INSERT INTO tags (name, display_name, color)
-      VALUES (?, ?, ?)
+      INSERT INTO tags (user_id, name, display_name, color)
+      VALUES (?, ?, ?, ?)
     `
     )
-      .bind(normalizedName, display_name ?? name, color ?? null)
+      .bind(userId, normalizedName, display_name ?? name, color ?? null)
       .run();
 
     const newTag = await c.env.DB.prepare('SELECT * FROM tags WHERE id = ?')
@@ -171,6 +213,7 @@ tags.post('/', async (c) => {
 
 // GET /api/tags/:id - Get single tag
 tags.get('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
@@ -185,11 +228,11 @@ tags.get('/:id', async (c) => {
         COUNT(rt.recipe_id) as usage_count
       FROM tags t
       LEFT JOIN recipe_tags rt ON t.id = rt.tag_id
-      WHERE t.id = ?
+      WHERE t.id = ? AND t.user_id = ?
       GROUP BY t.id
     `
     )
-      .bind(id)
+      .bind(id, userId)
       .first();
 
     if (!tag) {
@@ -209,14 +252,17 @@ tags.get('/:id', async (c) => {
 
 // PUT /api/tags/:id - Update tag
 tags.put('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
     const body = await c.req.json();
     const { name, display_name, color, is_category } = body;
 
-    // Check if tag exists
-    const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE id = ?').bind(id).first();
+    // Check if tag exists and belongs to user
+    const existing = await c.env.DB.prepare('SELECT id FROM tags WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .first();
 
     if (!existing) {
       return c.json({ error: 'Tag not found' }, 404);
@@ -228,9 +274,11 @@ tags.put('/:id', async (c) => {
 
     if (name !== undefined) {
       const normalizedName = name.toLowerCase().trim();
-      // Check if new name conflicts with another tag
-      const conflict = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ? AND id != ?')
-        .bind(normalizedName, id)
+      // Check if new name conflicts with another tag for this user
+      const conflict = await c.env.DB.prepare(
+        'SELECT id FROM tags WHERE name = ? AND id != ? AND user_id = ?'
+      )
+        .bind(normalizedName, id, userId)
         .first();
       if (conflict) {
         return c.json({ error: 'A tag with this name already exists' }, 409);
@@ -258,9 +306,9 @@ tags.put('/:id', async (c) => {
       return c.json({ error: 'No valid fields to update' }, 400);
     }
 
-    values.push(id);
+    values.push(id, userId);
 
-    await c.env.DB.prepare(`UPDATE tags SET ${updates.join(', ')} WHERE id = ?`)
+    await c.env.DB.prepare(`UPDATE tags SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`)
       .bind(...values)
       .run();
 
@@ -295,11 +343,14 @@ tags.put('/:id', async (c) => {
 
 // DELETE /api/tags/:id - Delete tag and remove from all recipes
 tags.delete('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const existing = await c.env.DB.prepare('SELECT id, name FROM tags WHERE id = ?')
-      .bind(id)
+    const existing = await c.env.DB.prepare(
+      'SELECT id, name FROM tags WHERE id = ? AND user_id = ?'
+    )
+      .bind(id, userId)
       .first<{ id: number; name: string }>();
 
     if (!existing) {
@@ -310,7 +361,7 @@ tags.delete('/:id', async (c) => {
     await c.env.DB.prepare('DELETE FROM recipe_tags WHERE tag_id = ?').bind(id).run();
 
     // Delete the tag
-    await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
+    await c.env.DB.prepare('DELETE FROM tags WHERE id = ? AND user_id = ?').bind(id, userId).run();
 
     return c.json({ success: true, id, name: existing.name });
   } catch (error) {
@@ -325,6 +376,7 @@ tags.delete('/:id', async (c) => {
 
 // POST /api/tags/:id/merge - Merge another tag into this one
 tags.post('/:id/merge', async (c) => {
+  const { userId } = c.get('user');
   const targetId = Number(c.req.param('id'));
 
   try {
@@ -335,12 +387,16 @@ tags.post('/:id/merge', async (c) => {
       return c.json({ error: 'sourceId is required' }, 400);
     }
 
-    // Check both tags exist
-    const targetTag = await c.env.DB.prepare('SELECT id, name FROM tags WHERE id = ?')
-      .bind(targetId)
+    // Check both tags exist and belong to user
+    const targetTag = await c.env.DB.prepare(
+      'SELECT id, name FROM tags WHERE id = ? AND user_id = ?'
+    )
+      .bind(targetId, userId)
       .first<{ id: number; name: string }>();
-    const sourceTag = await c.env.DB.prepare('SELECT id, name FROM tags WHERE id = ?')
-      .bind(sourceId)
+    const sourceTag = await c.env.DB.prepare(
+      'SELECT id, name FROM tags WHERE id = ? AND user_id = ?'
+    )
+      .bind(sourceId, userId)
       .first<{ id: number; name: string }>();
 
     if (!targetTag) {
@@ -364,7 +420,9 @@ tags.post('/:id/merge', async (c) => {
     await c.env.DB.prepare('DELETE FROM recipe_tags WHERE tag_id = ?').bind(sourceId).run();
 
     // Delete source tag
-    await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(sourceId).run();
+    await c.env.DB.prepare('DELETE FROM tags WHERE id = ? AND user_id = ?')
+      .bind(sourceId, userId)
+      .run();
 
     // Get updated target tag
     const updated = await c.env.DB.prepare(
@@ -402,15 +460,16 @@ tags.post('/:id/merge', async (c) => {
 
 // POST /api/recipes/:id/tags - Add tag to recipe
 tags.post('/recipes/:id/tags', async (c) => {
+  const { userId } = c.get('user');
   const recipeId = Number(c.req.param('id'));
 
   try {
     const body = await c.req.json();
     const { tag_id, name } = body;
 
-    // Check if recipe exists
-    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
-      .bind(recipeId)
+    // Check if recipe exists and belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(recipeId, userId)
       .first();
 
     if (!recipe) {
@@ -423,21 +482,23 @@ tags.post('/recipes/:id/tags', async (c) => {
     if (!tagId && name) {
       const normalizedName = name.toLowerCase().trim();
 
-      // Try to find existing tag
-      const existingTag = await c.env.DB.prepare('SELECT id FROM tags WHERE name = ?')
-        .bind(normalizedName)
+      // Try to find existing tag for this user
+      const existingTag = await c.env.DB.prepare(
+        'SELECT id FROM tags WHERE name = ? AND user_id = ?'
+      )
+        .bind(normalizedName, userId)
         .first<{ id: number }>();
 
       if (existingTag) {
         tagId = existingTag.id;
       } else {
-        // Create new tag
+        // Create new tag for user
         const result = await c.env.DB.prepare(
           `
-          INSERT INTO tags (name, display_name) VALUES (?, ?)
+          INSERT INTO tags (user_id, name, display_name) VALUES (?, ?, ?)
         `
         )
-          .bind(normalizedName, name)
+          .bind(userId, normalizedName, name)
           .run();
         tagId = result.meta.last_row_id;
       }
@@ -447,8 +508,10 @@ tags.post('/recipes/:id/tags', async (c) => {
       return c.json({ error: 'Either tag_id or name is required' }, 400);
     }
 
-    // Check if tag exists
-    const tag = await c.env.DB.prepare('SELECT * FROM tags WHERE id = ?').bind(tagId).first();
+    // Check if tag exists and belongs to user
+    const tag = await c.env.DB.prepare('SELECT * FROM tags WHERE id = ? AND user_id = ?')
+      .bind(tagId, userId)
+      .first();
 
     if (!tag) {
       return c.json({ error: 'Tag not found' }, 404);
@@ -496,10 +559,20 @@ tags.post('/recipes/:id/tags', async (c) => {
 
 // DELETE /api/recipes/:id/tags/:tagId - Remove tag from recipe
 tags.delete('/recipes/:id/tags/:tagId', async (c) => {
+  const { userId } = c.get('user');
   const recipeId = Number(c.req.param('id'));
   const tagId = Number(c.req.param('tagId'));
 
   try {
+    // Check if recipe belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(recipeId, userId)
+      .first();
+
+    if (!recipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
     // Check if link exists
     const existingLink = await c.env.DB.prepare(
       'SELECT 1 FROM recipe_tags WHERE recipe_id = ? AND tag_id = ?'

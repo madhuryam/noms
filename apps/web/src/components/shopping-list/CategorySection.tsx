@@ -104,9 +104,7 @@ export function CategorySection({
               {category.name}
               <span className="ml-2 text-xs font-normal text-gray-400">({itemCount})</span>
             </button>
-            {isOver && (
-              <span className="text-xs text-blue-500">Drop here to add</span>
-            )}
+            {isOver && <span className="text-xs text-blue-500">Drop here to add</span>}
           </>
         )}
 
@@ -117,7 +115,12 @@ export function CategorySection({
             title="Delete category"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}
@@ -155,9 +158,7 @@ export function UncategorizedSection({ itemCount, children }: UncategorizedSecti
           Uncategorized
           <span className="ml-2 text-xs font-normal text-gray-400">({itemCount})</span>
         </span>
-        {isOver && (
-          <span className="text-xs text-blue-500">Drop here to add</span>
-        )}
+        {isOver && <span className="text-xs text-blue-500">Drop here to add</span>}
       </div>
 
       <div className="space-y-2">{children}</div>

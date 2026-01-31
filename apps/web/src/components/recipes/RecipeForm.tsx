@@ -1,12 +1,22 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateRecipe, useUpdateRecipe, useTags, useAddTagToRecipe, useRemoveTagFromRecipe, useCreateTag, useCreateNutrition, useNutritionEntriesFromDb } from '../../hooks';
+import {
+  useCreateRecipe,
+  useUpdateRecipe,
+  useTags,
+  useAddTagToRecipe,
+  useRemoveTagFromRecipe,
+  useCreateTag,
+  useCreateNutrition,
+  useNutritionEntriesFromDb,
+} from '../../hooks';
 import { DEFAULT_SERVINGS } from '../../lib/constants';
 import { calculateRecipeMacros } from '../../lib/macroCalculation';
 import { TagSelector } from '../tags';
 import { PairingSelector } from './PairingSelector';
 
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
+const API_URL =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
 
 // Section for the editor (used by both ingredients and instructions)
 interface EditorSection {
@@ -98,11 +108,19 @@ function isGroupHeader(line: string): boolean {
   if (trimmed.endsWith(':')) return true;
 
   const words = trimmed.split(/\s+/);
-  const upperWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
-  if (upperWords.length >= 1 && upperWords.length === words.filter(w => /[A-Z]/i.test(w)).length) {
+  const upperWords = words.filter((w) => w === w.toUpperCase() && /[A-Z]/.test(w));
+  if (
+    upperWords.length >= 1 &&
+    upperWords.length === words.filter((w) => /[A-Z]/i.test(w)).length
+  ) {
     return true;
   }
-  if (words.length > 0 && words[0] === words[0].toUpperCase() && /[A-Z]/.test(words[0]) && !/\d/.test(trimmed)) {
+  if (
+    words.length > 0 &&
+    words[0] === words[0].toUpperCase() &&
+    /[A-Z]/.test(words[0]) &&
+    !/\d/.test(trimmed)
+  ) {
     if (words[0].replace(/[^A-Z]/g, '').length >= 2) {
       return true;
     }
@@ -265,9 +283,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
   const [instructionSections, setInstructionSections] = useState<EditorSection[]>(() =>
     parseToSections('')
   );
-  const [prepSections, setPrepSections] = useState<EditorSection[]>(() =>
-    parseToSections('')
-  );
+  const [prepSections, setPrepSections] = useState<EditorSection[]>(() => parseToSections(''));
 
   // Update formData when sections change
   const updateIngredientsFromSections = useCallback((sections: EditorSection[]) => {
@@ -367,12 +383,8 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       instructions_raw: formData.instructions_raw.trim(),
       prep_instructions_raw: formData.prep_instructions_raw.trim() || null,
       servings: formData.servings ? Number(formData.servings) : DEFAULT_SERVINGS,
-      prep_time_minutes: formData.prep_time_minutes
-        ? Number(formData.prep_time_minutes)
-        : null,
-      cook_time_minutes: formData.cook_time_minutes
-        ? Number(formData.cook_time_minutes)
-        : null,
+      prep_time_minutes: formData.prep_time_minutes ? Number(formData.prep_time_minutes) : null,
+      cook_time_minutes: formData.cook_time_minutes ? Number(formData.cook_time_minutes) : null,
       notes: formData.notes.trim() || null,
       source_url: formData.source_url.trim() || null,
       ...macroValues,
@@ -650,7 +662,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
               type="button"
               onClick={() => setMacrosManual(!macrosManual)}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                macrosManual ? 'bg-purple-600 dark:bg-onedark-purple' : 'bg-gray-300 dark:bg-onedark-bg-highlight'
+                macrosManual
+                  ? 'bg-purple-600 dark:bg-onedark-purple'
+                  : 'bg-gray-300 dark:bg-onedark-bg-highlight'
               }`}
             >
               <span
@@ -666,22 +680,30 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
           // Manual input mode
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Calories</label>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
+                Calories
+              </label>
               <input
                 type="number"
                 value={formData.calories_total}
-                onChange={(e) => setFormData(prev => ({ ...prev, calories_total: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, calories_total: e.target.value }))
+                }
                 min="0"
                 placeholder="0"
                 className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg-lighter focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Protein (g)</label>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
+                Protein (g)
+              </label>
               <input
                 type="number"
                 value={formData.protein_total}
-                onChange={(e) => setFormData(prev => ({ ...prev, protein_total: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, protein_total: e.target.value }))
+                }
                 min="0"
                 step="0.1"
                 placeholder="0"
@@ -689,11 +711,13 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Carbs (g)</label>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
+                Carbs (g)
+              </label>
               <input
                 type="number"
                 value={formData.carbs_total}
-                onChange={(e) => setFormData(prev => ({ ...prev, carbs_total: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, carbs_total: e.target.value }))}
                 min="0"
                 step="0.1"
                 placeholder="0"
@@ -701,11 +725,13 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">Fat (g)</label>
+              <label className="block text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
+                Fat (g)
+              </label>
               <input
                 type="number"
                 value={formData.fat_total}
-                onChange={(e) => setFormData(prev => ({ ...prev, fat_total: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, fat_total: e.target.value }))}
                 min="0"
                 step="0.1"
                 placeholder="0"
@@ -748,7 +774,8 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 <div className="text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500 dark:text-onedark-fg-muted">
-                      {calculatedMacros.matched_count}/{calculatedMacros.total_count} ingredients matched
+                      {calculatedMacros.matched_count}/{calculatedMacros.total_count} ingredients
+                      matched
                     </span>
                     {calculatedMacros.unmatched_ingredients.length > 0 && (
                       <button
@@ -763,7 +790,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </button>
                     )}
@@ -778,12 +810,19 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                       <ul className="space-y-1">
                         {calculatedMacros.unmatched_ingredients.map((ingredient, index) => (
                           <li key={index} className="flex items-center justify-between gap-2">
-                            <span className="text-gray-700 dark:text-onedark-fg truncate">{ingredient}</span>
+                            <span className="text-gray-700 dark:text-onedark-fg truncate">
+                              {ingredient}
+                            </span>
                             <button
                               type="button"
                               onClick={() => {
                                 setNutritionEntryIngredient(ingredient);
-                                setNutritionEntryForm({ calories: '', protein: '', carbs: '', fat: '' });
+                                setNutritionEntryForm({
+                                  calories: '',
+                                  protein: '',
+                                  carbs: '',
+                                  fat: '',
+                                });
                               }}
                               className="flex-shrink-0 text-blue-600 dark:text-onedark-blue hover:underline text-xs"
                             >
@@ -828,7 +867,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
             className="text-sm text-blue-600 dark:text-onedark-blue hover:text-blue-700 dark:hover:text-onedark-blue/80 flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add Section
           </button>
@@ -870,7 +914,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                     title="Remove section"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 )}
@@ -914,7 +963,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
             className="text-sm text-blue-600 dark:text-onedark-blue hover:text-blue-700 dark:hover:text-onedark-blue/80 flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add Section
           </button>
@@ -956,7 +1010,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                     title="Remove section"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 )}
@@ -987,7 +1046,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="block text-sm font-medium text-gray-700 dark:text-onedark-fg">
-            Prep Steps <span className="text-xs text-gray-400 dark:text-onedark-fg-muted font-normal">(optional - for meal planning)</span>
+            Prep Steps{' '}
+            <span className="text-xs text-gray-400 dark:text-onedark-fg-muted font-normal">
+              (optional - for meal planning)
+            </span>
           </label>
           <button
             type="button"
@@ -1000,7 +1062,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
             className="text-sm text-amber-600 dark:text-onedark-yellow hover:text-amber-700 dark:hover:text-onedark-yellow/80 flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add Section
           </button>
@@ -1034,15 +1101,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                   <button
                     type="button"
                     onClick={() => {
-                      updatePrepFromSections(
-                        prepSections.filter((s) => s.id !== section.id)
-                      );
+                      updatePrepFromSections(prepSections.filter((s) => s.id !== section.id));
                     }}
                     className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-onedark-red transition-colors"
                     title="Remove section"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 )}
@@ -1103,8 +1173,19 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <div className="flex items-center gap-2 text-white">
                       <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
                       </svg>
                       Uploading...
                     </div>
@@ -1119,7 +1200,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-onedark-fg border border-gray-200 dark:border-onedark-bg-highlight rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
                   </svg>
                   Replace Image
                 </button>
@@ -1130,8 +1216,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-onedark-fg border border-gray-200 dark:border-onedark-bg-highlight rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
                   </svg>
                   Take Photo
                 </button>
@@ -1147,7 +1243,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
                 </svg>
                 <p className="mt-2 text-sm text-gray-500 dark:text-onedark-fg-muted">
                   No image for this recipe
@@ -1160,7 +1261,12 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 disabled:opacity-50 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                      />
                     </svg>
                     Upload Image
                   </button>
@@ -1171,8 +1277,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                     className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight disabled:opacity-50 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
                     </svg>
                     Take Photo
                   </button>
@@ -1180,8 +1296,19 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 {isUploadingImage && (
                   <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-onedark-fg-muted">
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Uploading...
                   </div>
@@ -1255,9 +1382,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       </div>
 
       {/* Pairings - only shown in edit mode */}
-      {mode === 'edit' && recipeId && (
-        <PairingSelector recipeId={recipeId} />
-      )}
+      {mode === 'edit' && recipeId && <PairingSelector recipeId={recipeId} />}
 
       {/* Error Message */}
       {mutation.isError && (
@@ -1336,7 +1461,10 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
               Add Nutrition Data
             </h2>
             <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mb-4">
-              Enter nutrition values per 100g for: <span className="font-medium text-gray-900 dark:text-onedark-fg">{nutritionEntryIngredient}</span>
+              Enter nutrition values per 100g for:{' '}
+              <span className="font-medium text-gray-900 dark:text-onedark-fg">
+                {nutritionEntryIngredient}
+              </span>
             </p>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1347,7 +1475,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 <input
                   type="number"
                   value={nutritionEntryForm.calories}
-                  onChange={(e) => setNutritionEntryForm(prev => ({ ...prev, calories: e.target.value }))}
+                  onChange={(e) =>
+                    setNutritionEntryForm((prev) => ({ ...prev, calories: e.target.value }))
+                  }
                   min="0"
                   placeholder="kcal"
                   className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-onedark-bg-highlight bg-white dark:bg-onedark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-onedark-blue dark:text-onedark-fg"
@@ -1360,7 +1490,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 <input
                   type="number"
                   value={nutritionEntryForm.protein}
-                  onChange={(e) => setNutritionEntryForm(prev => ({ ...prev, protein: e.target.value }))}
+                  onChange={(e) =>
+                    setNutritionEntryForm((prev) => ({ ...prev, protein: e.target.value }))
+                  }
                   min="0"
                   step="0.1"
                   placeholder="g"
@@ -1374,7 +1506,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 <input
                   type="number"
                   value={nutritionEntryForm.carbs}
-                  onChange={(e) => setNutritionEntryForm(prev => ({ ...prev, carbs: e.target.value }))}
+                  onChange={(e) =>
+                    setNutritionEntryForm((prev) => ({ ...prev, carbs: e.target.value }))
+                  }
                   min="0"
                   step="0.1"
                   placeholder="g"
@@ -1388,7 +1522,9 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                 <input
                   type="number"
                   value={nutritionEntryForm.fat}
-                  onChange={(e) => setNutritionEntryForm(prev => ({ ...prev, fat: e.target.value }))}
+                  onChange={(e) =>
+                    setNutritionEntryForm((prev) => ({ ...prev, fat: e.target.value }))
+                  }
                   min="0"
                   step="0.1"
                   placeholder="g"
@@ -1416,10 +1552,18 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
                   try {
                     await createNutrition.mutateAsync({
                       ingredient_name: nutritionEntryIngredient,
-                      calories_per_100g: nutritionEntryForm.calories ? parseFloat(nutritionEntryForm.calories) : null,
-                      protein_per_100g: nutritionEntryForm.protein ? parseFloat(nutritionEntryForm.protein) : null,
-                      carbs_per_100g: nutritionEntryForm.carbs ? parseFloat(nutritionEntryForm.carbs) : null,
-                      fat_per_100g: nutritionEntryForm.fat ? parseFloat(nutritionEntryForm.fat) : null,
+                      calories_per_100g: nutritionEntryForm.calories
+                        ? parseFloat(nutritionEntryForm.calories)
+                        : null,
+                      protein_per_100g: nutritionEntryForm.protein
+                        ? parseFloat(nutritionEntryForm.protein)
+                        : null,
+                      carbs_per_100g: nutritionEntryForm.carbs
+                        ? parseFloat(nutritionEntryForm.carbs)
+                        : null,
+                      fat_per_100g: nutritionEntryForm.fat
+                        ? parseFloat(nutritionEntryForm.fat)
+                        : null,
                     });
                     setNutritionEntryIngredient(null);
                   } catch {

@@ -70,16 +70,24 @@ function isGroupHeader(line: string): boolean {
   // Check if line is predominantly uppercase (section headers like "GARLIC HERB SAUCE")
   // Allow some lowercase words like "optional", "for the"
   const words = trimmed.split(/\s+/);
-  const upperWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+  const upperWords = words.filter((w) => w === w.toUpperCase() && /[A-Z]/.test(w));
 
   // If all words with letters are uppercase, it's a header
-  if (upperWords.length >= 1 && upperWords.length === words.filter(w => /[A-Z]/i.test(w)).length) {
+  if (
+    upperWords.length >= 1 &&
+    upperWords.length === words.filter((w) => /[A-Z]/i.test(w)).length
+  ) {
     return true;
   }
 
   // If first word is all caps and line has no numbers (no quantity), likely a header
   // e.g., "TOPPINGS optional" or "SAUCE"
-  if (words.length > 0 && words[0] === words[0].toUpperCase() && /[A-Z]/.test(words[0]) && !/\d/.test(trimmed)) {
+  if (
+    words.length > 0 &&
+    words[0] === words[0].toUpperCase() &&
+    /[A-Z]/.test(words[0]) &&
+    !/\d/.test(trimmed)
+  ) {
     // Must have at least 2 uppercase letters to avoid matching single letters
     if (words[0].replace(/[^A-Z]/g, '').length >= 2) {
       return true;
@@ -301,7 +309,12 @@ export function scaleIngredient(line: string, scaleFactor: number): ScaledIngred
   const parsed = parseIngredient(line);
 
   if (!parsed.shouldScale || parsed.amount === null || scaleFactor === 1) {
-    return { display: parsed.original, original: parsed.original, wasScaled: false, isGroupHeader: false };
+    return {
+      display: parsed.original,
+      original: parsed.original,
+      wasScaled: false,
+      isGroupHeader: false,
+    };
   }
 
   const scaledAmount = parsed.amount * scaleFactor;
@@ -316,7 +329,12 @@ export function scaleIngredient(line: string, scaleFactor: number): ScaledIngred
     display += ` ${parsed.ingredient}`;
   }
 
-  return { display: display.trim(), original: parsed.original, wasScaled: true, isGroupHeader: false };
+  return {
+    display: display.trim(),
+    original: parsed.original,
+    wasScaled: true,
+    isGroupHeader: false,
+  };
 }
 
 function stripCheckbox(line: string): string {

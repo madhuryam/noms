@@ -39,9 +39,7 @@ export function FridgeList({
 
   if (isLoading) {
     return (
-      <div className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">
-        Loading...
-      </div>
+      <div className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">Loading...</div>
     );
   }
 
@@ -57,9 +55,7 @@ export function FridgeList({
       )}
 
       {sortedItems.length === 0 ? (
-        <p className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">
-          {emptyMessage}
-        </p>
+        <p className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">{emptyMessage}</p>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-onedark-bg-highlight">
           {sortedItems.map((item) => (

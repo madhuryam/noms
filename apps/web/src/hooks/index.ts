@@ -1,13 +1,34 @@
 export { useRecipes, useInfiniteRecipes } from './useRecipes';
 export type { Recipe, RecipeTag } from './useRecipes';
-export { useRecipe, useCreateRecipe, useUpdateRecipe, useDeleteRecipe, useRecipeIngredients } from './useRecipe';
+export {
+  useRecipe,
+  useCreateRecipe,
+  useUpdateRecipe,
+  useDeleteRecipe,
+  useRecipeIngredients,
+} from './useRecipe';
 export type { ParsedIngredient } from './useRecipe';
 export { useVaultImport } from './useVaultImport';
 export { useSearch, useSearchSuggestions, useSpellCheck } from './useSearch';
 export type { SearchResult, SearchSuggestion } from './useSearch';
-export { useAssociations, useAssociation, useCreateAssociation, useUpdateAssociation, useDeleteAssociation } from './useAssociations';
+export {
+  useAssociations,
+  useAssociation,
+  useCreateAssociation,
+  useUpdateAssociation,
+  useDeleteAssociation,
+} from './useAssociations';
 export type { AssociationGroup } from './useAssociations';
-export { useTags, useSmartTags, useCreateTag, useUpdateTag, useDeleteTag, useMergeTags, useAddTagToRecipe, useRemoveTagFromRecipe } from './useTags';
+export {
+  useTags,
+  useSmartTags,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+  useMergeTags,
+  useAddTagToRecipe,
+  useRemoveTagFromRecipe,
+} from './useTags';
 export type { Tag, SmartTag } from './useTags';
 export { useDailySuggestions } from './useDailySuggestions';
 export {
@@ -80,7 +101,12 @@ export type {
 } from './useShoppingList';
 export { usePairings, useAddPairing, useRemovePairing, PAIRING_TYPES } from './usePairings';
 export type { Pairing, AddPairingInput } from './usePairings';
-export { useCustomItems, useAllCustomItems, useAddCustomItem, useRemoveCustomItem } from './useCustomItems';
+export {
+  useCustomItems,
+  useAllCustomItems,
+  useAddCustomItem,
+  useRemoveCustomItem,
+} from './useCustomItems';
 export {
   useNutritionEntries,
   useNutritionEntriesFromDb,
@@ -91,3 +117,5 @@ export {
 } from './useNutrition';
 export type { NutritionEntry, NutritionEntryWithSource } from './useNutrition';
 export { useWakeLock } from './useWakeLock';
+export { useUser, useUpdateUser } from './useUser';
+export type { User } from './useUser';

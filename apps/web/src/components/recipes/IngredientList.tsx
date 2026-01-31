@@ -21,7 +21,7 @@ const NO_SCALE_INGREDIENTS = [
 
 function shouldNotScale(ingredientName: string): boolean {
   const lower = ingredientName.toLowerCase();
-  return NO_SCALE_INGREDIENTS.some(item => lower.includes(item));
+  return NO_SCALE_INGREDIENTS.some((item) => lower.includes(item));
 }
 
 interface IngredientListProps {
@@ -178,7 +178,10 @@ function HighlightedIngredient({
   }
 
   // Split normalization key on '|' for alternatives
-  const keys = normalizationKey.split('|').map(k => k.trim()).filter(k => k.length > 0);
+  const keys = normalizationKey
+    .split('|')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
 
   // Find all matches and their positions
   const lowerIngredient = ingredient.toLowerCase();
@@ -252,7 +255,7 @@ export function IngredientList({
   // Create a map of ingredient ID to pantry match for quick lookup
   const pantryMatchMap = useMemo(() => {
     if (!pantryMatches) return new Map<number, IngredientMatch>();
-    return new Map(pantryMatches.map(m => [m.id, m]));
+    return new Map(pantryMatches.map((m) => [m.id, m]));
   }, [pantryMatches]);
 
   // Format ingredients for display
@@ -262,7 +265,7 @@ export function IngredientList({
       if (!ingredientsRaw) return [];
       return ingredientsRaw
         .split('\n')
-        .filter(line => line.trim())
+        .filter((line) => line.trim())
         .map((line) => ({
           id: null,
           quantity: null,
@@ -276,7 +279,7 @@ export function IngredientList({
         }));
     }
 
-    return parsedIngredients.map(ing => formatIngredientDisplay(ing, scaleFactor));
+    return parsedIngredients.map((ing) => formatIngredientDisplay(ing, scaleFactor));
   }, [parsedIngredients, ingredientsRaw, scaleFactor]);
 
   const sections = useMemo(() => groupIntoSections(ingredients), [ingredients]);
@@ -299,7 +302,7 @@ export function IngredientList({
   }, [onProgressChange]);
 
   // Count only non-header items
-  const nonHeaderIngredients = ingredients.filter(ing => !ing.isGroupHeader);
+  const nonHeaderIngredients = ingredients.filter((ing) => !ing.isGroupHeader);
   const checkedCount = checkedItems.size;
   const totalCount = nonHeaderIngredients.length;
 
@@ -313,7 +316,7 @@ export function IngredientList({
           Ingredients
         </h2>
         <div className="space-y-2 animate-pulse">
-          {[1, 2, 3, 4, 5].map(i => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-6 bg-gray-200 dark:bg-onedark-bg-highlight rounded" />
           ))}
         </div>
@@ -384,7 +387,9 @@ export function IngredientList({
                         onClick={() => toggleItem(originalIndex)}
                         aria-pressed={isChecked}
                         aria-label={
-                          isChecked ? `Uncheck ${ingredient.original}` : `Check ${ingredient.original}`
+                          isChecked
+                            ? `Uncheck ${ingredient.original}`
+                            : `Check ${ingredient.original}`
                         }
                         className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                           isChecked
@@ -427,24 +432,43 @@ export function IngredientList({
                           />
                         )}
                         {ingredient.extra && (
-                          <span className="text-gray-500 dark:text-onedark-fg-muted"> ({ingredient.extra})</span>
+                          <span className="text-gray-500 dark:text-onedark-fg-muted">
+                            {' '}
+                            ({ingredient.extra})
+                          </span>
                         )}
                       </span>
                       {/* Pantry match indicator */}
                       {hasPantryData && (
                         <span
-                          title={pantryMatch?.have_ingredient
-                            ? `In pantry${pantryMatch.matched_pantry_item ? `: ${pantryMatch.matched_pantry_item}` : ''}`
-                            : 'Need to buy'}
+                          title={
+                            pantryMatch?.have_ingredient
+                              ? `In pantry${pantryMatch.matched_pantry_item ? `: ${pantryMatch.matched_pantry_item}` : ''}`
+                              : 'Need to buy'
+                          }
                           className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-400 dark:text-onedark-fg-muted"
                         >
                           {pantryMatch?.have_ingredient ? (
                             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              <path
+                                fillRule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clipRule="evenodd"
+                              />
                             </svg>
                           ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                              />
                             </svg>
                           )}
                         </span>

@@ -48,9 +48,10 @@ interface NutritionRowProps {
 function NutritionRow({ label, value, unit, dailyValue, indent }: NutritionRowProps) {
   if (value === null) return null;
 
-  const displayValue = unit === 'g' || unit === 'mg' || unit === 'mcg'
-    ? Math.round(value * 10) / 10
-    : Math.round(value);
+  const displayValue =
+    unit === 'g' || unit === 'mg' || unit === 'mcg'
+      ? Math.round(value * 10) / 10
+      : Math.round(value);
 
   return (
     <div className={`flex items-center justify-between py-1.5 ${indent ? 'pl-4' : ''}`}>
@@ -59,12 +60,11 @@ function NutritionRow({ label, value, unit, dailyValue, indent }: NutritionRowPr
       </span>
       <div className="flex items-center gap-2">
         <span className="font-medium text-gray-900 dark:text-onedark-fg">
-          {displayValue}{unit}
+          {displayValue}
+          {unit}
         </span>
         {dailyValue !== null && dailyValue !== undefined && (
-          <span className="text-sm text-gray-500 dark:text-onedark-fg-muted">
-            {dailyValue}%
-          </span>
+          <span className="text-sm text-gray-500 dark:text-onedark-fg-muted">{dailyValue}%</span>
         )}
       </div>
     </div>
@@ -114,19 +114,19 @@ export function NutritionModal({
   };
 
   // Check if we have any detailed nutrition beyond basic macros
-  const hasDetailedNutrition = detailedNutrition && (
-    detailedNutrition.saturatedFat !== null ||
-    detailedNutrition.fiber !== null ||
-    detailedNutrition.sugar !== null ||
-    detailedNutrition.sodium !== null ||
-    detailedNutrition.cholesterol !== null ||
-    detailedNutrition.potassium !== null ||
-    detailedNutrition.vitaminA !== null ||
-    detailedNutrition.vitaminC !== null ||
-    detailedNutrition.vitaminD !== null ||
-    detailedNutrition.calcium !== null ||
-    detailedNutrition.iron !== null
-  );
+  const hasDetailedNutrition =
+    detailedNutrition &&
+    (detailedNutrition.saturatedFat !== null ||
+      detailedNutrition.fiber !== null ||
+      detailedNutrition.sugar !== null ||
+      detailedNutrition.sodium !== null ||
+      detailedNutrition.cholesterol !== null ||
+      detailedNutrition.potassium !== null ||
+      detailedNutrition.vitaminA !== null ||
+      detailedNutrition.vitaminC !== null ||
+      detailedNutrition.vitaminD !== null ||
+      detailedNutrition.calcium !== null ||
+      detailedNutrition.iron !== null);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -135,15 +135,24 @@ export function NutritionModal({
         <div className="px-6 py-4 border-b border-gray-200 dark:border-onedark-bg-highlight">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">Nutrition Facts</h2>
-              <p className="text-sm text-gray-500 dark:text-onedark-fg-muted truncate max-w-[250px]">{recipeTitle}</p>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
+                Nutrition Facts
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-onedark-fg-muted truncate max-w-[250px]">
+                {recipeTitle}
+              </p>
             </div>
             <button
               onClick={onClose}
               className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -172,7 +181,8 @@ export function NutritionModal({
               {displayCalories ?? '—'}
             </p>
             <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mt-1">
-              Calories {dvCalories !== null && <span className="text-gray-400">({dvCalories}% DV)</span>}
+              Calories{' '}
+              {dvCalories !== null && <span className="text-gray-400">({dvCalories}% DV)</span>}
             </p>
           </div>
 
@@ -240,7 +250,12 @@ export function NutritionModal({
               />
             )}
 
-            <NutritionRow label="Total Carbohydrates" value={displayCarbs} unit="g" dailyValue={dvCarbs} />
+            <NutritionRow
+              label="Total Carbohydrates"
+              value={displayCarbs}
+              unit="g"
+              dailyValue={dvCarbs}
+            />
             {detailedNutrition?.fiber !== null && (
               <NutritionRow
                 label="Dietary Fiber"
@@ -310,14 +325,26 @@ export function NutritionModal({
           {macros.isManual ? (
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-onedark-fg-muted">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                />
               </svg>
               Manually entered values
             </div>
-          ) : macros.matchedCount !== undefined && macros.totalCount !== undefined && macros.totalCount > 0 ? (
+          ) : macros.matchedCount !== undefined &&
+            macros.totalCount !== undefined &&
+            macros.totalCount > 0 ? (
             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-onedark-fg-muted">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                />
               </svg>
               Calculated from {macros.matchedCount}/{macros.totalCount} matched ingredients
             </div>
@@ -326,8 +353,18 @@ export function NutritionModal({
           {/* Disclaimer */}
           <div className="bg-gray-50 dark:bg-onedark-bg border border-gray-200 dark:border-onedark-bg-highlight rounded-lg p-4">
             <div className="flex gap-3">
-              <svg className="w-5 h-5 text-gray-500 dark:text-onedark-fg-muted flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-5 h-5 text-gray-500 dark:text-onedark-fg-muted flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-onedark-fg">

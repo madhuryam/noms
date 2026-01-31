@@ -1,15 +1,33 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useAddPantryItem, useBulkAddPantryItems, useShelfLifeEntries, usePantryItems, usePantryCategories, useCreatePantryCategory, useDeletePantryItem, useUpdatePantryItem } from '../../hooks';
+import {
+  useAddPantryItem,
+  useBulkAddPantryItems,
+  useShelfLifeEntries,
+  usePantryItems,
+  usePantryCategories,
+  useCreatePantryCategory,
+  useDeletePantryItem,
+  useUpdatePantryItem,
+} from '../../hooks';
 import type { PantryLocation } from '../../hooks';
 import { getItemsForLocation, type ItemCategory } from '../../data/inventoryItems';
-import { useCustomItems, useAddCustomItem, useRemoveCustomItem, useItemRenames, useRenameItem, useCategoryItems, useAddCategoryItem, useRemoveCategoryItem } from '../../hooks/useCustomItems';
+import {
+  useCustomItems,
+  useAddCustomItem,
+  useRemoveCustomItem,
+  useItemRenames,
+  useRenameItem,
+  useCategoryItems,
+  useAddCategoryItem,
+  useRemoveCategoryItem,
+} from '../../hooks/useCustomItems';
 
 // Title case helper - capitalizes first letter of each word
 function toTitleCase(str: string): string {
   return str
     .toLowerCase()
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -82,8 +100,8 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   const existingItemNamesLower = useMemo(() => {
     return new Set<string>(
       pantryItems
-        .filter(item => item.location === location)
-        .map(item => (item.original_name || item.name).toLowerCase())
+        .filter((item) => item.location === location)
+        .map((item) => (item.original_name || item.name).toLowerCase())
     );
   }, [pantryItems, location]);
 
@@ -101,19 +119,25 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   }, [pantryItems, location]);
 
   // Helper to get pantry item by name (case-insensitive)
-  const getPantryItem = useCallback((item: string) => {
-    return originalNameToPantryItem.get(item.toLowerCase());
-  }, [originalNameToPantryItem]);
+  const getPantryItem = useCallback(
+    (item: string) => {
+      return originalNameToPantryItem.get(item.toLowerCase());
+    },
+    [originalNameToPantryItem]
+  );
 
   // Case-insensitive set of selected items for lookups
   const selectedItemsLower = useMemo(() => {
-    return new Set(Array.from(selectedItems).map(s => s.toLowerCase()));
+    return new Set(Array.from(selectedItems).map((s) => s.toLowerCase()));
   }, [selectedItems]);
 
   // Helper to check if an item is selected (case-insensitive)
-  const isItemSelected = useCallback((item: string) => {
-    return selectedItemsLower.has(item.toLowerCase());
-  }, [selectedItemsLower]);
+  const isItemSelected = useCallback(
+    (item: string) => {
+      return selectedItemsLower.has(item.toLowerCase());
+    },
+    [selectedItemsLower]
+  );
 
   // Store initial selection state to allow "Clear changes" functionality
   const [initialSelection, setInitialSelection] = useState<Set<string> | null>(null);
@@ -125,7 +149,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
     if (!initialized) {
       // Get original names from pantry items (these should match category item names)
       const existingOriginalNames = new Set<string>(
-        Array.from(originalNameToPantryItem.values()).map(item => item.originalName)
+        Array.from(originalNameToPantryItem.values()).map((item) => item.originalName)
       );
       setSelectedItems(existingOriginalNames);
       setInitialSelection(existingOriginalNames);
@@ -138,7 +162,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
     if (!initialSelection) return selectedItems.size > 0;
     if (selectedItems.size !== initialSelection.size) return true;
 
-    const initialLower = new Set(Array.from(initialSelection).map(s => s.toLowerCase()));
+    const initialLower = new Set(Array.from(initialSelection).map((s) => s.toLowerCase()));
     for (const item of selectedItems) {
       if (!initialLower.has(item.toLowerCase())) return true;
     }
@@ -172,36 +196,38 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   }, [pantryItems, location]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Calculate expiration date based on shelf life data
-  const getExpirationDate = useCallback((ingredientName: string): string | undefined => {
-    // Only calculate for fridge/freezer
-    if (location !== 'fridge' && location !== 'freezer') {
-      return undefined;
-    }
+  const getExpirationDate = useCallback(
+    (ingredientName: string): string | undefined => {
+      // Only calculate for fridge/freezer
+      if (location !== 'fridge' && location !== 'freezer') {
+        return undefined;
+      }
 
-    const nameLower = ingredientName.toLowerCase();
+      const nameLower = ingredientName.toLowerCase();
 
-    // Try exact match first
-    let entry = shelfLifeEntries.find(
-      (e) => e.ingredient_name.toLowerCase() === nameLower
-    );
+      // Try exact match first
+      let entry = shelfLifeEntries.find((e) => e.ingredient_name.toLowerCase() === nameLower);
 
-    // Try partial match if no exact match
-    if (!entry) {
-      entry = shelfLifeEntries.find(
-        (e) => nameLower.includes(e.ingredient_name.toLowerCase()) ||
-               e.ingredient_name.toLowerCase().includes(nameLower)
-      );
-    }
+      // Try partial match if no exact match
+      if (!entry) {
+        entry = shelfLifeEntries.find(
+          (e) =>
+            nameLower.includes(e.ingredient_name.toLowerCase()) ||
+            e.ingredient_name.toLowerCase().includes(nameLower)
+        );
+      }
 
-    if (!entry) return undefined;
+      if (!entry) return undefined;
 
-    const days = location === 'fridge' ? entry.fridge_days : entry.freezer_days;
-    if (!days) return undefined;
+      const days = location === 'fridge' ? entry.fridge_days : entry.freezer_days;
+      if (!days) return undefined;
 
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return date.toISOString().split('T')[0];
-  }, [location, shelfLifeEntries]);
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      return date.toISOString().split('T')[0];
+    },
+    [location, shelfLifeEntries]
+  );
 
   // Get items for this location and merge with custom items
   const locationItems = getItemsForLocation(location);
@@ -226,7 +252,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
         // Merge and deduplicate
         const allItems = [...category.items];
         for (const item of customCategoryItems) {
-          if (!allItems.some(existing => existing.toLowerCase() === item.toLowerCase())) {
+          if (!allItems.some((existing) => existing.toLowerCase() === item.toLowerCase())) {
             allItems.push(item);
           }
         }
@@ -238,7 +264,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
 
     // Add custom items as a separate category, filtering out items that exist in predefined categories
     const filteredCustomItems = customItems.filter(
-      item => !predefinedItemsLower.has(item.toLowerCase())
+      (item) => !predefinedItemsLower.has(item.toLowerCase())
     );
     if (filteredCustomItems.length > 0) {
       categories.unshift({
@@ -251,18 +277,19 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   }, [locationItems.categories, customItems, categoryItems, predefinedItemsLower]);
 
   // Check if an item is a custom item (added by user to a category or to "Your Items")
-  const isCustomCategoryItem = useCallback((categoryName: string, item: string): boolean => {
-    // All items in "Your Items" are custom items
-    if (categoryName === 'Your Items') {
-      return customItems.some(
+  const isCustomCategoryItem = useCallback(
+    (categoryName: string, item: string): boolean => {
+      // All items in "Your Items" are custom items
+      if (categoryName === 'Your Items') {
+        return customItems.some((customItem) => customItem.toLowerCase() === item.toLowerCase());
+      }
+      const customCategoryItems = categoryItems[categoryName] || [];
+      return customCategoryItems.some(
         (customItem) => customItem.toLowerCase() === item.toLowerCase()
       );
-    }
-    const customCategoryItems = categoryItems[categoryName] || [];
-    return customCategoryItems.some(
-      (customItem) => customItem.toLowerCase() === item.toLowerCase()
-    );
-  }, [categoryItems, customItems]);
+    },
+    [categoryItems, customItems]
+  );
 
   // Filter categories and items based on search query
   const filteredCategories = useMemo(() => {
@@ -274,9 +301,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
     return allCategories
       .map((category) => ({
         ...category,
-        items: category.items.filter((item) =>
-          item.toLowerCase().includes(query)
-        ),
+        items: category.items.filter((item) => item.toLowerCase().includes(query)),
       }))
       .filter((category) => category.items.length > 0);
   }, [allCategories, searchQuery]);
@@ -309,9 +334,12 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   }, [allCategories]);
 
   // Get display name for an item (applies renames)
-  const getDisplayName = useCallback((originalName: string) => {
-    return itemRenames[originalName] || originalName;
-  }, [itemRenames]);
+  const getDisplayName = useCallback(
+    (originalName: string) => {
+      return itemRenames[originalName] || originalName;
+    },
+    [itemRenames]
+  );
 
   // Start editing an item
   const startEditing = (originalName: string, e: React.MouseEvent) => {
@@ -455,18 +483,18 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   const handleAddSelected = async () => {
     // Determine what changed from initial state
     const initialLower = initialSelection
-      ? new Set(Array.from(initialSelection).map(s => s.toLowerCase()))
+      ? new Set(Array.from(initialSelection).map((s) => s.toLowerCase()))
       : new Set<string>();
-    const currentLower = new Set(Array.from(selectedItems).map(s => s.toLowerCase()));
+    const currentLower = new Set(Array.from(selectedItems).map((s) => s.toLowerCase()));
 
     // Items to ADD: currently selected but not in initial selection
     const itemsToAdd = Array.from(selectedItems).filter(
-      item => !initialLower.has(item.toLowerCase())
+      (item) => !initialLower.has(item.toLowerCase())
     );
 
     // Items to DELETE: in initial selection but not currently selected
     const itemsToDelete = initialSelection
-      ? Array.from(initialSelection).filter(item => !currentLower.has(item.toLowerCase()))
+      ? Array.from(initialSelection).filter((item) => !currentLower.has(item.toLowerCase()))
       : [];
 
     // If no changes, just close
@@ -510,7 +538,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
 
           // Look for existing category with this name
           const existingCategory = pantryCategories.find(
-            c => c.name.toLowerCase() === categoryName.toLowerCase()
+            (c) => c.name.toLowerCase() === categoryName.toLowerCase()
           );
 
           if (existingCategory) {
@@ -579,7 +607,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
         }
 
         const existingCategory = pantryCategories.find(
-          c => c.name.toLowerCase() === categoryName.toLowerCase()
+          (c) => c.name.toLowerCase() === categoryName.toLowerCase()
         );
 
         if (existingCategory) {
@@ -627,7 +655,9 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
 
   // Count items that will be newly added (selected but not already in inventory)
   const newItemsCount = useMemo(() => {
-    return Array.from(selectedItems).filter(item => !existingItemNamesLower.has(item.toLowerCase())).length;
+    return Array.from(selectedItems).filter(
+      (item) => !existingItemNamesLower.has(item.toLowerCase())
+    ).length;
   }, [selectedItems, existingItemNamesLower]);
 
   const handleAddCustomItem = async () => {
@@ -635,9 +665,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
     if (!trimmedQuery) return;
 
     // Check if item already exists in the list
-    const exists = allItems.some(
-      (item) => item.toLowerCase() === trimmedQuery.toLowerCase()
-    );
+    const exists = allItems.some((item) => item.toLowerCase() === trimmedQuery.toLowerCase());
 
     if (!exists) {
       // Add to custom items for this location
@@ -652,9 +680,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
   // Check if search query matches any existing item
   const searchMatchesExisting = useMemo(() => {
     if (!searchQuery.trim()) return true;
-    return allItems.some(
-      (item) => item.toLowerCase() === searchQuery.trim().toLowerCase()
-    );
+    return allItems.some((item) => item.toLowerCase() === searchQuery.trim().toLowerCase());
   }, [allItems, searchQuery]);
 
   const locationLabel = {
@@ -680,7 +706,12 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
               className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -729,7 +760,12 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
               </div>
 
@@ -740,7 +776,12 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                   className="mt-2 flex items-center gap-2 px-3 py-1.5 text-sm bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
                   </svg>
                   Add "{searchQuery.trim()}" as new item
                 </button>
@@ -772,7 +813,8 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                 </div>
               ) : (
                 filteredCategories.map((category) => {
-                  const isExpanded = expandedCategories.has(category.name) || searchQuery.trim().length > 0;
+                  const isExpanded =
+                    expandedCategories.has(category.name) || searchQuery.trim().length > 0;
                   const selectionCount = getCategorySelectionCount(category);
 
                   return (
@@ -792,7 +834,12 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                             stroke="currentColor"
                             viewBox="0 0 24 24"
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5l7 7-7 7"
+                            />
                           </svg>
                           <span className="font-medium text-gray-900 dark:text-onedark-fg">
                             {category.name}
@@ -821,7 +868,9 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                             </button>
                             {selectionCount > 0 && (
                               <>
-                                <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
+                                <span className="text-gray-300 dark:text-onedark-bg-highlight">
+                                  |
+                                </span>
                                 <button
                                   onClick={() => deselectAllInCategory(category)}
                                   className="text-xs text-gray-600 dark:text-onedark-fg-muted hover:underline"
@@ -836,7 +885,9 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {category.items.map((item) => {
                               const isSelected = isItemSelected(item);
-                              const itemInInventory = existingItemNamesLower.has(item.toLowerCase());
+                              const itemInInventory = existingItemNamesLower.has(
+                                item.toLowerCase()
+                              );
                               const displayName = getDisplayName(item);
                               const isEditing = editingItem === item;
                               const isRenamed = displayName !== item;
@@ -863,8 +914,18 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                                       className="p-1 text-green-600 hover:text-green-700"
                                       title="Save"
                                     >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M5 13l4 4L19 7"
+                                        />
                                       </svg>
                                     </button>
                                     <button
@@ -872,8 +933,18 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                                       className="p-1 text-gray-400 hover:text-gray-600"
                                       title="Cancel"
                                     >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M6 18L18 6M6 6l12 12"
+                                        />
                                       </svg>
                                     </button>
                                   </div>
@@ -910,8 +981,16 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                                     </span>
                                   </label>
                                   {itemInInventory && (
-                                    <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    <svg
+                                      className="w-3.5 h-3.5 flex-shrink-0 text-gray-400"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clipRule="evenodd"
+                                      />
                                     </svg>
                                   )}
                                   <button
@@ -919,8 +998,18 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                                     className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                                     title="Rename"
                                   >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                      />
                                     </svg>
                                   </button>
                                   {isCustomItem && (
@@ -933,8 +1022,18 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                                       className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                                       title="Delete from list"
                                     >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      <svg
+                                        className="w-3.5 h-3.5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                        />
                                       </svg>
                                     </button>
                                   )}
@@ -943,11 +1042,21 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                             })}
 
                             {/* Add new item - inline editable element */}
-                            {category.name !== 'Your Items' && (
-                              addingToCategory === category.name ? (
+                            {category.name !== 'Your Items' &&
+                              (addingToCategory === category.name ? (
                                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50">
-                                  <svg className="w-4 h-4 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  <svg
+                                    className="w-4 h-4 flex-shrink-0 text-green-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 4v16m8-8H4"
+                                    />
                                   </svg>
                                   <input
                                     type="text"
@@ -976,15 +1085,24 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                                   onClick={() => setAddingToCategory(category.name)}
                                   className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-onedark-bg border border-dashed border-gray-300 dark:border-onedark-bg-highlight hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 cursor-pointer transition-colors"
                                 >
-                                  <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  <svg
+                                    className="w-4 h-4 flex-shrink-0 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 4v16m8-8H4"
+                                    />
                                   </svg>
                                   <span className="text-sm text-gray-400 dark:text-onedark-fg-muted">
                                     Add item...
                                   </span>
                                 </div>
-                              )
-                            )}
+                              ))}
                           </div>
                         </div>
                       )}
@@ -1010,8 +1128,19 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                 {isAdding ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Adding...
                   </>
@@ -1065,7 +1194,10 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                   </h4>
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {parsedItems.map((item, index) => (
-                      <div key={index} className="text-sm text-gray-600 dark:text-onedark-fg-muted flex gap-2">
+                      <div
+                        key={index}
+                        className="text-sm text-gray-600 dark:text-onedark-fg-muted flex gap-2"
+                      >
                         <span className="font-medium text-gray-900 dark:text-onedark-fg">
                           {item.name}
                         </span>
@@ -1097,8 +1229,19 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
                 {isAdding ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Adding...
                   </>

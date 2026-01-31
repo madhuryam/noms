@@ -105,7 +105,13 @@ export function useMergeTags() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ targetId, sourceId }: { targetId: number; sourceId: number }): Promise<void> => {
+    mutationFn: async ({
+      targetId,
+      sourceId,
+    }: {
+      targetId: number;
+      sourceId: number;
+    }): Promise<void> => {
       await api.post(`/api/tags/${targetId}/merge`, { sourceId });
     },
     onSuccess: () => {
@@ -132,7 +138,10 @@ export function useAddTagToRecipe() {
     },
     onSuccess: (_, variables) => {
       // Use refetchType: 'all' to ensure all matching queries refetch immediately
-      queryClient.invalidateQueries({ queryKey: ['recipe', variables.recipeId], refetchType: 'all' });
+      queryClient.invalidateQueries({
+        queryKey: ['recipe', variables.recipeId],
+        refetchType: 'all',
+      });
       queryClient.invalidateQueries({ queryKey: ['recipes'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['tags'], refetchType: 'all' });
     },
@@ -148,7 +157,10 @@ export function useRemoveTagFromRecipe() {
     },
     onSuccess: (_, variables) => {
       // Use refetchType: 'all' to ensure all matching queries refetch immediately
-      queryClient.invalidateQueries({ queryKey: ['recipe', variables.recipeId], refetchType: 'all' });
+      queryClient.invalidateQueries({
+        queryKey: ['recipe', variables.recipeId],
+        refetchType: 'all',
+      });
       queryClient.invalidateQueries({ queryKey: ['recipes'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['tags'], refetchType: 'all' });
     },

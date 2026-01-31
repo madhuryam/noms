@@ -1,8 +1,12 @@
 import { Hono } from 'hono';
-import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
+import type { UserContext } from '../middleware';
 
 type Bindings = {
   DB: D1Database;
+};
+
+type Variables = {
+  user: UserContext;
 };
 
 interface MealPlan {
@@ -34,17 +38,24 @@ interface MealSlot {
   default_servings: number;
 }
 
-const mealPlans = new Hono<{ Bindings: Bindings }>();
+const mealPlans = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // GET /api/meal-plans - List all meal plans
 mealPlans.get('/', async (c) => {
+  const { userId } = c.get('user');
+
   try {
-    const results = await c.env.DB.prepare(`
+    const results = await c.env.DB.prepare(
+      `
       SELECT mp.*,
         (SELECT COUNT(*) FROM planned_meals pm WHERE pm.meal_plan_id = mp.id) as meal_count
       FROM meal_plans mp
+      WHERE mp.user_id = ?
       ORDER BY mp.start_date DESC
-    `).all();
+    `
+    )
+      .bind(userId)
+      .all();
 
     return c.json({
       plans: results.results ?? [],
@@ -60,9 +71,11 @@ mealPlans.get('/', async (c) => {
 // GET /api/meal-plans/slots - Get all meal slot types
 mealPlans.get('/slots', async (c) => {
   try {
-    const results = await c.env.DB.prepare(`
+    const results = await c.env.DB.prepare(
+      `
       SELECT * FROM meal_slots ORDER BY sort_order ASC
-    `).all();
+    `
+    ).all();
 
     return c.json({
       slots: results.results ?? [],
@@ -77,18 +90,22 @@ mealPlans.get('/slots', async (c) => {
 
 // GET /api/meal-plans/current - Get the plan containing today's date
 mealPlans.get('/current', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    const plan = await c.env.DB.prepare(`
+    const plan = await c.env.DB.prepare(
+      `
       SELECT mp.*,
         (SELECT COUNT(*) FROM planned_meals pm WHERE pm.meal_plan_id = mp.id) as meal_count
       FROM meal_plans mp
-      WHERE mp.start_date <= ? AND mp.end_date >= ?
+      WHERE mp.user_id = ? AND mp.start_date <= ? AND mp.end_date >= ?
       ORDER BY mp.start_date DESC
       LIMIT 1
-    `)
-      .bind(today, today)
+    `
+    )
+      .bind(userId, today, today)
       .first<MealPlan & { meal_count: number }>();
 
     if (!plan) {
@@ -96,7 +113,8 @@ mealPlans.get('/current', async (c) => {
     }
 
     // Get all meals for this plan with recipe info
-    const meals = await c.env.DB.prepare(`
+    const meals = await c.env.DB.prepare(
+      `
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
@@ -107,7 +125,8 @@ mealPlans.get('/current', async (c) => {
       JOIN meal_slots ms ON pm.meal_slot_id = ms.id
       WHERE pm.meal_plan_id = ?
       ORDER BY pm.planned_date ASC, ms.sort_order ASC
-    `)
+    `
+    )
       .bind(plan.id)
       .all();
 
@@ -127,6 +146,8 @@ mealPlans.get('/current', async (c) => {
 
 // POST /api/meal-plans - Create new plan
 mealPlans.post('/', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const body = await c.req.json<{
       name?: string;
@@ -145,11 +166,14 @@ mealPlans.post('/', async (c) => {
       ? new Date(body.end_date)
       : new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
 
-    const result = await c.env.DB.prepare(`
-      INSERT INTO meal_plans (name, start_date, end_date, is_template)
-      VALUES (?, ?, ?, ?)
-    `)
+    const result = await c.env.DB.prepare(
+      `
+      INSERT INTO meal_plans (user_id, name, start_date, end_date, is_template)
+      VALUES (?, ?, ?, ?, ?)
+    `
+    )
       .bind(
+        userId,
         body.name ?? null,
         startDate.toISOString().split('T')[0],
         endDate.toISOString().split('T')[0],
@@ -157,8 +181,8 @@ mealPlans.post('/', async (c) => {
       )
       .run();
 
-    const newPlan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ?')
-      .bind(result.meta.last_row_id)
+    const newPlan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(result.meta.last_row_id, userId)
       .first();
 
     return c.json(newPlan, 201);
@@ -172,11 +196,12 @@ mealPlans.post('/', async (c) => {
 
 // GET /api/meal-plans/:id - Get plan with all meals
 mealPlans.get('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const plan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ?')
-      .bind(id)
+    const plan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
       .first<MealPlan>();
 
     if (!plan) {
@@ -184,7 +209,8 @@ mealPlans.get('/:id', async (c) => {
     }
 
     // Get all meals with recipe info
-    const meals = await c.env.DB.prepare(`
+    const meals = await c.env.DB.prepare(
+      `
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
@@ -195,7 +221,8 @@ mealPlans.get('/:id', async (c) => {
       JOIN meal_slots ms ON pm.meal_slot_id = ms.id
       WHERE pm.meal_plan_id = ?
       ORDER BY pm.planned_date ASC, ms.sort_order ASC
-    `)
+    `
+    )
       .bind(id)
       .all();
 
@@ -213,6 +240,7 @@ mealPlans.get('/:id', async (c) => {
 
 // PUT /api/meal-plans/:id - Update plan
 mealPlans.put('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
@@ -222,8 +250,10 @@ mealPlans.put('/:id', async (c) => {
       end_date?: string;
     }>();
 
-    const existing = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ?')
-      .bind(id)
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM meal_plans WHERE id = ? AND user_id = ?'
+    )
+      .bind(id, userId)
       .first();
 
     if (!existing) {
@@ -251,13 +281,16 @@ mealPlans.put('/:id', async (c) => {
     }
 
     values.push(id);
+    values.push(userId);
 
-    await c.env.DB.prepare(`UPDATE meal_plans SET ${updates.join(', ')} WHERE id = ?`)
+    await c.env.DB.prepare(
+      `UPDATE meal_plans SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`
+    )
       .bind(...values)
       .run();
 
-    const updated = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ?')
-      .bind(id)
+    const updated = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
       .first();
 
     return c.json(updated);
@@ -271,11 +304,14 @@ mealPlans.put('/:id', async (c) => {
 
 // DELETE /api/meal-plans/:id - Delete plan and all meals
 mealPlans.delete('/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const existing = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ?')
-      .bind(id)
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM meal_plans WHERE id = ? AND user_id = ?'
+    )
+      .bind(id, userId)
       .first();
 
     if (!existing) {
@@ -283,7 +319,9 @@ mealPlans.delete('/:id', async (c) => {
     }
 
     // Meals will be deleted automatically via CASCADE
-    await c.env.DB.prepare('DELETE FROM meal_plans WHERE id = ?').bind(id).run();
+    await c.env.DB.prepare('DELETE FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .run();
 
     return c.json({ success: true, id });
   } catch (error) {
@@ -296,10 +334,21 @@ mealPlans.delete('/:id', async (c) => {
 
 // GET /api/meal-plans/:id/meals - List meals in plan
 mealPlans.get('/:id/meals', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const meals = await c.env.DB.prepare(`
+    // Verify meal plan belongs to user
+    const plan = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
+      .first();
+
+    if (!plan) {
+      return c.json({ error: 'Meal plan not found' }, 404);
+    }
+
+    const meals = await c.env.DB.prepare(
+      `
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
@@ -310,7 +359,8 @@ mealPlans.get('/:id/meals', async (c) => {
       JOIN meal_slots ms ON pm.meal_slot_id = ms.id
       WHERE pm.meal_plan_id = ?
       ORDER BY pm.planned_date ASC, ms.sort_order ASC
-    `)
+    `
+    )
       .bind(id)
       .all();
 
@@ -318,15 +368,13 @@ mealPlans.get('/:id/meals', async (c) => {
       meals: meals.results ?? [],
     });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch meals' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to fetch meals' }, 500);
   }
 });
 
 // POST /api/meal-plans/:id/meals - Add meal to plan
 mealPlans.post('/:id/meals', async (c) => {
+  const { userId } = c.get('user');
   const planId = Number(c.req.param('id'));
 
   try {
@@ -347,19 +395,19 @@ mealPlans.post('/:id/meals', async (c) => {
       return c.json({ error: 'Either recipe_id or custom_title is required' }, 400);
     }
 
-    // Verify plan exists
-    const plan = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ?')
-      .bind(planId)
+    // Verify plan exists and belongs to user
+    const plan = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(planId, userId)
       .first();
 
     if (!plan) {
       return c.json({ error: 'Meal plan not found' }, 404);
     }
 
-    // Verify recipe exists if provided
+    // Verify recipe exists and belongs to user if provided
     if (body.recipe_id) {
-      const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
-        .bind(body.recipe_id)
+      const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+        .bind(body.recipe_id, userId)
         .first();
 
       if (!recipe) {
@@ -367,10 +415,12 @@ mealPlans.post('/:id/meals', async (c) => {
       }
     }
 
-    const result = await c.env.DB.prepare(`
+    const result = await c.env.DB.prepare(
+      `
       INSERT INTO planned_meals (meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `)
+    `
+    )
       .bind(
         planId,
         body.recipe_id ?? null,
@@ -392,7 +442,8 @@ mealPlans.post('/:id/meals', async (c) => {
     }
 
     // Return the new meal with recipe info
-    const newMeal = await c.env.DB.prepare(`
+    const newMeal = await c.env.DB.prepare(
+      `
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
@@ -402,21 +453,20 @@ mealPlans.post('/:id/meals', async (c) => {
       LEFT JOIN recipes r ON pm.recipe_id = r.id
       JOIN meal_slots ms ON pm.meal_slot_id = ms.id
       WHERE pm.id = ?
-    `)
+    `
+    )
       .bind(result.meta.last_row_id)
       .first();
 
     return c.json(newMeal, 201);
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to add meal' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to add meal' }, 500);
   }
 });
 
 // PUT /api/meal-plans/:id/meals/:mealId - Update meal
 mealPlans.put('/:id/meals/:mealId', async (c) => {
+  const { userId } = c.get('user');
   const planId = Number(c.req.param('id'));
   const mealId = Number(c.req.param('mealId'));
 
@@ -431,6 +481,15 @@ mealPlans.put('/:id/meals/:mealId', async (c) => {
       is_completed?: boolean;
     }>();
 
+    // Verify meal plan belongs to user
+    const plan = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(planId, userId)
+      .first();
+
+    if (!plan) {
+      return c.json({ error: 'Meal plan not found' }, 404);
+    }
+
     const existing = await c.env.DB.prepare(
       'SELECT id FROM planned_meals WHERE id = ? AND meal_plan_id = ?'
     )
@@ -439,6 +498,17 @@ mealPlans.put('/:id/meals/:mealId', async (c) => {
 
     if (!existing) {
       return c.json({ error: 'Meal not found in this plan' }, 404);
+    }
+
+    // If updating recipe_id, verify recipe belongs to user
+    if (body.recipe_id !== undefined && body.recipe_id !== null) {
+      const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+        .bind(body.recipe_id, userId)
+        .first();
+
+      if (!recipe) {
+        return c.json({ error: 'Recipe not found' }, 404);
+      }
     }
 
     const updates: string[] = [];
@@ -484,7 +554,8 @@ mealPlans.put('/:id/meals/:mealId', async (c) => {
       .run();
 
     // Return updated meal with recipe info
-    const updated = await c.env.DB.prepare(`
+    const updated = await c.env.DB.prepare(
+      `
       SELECT pm.*,
         r.id as recipe_id, r.slug as recipe_slug, r.title as recipe_title, r.image_path as recipe_image,
         r.prep_time_minutes, r.cook_time_minutes, r.servings as recipe_servings,
@@ -494,25 +565,33 @@ mealPlans.put('/:id/meals/:mealId', async (c) => {
       LEFT JOIN recipes r ON pm.recipe_id = r.id
       JOIN meal_slots ms ON pm.meal_slot_id = ms.id
       WHERE pm.id = ?
-    `)
+    `
+    )
       .bind(mealId)
       .first();
 
     return c.json(updated);
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to update meal' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to update meal' }, 500);
   }
 });
 
 // DELETE /api/meal-plans/:id/meals/:mealId - Remove meal from plan
 mealPlans.delete('/:id/meals/:mealId', async (c) => {
+  const { userId } = c.get('user');
   const planId = Number(c.req.param('id'));
   const mealId = Number(c.req.param('mealId'));
 
   try {
+    // Verify meal plan belongs to user
+    const plan = await c.env.DB.prepare('SELECT id FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(planId, userId)
+      .first();
+
+    if (!plan) {
+      return c.json({ error: 'Meal plan not found' }, 404);
+    }
+
     const existing = await c.env.DB.prepare(
       'SELECT id FROM planned_meals WHERE id = ? AND meal_plan_id = ?'
     )
@@ -527,121 +606,14 @@ mealPlans.delete('/:id/meals/:mealId', async (c) => {
 
     return c.json({ success: true, id: mealId });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete meal' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to delete meal' }, 500);
   }
 });
 
 // Helper to parse ingredient line for shopping list
-function parseAmount(amountStr: string): number | null {
-  const fractionMap: Record<string, number> = {
-    '½': 0.5, '⅓': 1/3, '⅔': 2/3, '¼': 0.25, '¾': 0.75,
-    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
-  };
-
-  const str = amountStr.trim();
-
-  // Check for unicode fractions
-  for (const [frac, value] of Object.entries(fractionMap)) {
-    if (str.includes(frac)) {
-      const parts = str.split(frac);
-      const whole = parts[0].trim();
-      return whole ? parseInt(whole, 10) + value : value;
-    }
-  }
-
-  // Mixed fraction: "1 1/2"
-  const mixedMatch = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-  if (mixedMatch) {
-    return parseInt(mixedMatch[1]) + parseInt(mixedMatch[2]) / parseInt(mixedMatch[3]);
-  }
-
-  // Simple fraction: "1/2"
-  if (/^\d+\/\d+$/.test(str)) {
-    const [num, den] = str.split('/').map(Number);
-    return num / den;
-  }
-
-  // Plain number
-  return parseFloat(str) || null;
-}
-
-function parseIngredientLine(line: string): { name: string; minQuantity: number | null; maxQuantity: number | null; unit: string | null } | null {
-  const trimmed = line.trim()
-    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
-    .replace(/^[-*]\s+/, '')
-    .trim();
-
-  if (!trimmed) return null;
-
-  // Skip markdown headers (### Header, ## Header, **Header**)
-  if (/^#{2,}\s+/.test(trimmed)) return null;
-  if (/^\*\*[^*]+\*\*:?$/.test(trimmed)) return null;
-
-  // Skip group headers (all caps or ending with colon)
-  if (trimmed.endsWith(':')) return null;
-  const words = trimmed.split(/\s+/);
-  const upperWords = words.filter(w => w === w.toUpperCase() && /[A-Z]/.test(w));
-  if (upperWords.length >= 1 && upperWords.length === words.filter(w => /[A-Z]/i.test(w)).length) {
-    return null;
-  }
-
-  // Single amount pattern (no range)
-  const singleAmountPart = '(?:\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+\\.?\\d*\\s*[½⅓⅔¼¾⅛⅜⅝⅞]?|[½⅓⅔¼¾⅛⅜⅝⅞])';
-
-  // Range pattern: "2-3", "2 - 3", "2 to 3", "2 or 3"
-  const rangePattern = new RegExp(`^(${singleAmountPart})\\s*(?:-|–|to|or)\\s*(${singleAmountPart})\\s*`, 'i');
-  const singlePattern = new RegExp(`^(${singleAmountPart})\\s*`);
-
-  let minQuantity: number | null = null;
-  let maxQuantity: number | null = null;
-  let rest = trimmed;
-
-  // Try range first
-  const rangeMatch = trimmed.match(rangePattern);
-  if (rangeMatch) {
-    minQuantity = parseAmount(rangeMatch[1]);
-    maxQuantity = parseAmount(rangeMatch[2]);
-    rest = trimmed.slice(rangeMatch[0].length).trim();
-  } else {
-    // Try single amount
-    const singleMatch = trimmed.match(singlePattern);
-    if (singleMatch) {
-      const qty = parseAmount(singleMatch[1]);
-      minQuantity = qty;
-      maxQuantity = qty;
-      rest = trimmed.slice(singleMatch[0].length).trim();
-    }
-  }
-
-  // Try to extract unit
-  const unitPattern = /^(cups?|c\.?|tablespoons?|tbsp?\.?|teaspoons?|tsp\.?|ounces?|oz\.?|pounds?|lbs?\.?|grams?|g\.?|kg\.?|ml\.?|liters?|l\.?|cloves?|heads?|bunche?s?|stalks?|sprigs?|slices?|pieces?|cans?|sticks?|handfuls?|large|medium|small|whole)\s+/i;
-  const unitMatch = rest.match(unitPattern);
-
-  let unit: string | null = null;
-  let name = rest;
-
-  if (unitMatch) {
-    unit = unitMatch[1].toLowerCase();
-    name = rest.slice(unitMatch[0].length).trim();
-  }
-
-  // Clean up name - remove leading "of", trailing commas, parenthetical notes
-  name = name
-    .replace(/^of\s+/i, '')  // Remove leading "of" (e.g., "of cilantro" -> "cilantro")
-    .replace(/,.*$/, '')      // Remove everything after comma
-    .replace(/\s*\([^)]*\)\s*$/, '')  // Remove trailing parenthetical
-    .trim();
-
-  if (!name) return null;
-
-  return { name, minQuantity, maxQuantity, unit };
-}
-
 // GET /api/meal-plans/:id/shopping-list - Generate shopping list for a meal plan
 mealPlans.get('/:id/shopping-list', async (c) => {
+  const { userId } = c.get('user');
   const id = parseInt(c.req.param('id'));
 
   if (isNaN(id)) {
@@ -653,9 +625,9 @@ mealPlans.get('/:id/shopping-list', async (c) => {
   const endDateFilter = c.req.query('endDate');
 
   try {
-    // Verify plan exists
-    const plan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ?')
-      .bind(id)
+    // Verify plan exists and belongs to user
+    const plan = await c.env.DB.prepare('SELECT * FROM meal_plans WHERE id = ? AND user_id = ?')
+      .bind(id, userId)
       .first<MealPlan>();
 
     if (!plan) {
@@ -667,8 +639,10 @@ mealPlans.get('/:id/shopping-list', async (c) => {
     const endDate = endDateFilter || plan.end_date;
 
     // Get all planned meals with their recipe ingredients from the recipe_ingredients table
-    // This uses the already-computed normalization_key for the name, and raw_text for parsing quantities
-    const ingredientsResult = await c.env.DB.prepare(`
+    // This uses the stored normalization_key, min_quantity, max_quantity - single source of truth
+    // Also ensures recipes belong to user
+    const ingredientsResult = await c.env.DB.prepare(
+      `
       SELECT
         pm.recipe_id,
         pm.scaling_factor,
@@ -676,26 +650,32 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         r.slug as recipe_slug,
         r.title as recipe_title,
         ri.normalization_key,
-        ri.raw_text,
+        ri.min_quantity,
+        ri.max_quantity,
         ri.unit
       FROM planned_meals pm
-      JOIN recipes r ON pm.recipe_id = r.id
+      JOIN recipes r ON pm.recipe_id = r.id AND r.user_id = ?
       JOIN recipe_ingredients ri ON ri.recipe_id = r.id
       WHERE pm.meal_plan_id = ?
         AND pm.planned_date >= ?
         AND pm.planned_date <= ?
         AND ri.normalization_key IS NOT NULL
       ORDER BY pm.planned_date
-    `)
-      .bind(id, startDate, endDate)
+    `
+    )
+      .bind(userId, id, startDate, endDate)
       .all();
 
-    // Get pantry items for comparison - use normalization_key which matches the normalized ingredient keys
-    const pantryResult = await c.env.DB.prepare(`
+    // Get pantry items for comparison - filter by user_id
+    const pantryResult = await c.env.DB.prepare(
+      `
       SELECT normalization_key
       FROM pantry_items
-      WHERE normalization_key IS NOT NULL
-    `).all();
+      WHERE user_id = ? AND normalization_key IS NOT NULL
+    `
+    )
+      .bind(userId)
+      .all();
 
     const pantryItems = new Set<string>();
     for (const item of pantryResult.results ?? []) {
@@ -734,18 +714,18 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         recipe_slug: string | null;
         recipe_title: string;
         normalization_key: string;
-        raw_text: string;
+        min_quantity: number | null;
+        max_quantity: number | null;
         unit: string | null;
       };
 
       const normalizedKey = ing.normalization_key.toLowerCase();
       if (!normalizedKey) continue;
 
-      // Parse raw_text to get quantities (including ranges like "2-3")
-      const parsed = parseIngredientLine(ing.raw_text);
-      const minQty = parsed?.minQuantity ?? null;
-      const maxQty = parsed?.maxQuantity ?? null;
-      const unit = parsed?.unit ?? ing.unit;
+      // Use stored min/max quantities directly - single source of truth
+      const minQty = ing.min_quantity;
+      const maxQty = ing.max_quantity;
+      const unit = ing.unit;
       const scaledMinQty = minQty != null ? minQty * ing.scaling_factor : null;
       const scaledMaxQty = maxQty != null ? maxQty * ing.scaling_factor : null;
 
@@ -765,7 +745,8 @@ mealPlans.get('/:id/shopping-list', async (c) => {
         // Only sum quantities if units match and both have quantities
         if (scaledMinQty != null && existing.totalMinQuantity != null && existing.unit === unit) {
           existing.totalMinQuantity += scaledMinQty;
-          existing.totalMaxQuantity = (existing.totalMaxQuantity ?? 0) + (scaledMaxQty ?? scaledMinQty);
+          existing.totalMaxQuantity =
+            (existing.totalMaxQuantity ?? 0) + (scaledMaxQty ?? scaledMinQty);
         } else if (scaledMinQty != null && existing.totalMinQuantity == null) {
           existing.totalMinQuantity = scaledMinQty;
           existing.totalMaxQuantity = scaledMaxQty;

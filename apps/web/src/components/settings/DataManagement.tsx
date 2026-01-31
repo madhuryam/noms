@@ -154,7 +154,9 @@ export function DataManagement() {
       }
 
       const result = await response.json();
-      setSuccess(`Restored successfully! ${result.stats.recipes} recipes, ${result.stats.images} images, ${result.stats.tags} tags`);
+      setSuccess(
+        `Restored successfully! ${result.stats.recipes} recipes, ${result.stats.images} images, ${result.stats.tags} tags`
+      );
       // Invalidate all queries to refresh data
       queryClient.invalidateQueries();
       // Reload preview
@@ -210,7 +212,9 @@ export function DataManagement() {
 
         {preview && (
           <div className="mb-3 p-3 bg-gray-50 dark:bg-onedark-bg rounded-lg text-sm">
-            <p className="font-medium text-gray-700 dark:text-onedark-fg mb-2">Export will include:</p>
+            <p className="font-medium text-gray-700 dark:text-onedark-fg mb-2">
+              Export will include:
+            </p>
             <ul className="grid grid-cols-2 gap-1 text-gray-600 dark:text-onedark-fg-muted">
               <li>{preview.counts.recipes} recipes</li>
               <li>{preview.counts.categories} categories</li>
@@ -243,7 +247,8 @@ export function DataManagement() {
           </button>
         </div>
         <p className="mt-2 text-xs text-gray-400 dark:text-onedark-fg-muted">
-          Vault: Human-readable markdown files organized by category. Backup: JSON for restoring data.
+          Vault: Human-readable markdown files organized by category. Backup: JSON for restoring
+          data.
         </p>
       </div>
 

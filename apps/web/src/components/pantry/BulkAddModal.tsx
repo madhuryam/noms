@@ -70,10 +70,7 @@ export function BulkAddModal({ isOpen, onClose, defaultLocation = 'pantry' }: Bu
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative w-full max-w-xl bg-white dark:bg-onedark-bg-lighter rounded-xl shadow-xl">
@@ -87,7 +84,12 @@ export function BulkAddModal({ isOpen, onClose, defaultLocation = 'pantry' }: Bu
             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg rounded"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -112,9 +114,7 @@ export function BulkAddModal({ isOpen, onClose, defaultLocation = 'pantry' }: Bu
 
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 dark:text-onedark-fg-muted">
-                Add to:
-              </label>
+              <label className="text-sm text-gray-600 dark:text-onedark-fg-muted">Add to:</label>
               <select
                 value={location}
                 onChange={(e) => setLocation(e.target.value as PantryLocation)}
@@ -150,7 +150,10 @@ export function BulkAddModal({ isOpen, onClose, defaultLocation = 'pantry' }: Bu
               </h4>
               <div className="max-h-32 overflow-y-auto space-y-1">
                 {parsedItems.map((item, index) => (
-                  <div key={index} className="text-sm text-gray-600 dark:text-onedark-fg-muted flex gap-2">
+                  <div
+                    key={index}
+                    className="text-sm text-gray-600 dark:text-onedark-fg-muted flex gap-2"
+                  >
                     <span className="font-medium text-gray-900 dark:text-onedark-fg">
                       {item.name}
                     </span>

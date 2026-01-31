@@ -70,10 +70,7 @@ associations.get('/lookup/:term', async (c) => {
 
     return c.json({ terms: terms.length > 0 ? terms : [term] });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to lookup term' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to lookup term' }, 500);
   }
 });
 
@@ -159,9 +156,7 @@ associations.post('/', async (c) => {
     for (const term of terms) {
       const trimmedTerm = term.trim();
       if (trimmedTerm) {
-        await c.env.DB.prepare(
-          `INSERT INTO food_association_terms (group_id, term) VALUES (?, ?)`
-        )
+        await c.env.DB.prepare(`INSERT INTO food_association_terms (group_id, term) VALUES (?, ?)`)
           .bind(groupId, trimmedTerm)
           .run();
       }
@@ -199,9 +194,7 @@ associations.put('/:id', async (c) => {
     const { name, terms } = body as { name?: string; terms?: string[] };
 
     // Check if group exists
-    const existing = await c.env.DB.prepare(
-      `SELECT id FROM food_association_groups WHERE id = ?`
-    )
+    const existing = await c.env.DB.prepare(`SELECT id FROM food_association_groups WHERE id = ?`)
       .bind(id)
       .first();
 
@@ -297,9 +290,7 @@ associations.delete('/:id', async (c) => {
 
   try {
     // Check if group exists
-    const existing = await c.env.DB.prepare(
-      `SELECT id FROM food_association_groups WHERE id = ?`
-    )
+    const existing = await c.env.DB.prepare(`SELECT id FROM food_association_groups WHERE id = ?`)
       .bind(id)
       .first();
 

@@ -1,12 +1,17 @@
 import { Hono } from 'hono';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import type { UserContext } from '../middleware';
 
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
 };
 
-const exportRoutes = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+  user: UserContext;
+};
+
+const exportRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // ============================================
 // Type Definitions for Export
@@ -41,8 +46,20 @@ interface ExportedRecipe {
   calories_total: number | null;
   macros_manual: number | null;
   // Related data
-  tags: { id: number; name: string; display_name: string | null; color: string | null; is_category: number }[];
-  images: { id: number; path: string; alt: string | null; sort_order: number; created_at: string | null }[];
+  tags: {
+    id: number;
+    name: string;
+    display_name: string | null;
+    color: string | null;
+    is_category: number;
+  }[];
+  images: {
+    id: number;
+    path: string;
+    alt: string | null;
+    sort_order: number;
+    created_at: string | null;
+  }[];
   ingredients: {
     id: number;
     ingredient_id: number | null;
@@ -195,9 +212,11 @@ function generateSlug(title: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function buildCategoryPath(tags: { name: string; display_name: string | null; is_category: number }[]): string {
+function buildCategoryPath(
+  tags: { name: string; display_name: string | null; is_category: number }[]
+): string {
   // Find category tags (is_category = 1)
-  const categoryTags = tags.filter(t => t.is_category);
+  const categoryTags = tags.filter((t) => t.is_category);
   if (categoryTags.length === 0) return '';
   // Use the first category tag as the folder name
   const primary = categoryTags[0];
@@ -256,7 +275,11 @@ function formatIngredients(raw: string): string {
     const trimmed = line.trim();
 
     // Preserve section headers (### For the Cake, **Frosting:**, etc.)
-    if (trimmed.startsWith('###') || (trimmed.startsWith('**') && trimmed.endsWith('**')) || (trimmed.startsWith('**') && trimmed.endsWith(':'))) {
+    if (
+      trimmed.startsWith('###') ||
+      (trimmed.startsWith('**') && trimmed.endsWith('**')) ||
+      (trimmed.startsWith('**') && trimmed.endsWith(':'))
+    ) {
       result.push('');
       result.push(trimmed);
       result.push('');
@@ -309,7 +332,7 @@ function generateRecipeMarkdown(recipe: ExportedRecipe): string {
   }
 
   // Category as path string
-  if (recipe.tags.some(t => t.is_category)) {
+  if (recipe.tags.some((t) => t.is_category)) {
     const categoryPath = buildCategoryPath(recipe.tags);
     if (categoryPath) {
       lines.push(`category: "${categoryPath}"`);
@@ -426,59 +449,71 @@ function generateRecipeMarkdown(recipe: ExportedRecipe): string {
 /**
  * Get full recipe data with all relations
  */
-async function getFullRecipe(db: D1Database, recipeId: number): Promise<ExportedRecipe | null> {
+async function getFullRecipe(
+  db: D1Database,
+  recipeId: number,
+  userId: number
+): Promise<ExportedRecipe | null> {
   // Get base recipe
   const recipe = await db
-    .prepare('SELECT * FROM recipes WHERE id = ?')
-    .bind(recipeId)
+    .prepare('SELECT * FROM recipes WHERE id = ? AND user_id = ?')
+    .bind(recipeId, userId)
     .first<ExportedRecipe>();
 
   if (!recipe) return null;
 
   // Get tags (includes category tags with is_category=1)
   const tagsResult = await db
-    .prepare(`
+    .prepare(
+      `
       SELECT t.id, t.name, t.display_name, t.color, t.is_category
       FROM tags t
       JOIN recipe_tags rt ON t.id = rt.tag_id
       WHERE rt.recipe_id = ?
-    `)
+    `
+    )
     .bind(recipeId)
     .all();
   recipe.tags = (tagsResult.results || []) as ExportedRecipe['tags'];
 
   // Get images
   const imagesResult = await db
-    .prepare(`
+    .prepare(
+      `
       SELECT id, path, alt, sort_order, created_at
       FROM recipe_images
       WHERE recipe_id = ?
       ORDER BY sort_order ASC
-    `)
+    `
+    )
     .bind(recipeId)
     .all();
   recipe.images = (imagesResult.results || []) as ExportedRecipe['images'];
 
   // Get ingredients (including normalization_key for persistence)
   const ingredientsResult = await db
-    .prepare(`
+    .prepare(
+      `
       SELECT id, ingredient_id, quantity, unit, raw_text, preparation, notes, is_optional, group_name, sort_order, normalization_key
       FROM recipe_ingredients
       WHERE recipe_id = ?
       ORDER BY sort_order ASC
-    `)
+    `
+    )
     .bind(recipeId)
     .all();
   recipe.ingredients = (ingredientsResult.results || []) as ExportedRecipe['ingredients'];
 
   // Get pairings (including text-only pairings where paired_recipe_id is null)
   const pairingsResult = await db
-    .prepare(`
+    .prepare(
+      `
       SELECT rp.id, rp.paired_recipe_id, r.title as paired_recipe_title, rp.pairing_text, rp.pairing_type, rp.notes
       FROM recipe_pairings rp
       LEFT JOIN recipes r ON rp.paired_recipe_id = r.id
       WHERE rp.recipe_id = ?
-    `)
+    `
+    )
     .bind(recipeId)
     .all();
   recipe.pairings = (pairingsResult.results || []) as ExportedRecipe['pairings'];
@@ -492,10 +527,11 @@ async function getFullRecipe(db: D1Database, recipeId: number): Promise<Exported
 
 // GET /api/export/recipe/:id - Export single recipe as markdown
 exportRoutes.get('/recipe/:id', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const recipe = await getFullRecipe(c.env.DB, id);
+    const recipe = await getFullRecipe(c.env.DB, id, userId);
 
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
@@ -520,10 +556,11 @@ exportRoutes.get('/recipe/:id', async (c) => {
 
 // GET /api/export/recipe/:id/json - Export single recipe as JSON (for preview/testing)
 exportRoutes.get('/recipe/:id/json', async (c) => {
+  const { userId } = c.get('user');
   const id = Number(c.req.param('id'));
 
   try {
-    const recipe = await getFullRecipe(c.env.DB, id);
+    const recipe = await getFullRecipe(c.env.DB, id, userId);
 
     if (!recipe) {
       return c.json({ error: 'Recipe not found' }, 404);
@@ -540,16 +577,21 @@ exportRoutes.get('/recipe/:id/json', async (c) => {
 
 // GET /api/export/data - Export full database as JSON
 exportRoutes.get('/data', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const db = c.env.DB;
 
     // Get all recipes with relations
-    const recipesResult = await db.prepare('SELECT id FROM recipes ORDER BY id').all();
+    const recipesResult = await db
+      .prepare('SELECT id FROM recipes WHERE user_id = ? ORDER BY id')
+      .bind(userId)
+      .all();
     const recipeIds = (recipesResult.results || []).map((r) => (r as { id: number }).id);
 
     const recipes: ExportedRecipe[] = [];
     for (const id of recipeIds) {
-      const recipe = await getFullRecipe(db, id);
+      const recipe = await getFullRecipe(db, id, userId);
       if (recipe) {
         recipes.push(recipe);
       }
@@ -557,47 +599,67 @@ exportRoutes.get('/data', async (c) => {
 
     // Get all tags (includes category tags with is_category=1)
     const tagsResult = await db
-      .prepare('SELECT id, name, display_name, color, usage_count, is_category FROM tags ORDER BY name')
+      .prepare(
+        'SELECT id, name, display_name, color, usage_count, is_category FROM tags WHERE user_id = ? ORDER BY name'
+      )
+      .bind(userId)
       .all();
 
     // Get all ingredients
     const ingredientsResult = await db
-      .prepare('SELECT id, name, name_plural, normalized_name, category FROM ingredients ORDER BY name')
+      .prepare(
+        'SELECT id, name, name_plural, normalized_name, category FROM ingredients ORDER BY name'
+      )
       .all();
 
     // Get all ingredient nutrition (user customizations)
     const ingredientNutritionResult = await db
-      .prepare('SELECT id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at FROM ingredient_nutrition ORDER BY ingredient_name')
+      .prepare(
+        'SELECT id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at FROM ingredient_nutrition ORDER BY ingredient_name'
+      )
       .all();
 
     // Get all unit conversions (includes seeded defaults - they'll be re-seeded on fresh install)
     const unitConversionsResult = await db
-      .prepare('SELECT id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes FROM unit_conversions ORDER BY id')
+      .prepare(
+        'SELECT id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes FROM unit_conversions ORDER BY id'
+      )
       .all();
 
     // Get all pantry categories
     const pantryCategoriesResult = await db
-      .prepare('SELECT id, name, location, sort_order FROM pantry_categories ORDER BY location, sort_order')
+      .prepare(
+        'SELECT id, name, location, sort_order FROM pantry_categories ORDER BY location, sort_order'
+      )
       .all();
 
     // Get all pantry items (including all fields)
     const pantryResult = await db
-      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name FROM pantry_items ORDER BY name')
+      .prepare(
+        'SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name FROM pantry_items WHERE user_id = ? ORDER BY name'
+      )
+      .bind(userId)
       .all();
 
     // Get all meal plans
     const mealPlansResult = await db
-      .prepare('SELECT id, name, start_date, end_date, is_template, created_at FROM meal_plans ORDER BY start_date DESC')
+      .prepare(
+        'SELECT id, name, start_date, end_date, is_template, created_at FROM meal_plans ORDER BY start_date DESC'
+      )
       .all();
 
     // Get all meal slots
     const mealSlotsResult = await db
-      .prepare('SELECT id, name, display_name, sort_order, default_servings FROM meal_slots ORDER BY sort_order')
+      .prepare(
+        'SELECT id, name, display_name, sort_order, default_servings FROM meal_slots ORDER BY sort_order'
+      )
       .all();
 
     // Get all planned meals
     const plannedMealsResult = await db
-      .prepare('SELECT id, meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes, is_completed FROM planned_meals ORDER BY planned_date')
+      .prepare(
+        'SELECT id, meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes, is_completed FROM planned_meals ORDER BY planned_date'
+      )
       .all();
 
     // Get food association groups
@@ -607,12 +669,16 @@ exportRoutes.get('/data', async (c) => {
 
     // Get food association terms
     const foodTermsResult = await db
-      .prepare('SELECT id, group_id, term, created_at FROM food_association_terms ORDER BY group_id, term')
+      .prepare(
+        'SELECT id, group_id, term, created_at FROM food_association_terms ORDER BY group_id, term'
+      )
       .all();
 
     // Get shelf life data
     const shelfLifeResult = await db
-      .prepare('SELECT id, ingredient_name, fridge_days, freezer_days, created_at, updated_at FROM shelf_life ORDER BY ingredient_name')
+      .prepare(
+        'SELECT id, ingredient_name, fridge_days, freezer_days, created_at, updated_at FROM shelf_life ORDER BY ingredient_name'
+      )
       .all();
 
     // Collect all image paths
@@ -634,15 +700,19 @@ exportRoutes.get('/data', async (c) => {
       recipes,
       tags: (tagsResult.results || []) as FullExportData['tags'],
       ingredients: (ingredientsResult.results || []) as FullExportData['ingredients'],
-      ingredientNutrition: (ingredientNutritionResult.results || []) as FullExportData['ingredientNutrition'],
+      ingredientNutrition: (ingredientNutritionResult.results ||
+        []) as FullExportData['ingredientNutrition'],
       unitConversions: (unitConversionsResult.results || []) as FullExportData['unitConversions'],
-      pantryCategories: (pantryCategoriesResult.results || []) as FullExportData['pantryCategories'],
+      pantryCategories: (pantryCategoriesResult.results ||
+        []) as FullExportData['pantryCategories'],
       pantryItems: (pantryResult.results || []) as FullExportData['pantryItems'],
       mealPlans: (mealPlansResult.results || []) as FullExportData['mealPlans'],
       mealSlots: (mealSlotsResult.results || []) as FullExportData['mealSlots'],
       plannedMeals: (plannedMealsResult.results || []) as FullExportData['plannedMeals'],
-      foodAssociationGroups: (foodGroupsResult.results || []) as FullExportData['foodAssociationGroups'],
-      foodAssociationTerms: (foodTermsResult.results || []) as FullExportData['foodAssociationTerms'],
+      foodAssociationGroups: (foodGroupsResult.results ||
+        []) as FullExportData['foodAssociationGroups'],
+      foodAssociationTerms: (foodTermsResult.results ||
+        []) as FullExportData['foodAssociationTerms'],
       shelfLife: (shelfLifeResult.results || []) as FullExportData['shelfLife'],
       imagePaths,
     };
@@ -656,32 +726,34 @@ exportRoutes.get('/data', async (c) => {
       },
     });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to export data' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to export data' }, 500);
   }
 });
 
 // GET /api/export/data/preview - Preview export data (limited, no download)
 exportRoutes.get('/data/preview', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const db = c.env.DB;
 
-    // Get counts
+    // Get counts (filter user-scoped tables by user_id)
     const stats = await db
-      .prepare(`
+      .prepare(
+        `
         SELECT
-          (SELECT COUNT(*) FROM recipes) as recipes,
-          (SELECT COUNT(*) FROM tags) as tags,
+          (SELECT COUNT(*) FROM recipes WHERE user_id = ?) as recipes,
+          (SELECT COUNT(*) FROM tags WHERE user_id = ?) as tags,
           (SELECT COUNT(*) FROM ingredients) as ingredients,
-          (SELECT COUNT(*) FROM pantry_items) as pantry_items,
+          (SELECT COUNT(*) FROM pantry_items WHERE user_id = ?) as pantry_items,
           (SELECT COUNT(*) FROM meal_plans) as meal_plans,
           (SELECT COUNT(*) FROM planned_meals) as planned_meals,
           (SELECT COUNT(*) FROM recipe_images) as images,
           (SELECT COUNT(*) FROM food_association_groups) as food_groups,
           (SELECT COUNT(*) FROM shelf_life) as shelf_life_entries
-      `)
+      `
+      )
+      .bind(userId, userId, userId)
       .first();
 
     return c.json({
@@ -689,10 +761,7 @@ exportRoutes.get('/data/preview', async (c) => {
       counts: stats,
     });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to get preview' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to get preview' }, 500);
   }
 });
 
@@ -713,10 +782,7 @@ exportRoutes.get('/image/*', async (c) => {
 
     return new Response(object.body, { headers });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to get image' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to get image' }, 500);
   }
 });
 
@@ -752,7 +818,7 @@ exportRoutes.post('/import', async (c) => {
     };
 
     // Helper to convert undefined to null (D1 doesn't accept undefined)
-    const n = <T>(value: T | undefined): T | null => value === undefined ? null : value;
+    const n = <T>(value: T | undefined): T | null => (value === undefined ? null : value);
 
     // Helper to batch statements (D1 supports up to 100 statements per batch)
     const BATCH_SIZE = 50;
@@ -789,8 +855,17 @@ exportRoutes.post('/import', async (c) => {
     if (importData.tags?.length) {
       const tagStmts = importData.tags.map((tag) =>
         db
-          .prepare('INSERT INTO tags (id, name, display_name, color, usage_count, is_category) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0, (tag as { is_category?: number }).is_category ?? 0)
+          .prepare(
+            'INSERT INTO tags (id, name, display_name, color, usage_count, is_category) VALUES (?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            tag.id,
+            tag.name,
+            n(tag.display_name),
+            n(tag.color),
+            tag.usage_count ?? 0,
+            (tag as { is_category?: number }).is_category ?? 0
+          )
       );
       await runBatched(tagStmts);
       stats.tags = importData.tags.length;
@@ -800,7 +875,9 @@ exportRoutes.post('/import', async (c) => {
     if (importData.ingredients?.length) {
       const ingStmts = importData.ingredients.map((ing) =>
         db
-          .prepare('INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)'
+          )
           .bind(ing.id, ing.name, n(ing.name_plural), ing.normalized_name, n(ing.category))
       );
       await runBatched(ingStmts);
@@ -811,8 +888,20 @@ exportRoutes.post('/import', async (c) => {
     if (importData.ingredientNutrition?.length) {
       const nutritionStmts = importData.ingredientNutrition.map((item) =>
         db
-          .prepare(`INSERT INTO ingredient_nutrition (id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(item.id, item.ingredient_name, n(item.carbs_per_100g), n(item.protein_per_100g), n(item.fat_per_100g), n(item.calories_per_100g), n(item.usda_fdc_id), n(item.created_at), n(item.updated_at))
+          .prepare(
+            `INSERT INTO ingredient_nutrition (id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .bind(
+            item.id,
+            item.ingredient_name,
+            n(item.carbs_per_100g),
+            n(item.protein_per_100g),
+            n(item.fat_per_100g),
+            n(item.calories_per_100g),
+            n(item.usda_fdc_id),
+            n(item.created_at),
+            n(item.updated_at)
+          )
       );
       await runBatched(nutritionStmts);
       stats.ingredientNutrition = importData.ingredientNutrition.length;
@@ -822,8 +911,18 @@ exportRoutes.post('/import', async (c) => {
     if (importData.unitConversions?.length) {
       const convStmts = importData.unitConversions.map((conv) =>
         db
-          .prepare('INSERT INTO unit_conversions (id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .bind(conv.id, conv.ingredient_category, n(conv.ingredient_pattern), conv.from_unit, conv.to_unit, conv.factor, n(conv.notes))
+          .prepare(
+            'INSERT INTO unit_conversions (id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            conv.id,
+            conv.ingredient_category,
+            n(conv.ingredient_pattern),
+            conv.from_unit,
+            conv.to_unit,
+            conv.factor,
+            n(conv.notes)
+          )
       );
       await runBatched(convStmts);
       stats.unitConversions = importData.unitConversions.length;
@@ -833,7 +932,9 @@ exportRoutes.post('/import', async (c) => {
     if (importData.pantryCategories?.length) {
       const catStmts = importData.pantryCategories.map((cat) =>
         db
-          .prepare('INSERT INTO pantry_categories (id, name, location, sort_order) VALUES (?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO pantry_categories (id, name, location, sort_order) VALUES (?, ?, ?, ?)'
+          )
           .bind(cat.id, cat.name, cat.location, cat.sort_order)
       );
       await runBatched(catStmts);
@@ -844,7 +945,8 @@ exportRoutes.post('/import', async (c) => {
     if (importData.recipes?.length) {
       const recipeStmts = importData.recipes.map((recipe) =>
         db
-          .prepare(`
+          .prepare(
+            `
             INSERT INTO recipes (
               id, title, slug, source_path, source_url, markdown_content, description,
               ingredients_raw, instructions_raw, prep_instructions_raw, notes, prep_time_minutes, cook_time_minutes,
@@ -852,7 +954,8 @@ exportRoutes.post('/import', async (c) => {
               last_cooked_at, last_accessed_at, cook_count,
               carbs_total, protein_total, fat_total, calories_total, macros_manual
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `)
+          `
+          )
           .bind(
             recipe.id,
             recipe.title,
@@ -890,7 +993,8 @@ exportRoutes.post('/import', async (c) => {
       for (const recipe of importData.recipes) {
         for (const tag of recipe.tags || []) {
           recipeTagStmts.push(
-            db.prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
+            db
+              .prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
               .bind(recipe.id, tag.id)
           );
         }
@@ -902,7 +1006,10 @@ exportRoutes.post('/import', async (c) => {
       for (const recipe of importData.recipes) {
         for (const img of recipe.images || []) {
           recipeImgStmts.push(
-            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+            db
+              .prepare(
+                'INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+              )
               .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order ?? 0, n(img.created_at))
           );
         }
@@ -914,12 +1021,15 @@ exportRoutes.post('/import', async (c) => {
       for (const recipe of importData.recipes) {
         for (const ing of recipe.ingredients || []) {
           recipeIngStmts.push(
-            db.prepare(`
+            db
+              .prepare(
+                `
               INSERT INTO recipe_ingredients (
                 id, recipe_id, ingredient_id, quantity, unit, raw_text,
                 preparation, notes, is_optional, group_name, sort_order, normalization_key
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `)
+            `
+              )
               .bind(
                 ing.id,
                 recipe.id,
@@ -946,8 +1056,18 @@ exportRoutes.post('/import', async (c) => {
           // Skip pairings with undefined/null required fields
           if (pairing.id === undefined || pairing.id === null) continue;
           pairingStmts.push(
-            db.prepare('INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_text, pairing_type, notes) VALUES (?, ?, ?, ?, ?, ?)')
-              .bind(pairing.id, recipe.id, n(pairing.paired_recipe_id), n(pairing.pairing_text), n(pairing.pairing_type) ?? 'side', n(pairing.notes))
+            db
+              .prepare(
+                'INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_text, pairing_type, notes) VALUES (?, ?, ?, ?, ?, ?)'
+              )
+              .bind(
+                pairing.id,
+                recipe.id,
+                n(pairing.paired_recipe_id),
+                n(pairing.pairing_text),
+                n(pairing.pairing_type) ?? 'side',
+                n(pairing.notes)
+              )
           );
         }
       }
@@ -957,11 +1077,14 @@ exportRoutes.post('/import', async (c) => {
     // Import pantry items (including all fields)
     if (importData.pantryItems?.length) {
       const pantryStmts = importData.pantryItems.map((item) =>
-        db.prepare(`
+        db
+          .prepare(
+            `
           INSERT INTO pantry_items (
             id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
+        `
+          )
           .bind(
             item.id,
             n(item.ingredient_id),
@@ -986,7 +1109,10 @@ exportRoutes.post('/import', async (c) => {
     if (importData.mealSlots?.length) {
       await db.prepare('DELETE FROM meal_slots').run();
       const slotStmts = importData.mealSlots.map((slot) =>
-        db.prepare('INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)'
+          )
           .bind(slot.id, slot.name, slot.display_name, slot.sort_order, slot.default_servings ?? 1)
       );
       await runBatched(slotStmts);
@@ -996,8 +1122,18 @@ exportRoutes.post('/import', async (c) => {
     // Import meal plans
     if (importData.mealPlans?.length) {
       const planStmts = importData.mealPlans.map((plan) =>
-        db.prepare('INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(plan.id, n(plan.name), plan.start_date, plan.end_date, plan.is_template ?? 0, n(plan.created_at))
+        db
+          .prepare(
+            'INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            plan.id,
+            n(plan.name),
+            plan.start_date,
+            plan.end_date,
+            plan.is_template ?? 0,
+            n(plan.created_at)
+          )
       );
       await runBatched(planStmts);
       stats.mealPlans = importData.mealPlans.length;
@@ -1006,12 +1142,15 @@ exportRoutes.post('/import', async (c) => {
     // Import planned meals
     if (importData.plannedMeals?.length) {
       const mealStmts = importData.plannedMeals.map((meal) =>
-        db.prepare(`
+        db
+          .prepare(
+            `
           INSERT INTO planned_meals (
             id, meal_plan_id, recipe_id, custom_title, meal_slot_id,
             planned_date, scaling_factor, notes, is_completed
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
+        `
+          )
           .bind(
             meal.id,
             meal.meal_plan_id,
@@ -1031,7 +1170,8 @@ exportRoutes.post('/import', async (c) => {
     // Import food association groups
     if (importData.foodAssociationGroups?.length) {
       const groupStmts = importData.foodAssociationGroups.map((group) =>
-        db.prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
+        db
+          .prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
           .bind(group.id, group.name, n(group.created_at))
       );
       await runBatched(groupStmts);
@@ -1041,7 +1181,10 @@ exportRoutes.post('/import', async (c) => {
     // Import food association terms
     if (importData.foodAssociationTerms?.length) {
       const termStmts = importData.foodAssociationTerms.map((term) =>
-        db.prepare('INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)'
+          )
           .bind(term.id, term.group_id, term.term, n(term.created_at))
       );
       await runBatched(termStmts);
@@ -1051,7 +1194,10 @@ exportRoutes.post('/import', async (c) => {
     // Import shelf life
     if (importData.shelfLife?.length) {
       const shelfStmts = importData.shelfLife.map((entry) =>
-        db.prepare('INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+          )
           .bind(
             entry.id,
             entry.ingredient_name,
@@ -1072,10 +1218,7 @@ exportRoutes.post('/import', async (c) => {
       importedFrom: importData.exportedAt,
     });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to import data' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to import data' }, 500);
   }
 });
 
@@ -1129,10 +1272,7 @@ exportRoutes.delete('/clear', async (c) => {
       imagesDeleted: deletedCount,
     });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to clear data' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to clear data' }, 500);
   }
 });
 
@@ -1262,7 +1402,7 @@ exportRoutes.post('/import-zip', async (c) => {
     };
 
     // Helper to convert undefined to null
-    const n = <T>(value: T | undefined): T | null => value === undefined ? null : value;
+    const n = <T>(value: T | undefined): T | null => (value === undefined ? null : value);
 
     // Helper to batch statements
     const BATCH_SIZE = 50;
@@ -1303,11 +1443,11 @@ exportRoutes.post('/import-zip', async (c) => {
           // Determine content type from extension
           const ext = r2Path.split('.').pop()?.toLowerCase() || 'jpg';
           const contentTypes: Record<string, string> = {
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'gif': 'image/gif',
-            'webp': 'image/webp',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            png: 'image/png',
+            gif: 'image/gif',
+            webp: 'image/webp',
           };
           await bucket.put(r2Path, data, {
             httpMetadata: {
@@ -1324,8 +1464,18 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import tags
     if (importData.tags?.length) {
       const tagStmts = importData.tags.map((tag) =>
-        db.prepare('INSERT INTO tags (id, name, display_name, color, usage_count, is_category) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(tag.id, tag.name, n(tag.display_name), n(tag.color), tag.usage_count ?? 0, (tag as { is_category?: number }).is_category ?? 0)
+        db
+          .prepare(
+            'INSERT INTO tags (id, name, display_name, color, usage_count, is_category) VALUES (?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            tag.id,
+            tag.name,
+            n(tag.display_name),
+            n(tag.color),
+            tag.usage_count ?? 0,
+            (tag as { is_category?: number }).is_category ?? 0
+          )
       );
       await runBatched(tagStmts);
       stats.tags = importData.tags.length;
@@ -1334,7 +1484,10 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import ingredients
     if (importData.ingredients?.length) {
       const ingStmts = importData.ingredients.map((ing) =>
-        db.prepare('INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO ingredients (id, name, name_plural, normalized_name, category) VALUES (?, ?, ?, ?, ?)'
+          )
           .bind(ing.id, ing.name, n(ing.name_plural), ing.normalized_name, n(ing.category))
       );
       await runBatched(ingStmts);
@@ -1344,8 +1497,21 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import ingredient nutrition (user customizations)
     if (importData.ingredientNutrition?.length) {
       const nutritionStmts = importData.ingredientNutrition.map((item) =>
-        db.prepare(`INSERT INTO ingredient_nutrition (id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(item.id, item.ingredient_name, n(item.carbs_per_100g), n(item.protein_per_100g), n(item.fat_per_100g), n(item.calories_per_100g), n(item.usda_fdc_id), n(item.created_at), n(item.updated_at))
+        db
+          .prepare(
+            `INSERT INTO ingredient_nutrition (id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .bind(
+            item.id,
+            item.ingredient_name,
+            n(item.carbs_per_100g),
+            n(item.protein_per_100g),
+            n(item.fat_per_100g),
+            n(item.calories_per_100g),
+            n(item.usda_fdc_id),
+            n(item.created_at),
+            n(item.updated_at)
+          )
       );
       await runBatched(nutritionStmts);
       stats.ingredientNutrition = importData.ingredientNutrition.length;
@@ -1354,8 +1520,19 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import unit conversions
     if (importData.unitConversions?.length) {
       const convStmts = importData.unitConversions.map((conv) =>
-        db.prepare('INSERT INTO unit_conversions (id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .bind(conv.id, conv.ingredient_category, n(conv.ingredient_pattern), conv.from_unit, conv.to_unit, conv.factor, n(conv.notes))
+        db
+          .prepare(
+            'INSERT INTO unit_conversions (id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            conv.id,
+            conv.ingredient_category,
+            n(conv.ingredient_pattern),
+            conv.from_unit,
+            conv.to_unit,
+            conv.factor,
+            n(conv.notes)
+          )
       );
       await runBatched(convStmts);
       stats.unitConversions = importData.unitConversions.length;
@@ -1364,7 +1541,10 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import pantry categories (before pantry items since they reference them)
     if (importData.pantryCategories?.length) {
       const catStmts = importData.pantryCategories.map((cat) =>
-        db.prepare('INSERT INTO pantry_categories (id, name, location, sort_order) VALUES (?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO pantry_categories (id, name, location, sort_order) VALUES (?, ?, ?, ?)'
+          )
           .bind(cat.id, cat.name, cat.location, cat.sort_order)
       );
       await runBatched(catStmts);
@@ -1374,7 +1554,9 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import recipes
     if (importData.recipes?.length) {
       const recipeStmts = importData.recipes.map((recipe) =>
-        db.prepare(`
+        db
+          .prepare(
+            `
           INSERT INTO recipes (
             id, title, slug, source_path, source_url, markdown_content, description,
             ingredients_raw, instructions_raw, prep_instructions_raw, notes, prep_time_minutes, cook_time_minutes,
@@ -1382,16 +1564,35 @@ exportRoutes.post('/import-zip', async (c) => {
             last_cooked_at, last_accessed_at, cook_count,
             carbs_total, protein_total, fat_total, calories_total, macros_manual
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
+        `
+          )
           .bind(
-            recipe.id, recipe.title, n(recipe.slug), n(recipe.source_path), n(recipe.source_url),
-            n(recipe.markdown_content), n(recipe.description), n(recipe.ingredients_raw),
-            n(recipe.instructions_raw), n(recipe.prep_instructions_raw), n(recipe.notes), n(recipe.prep_time_minutes),
-            n(recipe.cook_time_minutes), n(recipe.servings), n(recipe.servings_unit),
-            n(recipe.image_path), n(recipe.created_at), n(recipe.updated_at),
-            n(recipe.last_cooked_at), n(recipe.last_accessed_at), recipe.cook_count ?? 0,
-            n(recipe.carbs_total), n(recipe.protein_total), n(recipe.fat_total),
-            n(recipe.calories_total), n(recipe.macros_manual)
+            recipe.id,
+            recipe.title,
+            n(recipe.slug),
+            n(recipe.source_path),
+            n(recipe.source_url),
+            n(recipe.markdown_content),
+            n(recipe.description),
+            n(recipe.ingredients_raw),
+            n(recipe.instructions_raw),
+            n(recipe.prep_instructions_raw),
+            n(recipe.notes),
+            n(recipe.prep_time_minutes),
+            n(recipe.cook_time_minutes),
+            n(recipe.servings),
+            n(recipe.servings_unit),
+            n(recipe.image_path),
+            n(recipe.created_at),
+            n(recipe.updated_at),
+            n(recipe.last_cooked_at),
+            n(recipe.last_accessed_at),
+            recipe.cook_count ?? 0,
+            n(recipe.carbs_total),
+            n(recipe.protein_total),
+            n(recipe.fat_total),
+            n(recipe.calories_total),
+            n(recipe.macros_manual)
           )
       );
       await runBatched(recipeStmts);
@@ -1402,7 +1603,8 @@ exportRoutes.post('/import-zip', async (c) => {
       for (const recipe of importData.recipes) {
         for (const tag of recipe.tags || []) {
           recipeTagStmts.push(
-            db.prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
+            db
+              .prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
               .bind(recipe.id, tag.id)
           );
         }
@@ -1414,7 +1616,10 @@ exportRoutes.post('/import-zip', async (c) => {
       for (const recipe of importData.recipes) {
         for (const img of recipe.images || []) {
           recipeImageStmts.push(
-            db.prepare('INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+            db
+              .prepare(
+                'INSERT INTO recipe_images (id, recipe_id, path, alt, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+              )
               .bind(img.id, recipe.id, img.path, n(img.alt), img.sort_order, n(img.created_at))
           );
         }
@@ -1426,16 +1631,28 @@ exportRoutes.post('/import-zip', async (c) => {
       for (const recipe of importData.recipes) {
         for (const ing of recipe.ingredients || []) {
           recipeIngStmts.push(
-            db.prepare(`
+            db
+              .prepare(
+                `
               INSERT INTO recipe_ingredients (
                 id, recipe_id, ingredient_id, quantity, unit, raw_text,
                 preparation, notes, is_optional, group_name, sort_order, normalization_key
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `)
+            `
+              )
               .bind(
-                ing.id, recipe.id, n(ing.ingredient_id), n(ing.quantity), n(ing.unit),
-                ing.raw_text, n(ing.preparation), n(ing.notes), ing.is_optional,
-                n(ing.group_name), ing.sort_order, n(ing.normalization_key)
+                ing.id,
+                recipe.id,
+                n(ing.ingredient_id),
+                n(ing.quantity),
+                n(ing.unit),
+                ing.raw_text,
+                n(ing.preparation),
+                n(ing.notes),
+                ing.is_optional,
+                n(ing.group_name),
+                ing.sort_order,
+                n(ing.normalization_key)
               )
           );
         }
@@ -1447,11 +1664,21 @@ exportRoutes.post('/import-zip', async (c) => {
       for (const recipe of importData.recipes) {
         for (const pairing of recipe.pairings || []) {
           pairingStmts.push(
-            db.prepare(`
+            db
+              .prepare(
+                `
               INSERT INTO recipe_pairings (id, recipe_id, paired_recipe_id, pairing_text, pairing_type, notes)
               VALUES (?, ?, ?, ?, ?, ?)
-            `)
-              .bind(pairing.id, recipe.id, n(pairing.paired_recipe_id), n(pairing.pairing_text), pairing.pairing_type, n(pairing.notes))
+            `
+              )
+              .bind(
+                pairing.id,
+                recipe.id,
+                n(pairing.paired_recipe_id),
+                n(pairing.pairing_text),
+                pairing.pairing_type,
+                n(pairing.notes)
+              )
           );
         }
       }
@@ -1461,11 +1688,28 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import pantry items (including all fields)
     if (importData.pantryItems?.length) {
       const pantryStmts = importData.pantryItems.map((item) =>
-        db.prepare(`
+        db
+          .prepare(
+            `
           INSERT INTO pantry_items (id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-          .bind(item.id, n(item.ingredient_id), item.name, item.normalized_name, n(item.quantity), n(item.unit), n(item.location), n(item.expiration_date), item.is_staple ?? 0, item.needs_refill ?? 0, n(item.normalization_key), n(item.category_id), n(item.original_name))
+        `
+          )
+          .bind(
+            item.id,
+            n(item.ingredient_id),
+            item.name,
+            item.normalized_name,
+            n(item.quantity),
+            n(item.unit),
+            n(item.location),
+            n(item.expiration_date),
+            item.is_staple ?? 0,
+            item.needs_refill ?? 0,
+            n(item.normalization_key),
+            n(item.category_id),
+            n(item.original_name)
+          )
       );
       await runBatched(pantryStmts);
       stats.pantryItems = importData.pantryItems.length;
@@ -1475,7 +1719,10 @@ exportRoutes.post('/import-zip', async (c) => {
     if (importData.mealSlots?.length) {
       await db.prepare('DELETE FROM meal_slots').run();
       const slotStmts = importData.mealSlots.map((slot) =>
-        db.prepare('INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO meal_slots (id, name, display_name, sort_order, default_servings) VALUES (?, ?, ?, ?, ?)'
+          )
           .bind(slot.id, slot.name, slot.display_name, slot.sort_order, slot.default_servings ?? 1)
       );
       await runBatched(slotStmts);
@@ -1485,8 +1732,18 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import meal plans
     if (importData.mealPlans?.length) {
       const planStmts = importData.mealPlans.map((plan) =>
-        db.prepare('INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(plan.id, n(plan.name), plan.start_date, plan.end_date, plan.is_template ?? 0, n(plan.created_at))
+        db
+          .prepare(
+            'INSERT INTO meal_plans (id, name, start_date, end_date, is_template, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            plan.id,
+            n(plan.name),
+            plan.start_date,
+            plan.end_date,
+            plan.is_template ?? 0,
+            n(plan.created_at)
+          )
       );
       await runBatched(planStmts);
       stats.mealPlans = importData.mealPlans.length;
@@ -1495,11 +1752,24 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import planned meals
     if (importData.plannedMeals?.length) {
       const mealStmts = importData.plannedMeals.map((meal) =>
-        db.prepare(`
+        db
+          .prepare(
+            `
           INSERT INTO planned_meals (id, meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes, is_completed)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-          .bind(meal.id, meal.meal_plan_id, n(meal.recipe_id), n(meal.custom_title), meal.meal_slot_id, meal.planned_date, meal.scaling_factor ?? 1, n(meal.notes), meal.is_completed ?? 0)
+        `
+          )
+          .bind(
+            meal.id,
+            meal.meal_plan_id,
+            n(meal.recipe_id),
+            n(meal.custom_title),
+            meal.meal_slot_id,
+            meal.planned_date,
+            meal.scaling_factor ?? 1,
+            n(meal.notes),
+            meal.is_completed ?? 0
+          )
       );
       await runBatched(mealStmts);
       stats.plannedMeals = importData.plannedMeals.length;
@@ -1508,7 +1778,8 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import food groups
     if (importData.foodAssociationGroups?.length) {
       const groupStmts = importData.foodAssociationGroups.map((group) =>
-        db.prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
+        db
+          .prepare('INSERT INTO food_association_groups (id, name, created_at) VALUES (?, ?, ?)')
           .bind(group.id, group.name, n(group.created_at))
       );
       await runBatched(groupStmts);
@@ -1518,7 +1789,10 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import food terms
     if (importData.foodAssociationTerms?.length) {
       const termStmts = importData.foodAssociationTerms.map((term) =>
-        db.prepare('INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)')
+        db
+          .prepare(
+            'INSERT INTO food_association_terms (id, group_id, term, created_at) VALUES (?, ?, ?, ?)'
+          )
           .bind(term.id, term.group_id, term.term, n(term.created_at))
       );
       await runBatched(termStmts);
@@ -1528,8 +1802,18 @@ exportRoutes.post('/import-zip', async (c) => {
     // Import shelf life
     if (importData.shelfLife?.length) {
       const shelfStmts = importData.shelfLife.map((item) =>
-        db.prepare('INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(item.id, item.ingredient_name, n(item.fridge_days), n(item.freezer_days), n(item.created_at), n(item.updated_at))
+        db
+          .prepare(
+            'INSERT INTO shelf_life (id, ingredient_name, fridge_days, freezer_days, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+          )
+          .bind(
+            item.id,
+            item.ingredient_name,
+            n(item.fridge_days),
+            n(item.freezer_days),
+            n(item.created_at),
+            n(item.updated_at)
+          )
       );
       await runBatched(shelfStmts);
       stats.shelfLife = importData.shelfLife.length;
@@ -1541,10 +1825,7 @@ exportRoutes.post('/import-zip', async (c) => {
       importedFrom: importData.exportedAt,
     });
   } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to import ZIP' },
-      500
-    );
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to import ZIP' }, 500);
   }
 });
 
@@ -1555,9 +1836,7 @@ exportRoutes.post('/import-zip', async (c) => {
 /**
  * Generate inventory markdown organized by location
  */
-function generateInventoryMarkdown(
-  pantryItems: FullExportData['pantryItems']
-): string {
+function generateInventoryMarkdown(pantryItems: FullExportData['pantryItems']): string {
   const lines: string[] = [];
   lines.push('# Inventory');
   lines.push('');
@@ -1659,9 +1938,7 @@ function generateShelfLifeMarkdown(entries: FullExportData['shelfLife']): string
   lines.push('|------------|---------------|----------------|');
 
   // Sort alphabetically
-  const sorted = [...entries].sort((a, b) =>
-    a.ingredient_name.localeCompare(b.ingredient_name)
-  );
+  const sorted = [...entries].sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name));
 
   for (const entry of sorted) {
     const fridge = entry.fridge_days?.toString() || '-';
@@ -1748,16 +2025,21 @@ function generateMealPlanMarkdown(
 
 // GET /api/export/vault - Export as human-readable vault (ZIP)
 exportRoutes.get('/vault', async (c) => {
+  const { userId } = c.get('user');
+
   try {
     const db = c.env.DB;
 
     // Fetch all data (reuse logic from /data endpoint)
-    const recipesResult = await db.prepare('SELECT id FROM recipes ORDER BY id').all();
+    const recipesResult = await db
+      .prepare('SELECT id FROM recipes WHERE user_id = ? ORDER BY id')
+      .bind(userId)
+      .all();
     const recipeIds = (recipesResult.results || []).map((r) => (r as { id: number }).id);
 
     const recipes: ExportedRecipe[] = [];
     for (const id of recipeIds) {
-      const recipe = await getFullRecipe(db, id);
+      const recipe = await getFullRecipe(db, id, userId);
       if (recipe) {
         recipes.push(recipe);
       }
@@ -1765,39 +2047,57 @@ exportRoutes.get('/vault', async (c) => {
 
     // Get ingredient nutrition (user customizations)
     const ingredientNutritionResult = await db
-      .prepare('SELECT id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at FROM ingredient_nutrition ORDER BY ingredient_name')
+      .prepare(
+        'SELECT id, ingredient_name, carbs_per_100g, protein_per_100g, fat_per_100g, calories_per_100g, usda_fdc_id, created_at, updated_at FROM ingredient_nutrition ORDER BY ingredient_name'
+      )
       .all();
-    const ingredientNutrition = (ingredientNutritionResult.results || []) as FullExportData['ingredientNutrition'];
+    const ingredientNutrition = (ingredientNutritionResult.results ||
+      []) as FullExportData['ingredientNutrition'];
 
     // Get unit conversions
     const unitConversionsResult = await db
-      .prepare('SELECT id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes FROM unit_conversions ORDER BY id')
+      .prepare(
+        'SELECT id, ingredient_category, ingredient_pattern, from_unit, to_unit, factor, notes FROM unit_conversions ORDER BY id'
+      )
       .all();
-    const unitConversions = (unitConversionsResult.results || []) as FullExportData['unitConversions'];
+    const unitConversions = (unitConversionsResult.results ||
+      []) as FullExportData['unitConversions'];
 
     // Get pantry categories
     const pantryCategoriesResult = await db
-      .prepare('SELECT id, name, location, sort_order FROM pantry_categories ORDER BY location, sort_order')
+      .prepare(
+        'SELECT id, name, location, sort_order FROM pantry_categories ORDER BY location, sort_order'
+      )
       .all();
-    const pantryCategories = (pantryCategoriesResult.results || []) as FullExportData['pantryCategories'];
+    const pantryCategories = (pantryCategoriesResult.results ||
+      []) as FullExportData['pantryCategories'];
 
     const pantryResult = await db
-      .prepare('SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name FROM pantry_items ORDER BY name')
+      .prepare(
+        'SELECT id, ingredient_id, name, normalized_name, quantity, unit, location, expiration_date, is_staple, needs_refill, normalization_key, category_id, original_name FROM pantry_items WHERE user_id = ? ORDER BY name'
+      )
+      .bind(userId)
       .all();
     const pantryItems = (pantryResult.results || []) as FullExportData['pantryItems'];
 
     const mealPlansResult = await db
-      .prepare('SELECT id, name, start_date, end_date, is_template, created_at FROM meal_plans ORDER BY start_date DESC')
+      .prepare(
+        'SELECT id, name, start_date, end_date, is_template, created_at FROM meal_plans ORDER BY start_date DESC'
+      )
       .all();
     const mealPlans = (mealPlansResult.results || []) as FullExportData['mealPlans'];
 
     const mealSlotsResult = await db
-      .prepare('SELECT id, name, display_name, sort_order, default_servings FROM meal_slots ORDER BY sort_order')
+      .prepare(
+        'SELECT id, name, display_name, sort_order, default_servings FROM meal_slots ORDER BY sort_order'
+      )
       .all();
     const mealSlots = (mealSlotsResult.results || []) as FullExportData['mealSlots'];
 
     const plannedMealsResult = await db
-      .prepare('SELECT id, meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes, is_completed FROM planned_meals ORDER BY planned_date')
+      .prepare(
+        'SELECT id, meal_plan_id, recipe_id, custom_title, meal_slot_id, planned_date, scaling_factor, notes, is_completed FROM planned_meals ORDER BY planned_date'
+      )
       .all();
     const plannedMeals = (plannedMealsResult.results || []) as FullExportData['plannedMeals'];
 
@@ -1807,22 +2107,31 @@ exportRoutes.get('/vault', async (c) => {
     const foodGroups = (foodGroupsResult.results || []) as FullExportData['foodAssociationGroups'];
 
     const foodTermsResult = await db
-      .prepare('SELECT id, group_id, term, created_at FROM food_association_terms ORDER BY group_id, term')
+      .prepare(
+        'SELECT id, group_id, term, created_at FROM food_association_terms ORDER BY group_id, term'
+      )
       .all();
     const foodTerms = (foodTermsResult.results || []) as FullExportData['foodAssociationTerms'];
 
     const shelfLifeResult = await db
-      .prepare('SELECT id, ingredient_name, fridge_days, freezer_days, created_at, updated_at FROM shelf_life ORDER BY ingredient_name')
+      .prepare(
+        'SELECT id, ingredient_name, fridge_days, freezer_days, created_at, updated_at FROM shelf_life ORDER BY ingredient_name'
+      )
       .all();
     const shelfLife = (shelfLifeResult.results || []) as FullExportData['shelfLife'];
 
     const tagsResult = await db
-      .prepare('SELECT id, name, display_name, color, usage_count, is_category FROM tags ORDER BY name')
+      .prepare(
+        'SELECT id, name, display_name, color, usage_count, is_category FROM tags WHERE user_id = ? ORDER BY name'
+      )
+      .bind(userId)
       .all();
     const tags = (tagsResult.results || []) as FullExportData['tags'];
 
     const ingredientsResult = await db
-      .prepare('SELECT id, name, name_plural, normalized_name, category FROM ingredients ORDER BY name')
+      .prepare(
+        'SELECT id, name, name_plural, normalized_name, category FROM ingredients ORDER BY name'
+      )
       .all();
     const ingredients = (ingredientsResult.results || []) as FullExportData['ingredients'];
 

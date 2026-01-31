@@ -110,7 +110,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-onedark-fg-muted dark:hover:bg-onedark-bg-highlight lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-onedark-bg"
             aria-label="Close navigation menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -122,7 +128,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }} aria-label="Primary">
+        <nav
+          className="p-4 space-y-1 overflow-y-auto"
+          style={{ maxHeight: 'calc(100vh - 140px)' }}
+          aria-label="Primary"
+        >
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -155,7 +165,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               }`
             }
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

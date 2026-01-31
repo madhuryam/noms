@@ -98,18 +98,21 @@ export function ImportPage() {
     [parseResult]
   );
 
-  const handleStartImport = useCallback(async (finalRecipes?: ParsedVaultRecipe[]) => {
-    if (!parseResult) return;
-    setStep('importing');
-    // Use passed recipes if available (contains latest edits), otherwise fall back to state
-    const recipesToImport = finalRecipes ?? parseResult.recipes;
-    await startImport(recipesToImport, parseResult.images);
-    // Invalidate all queries after import
-    queryClient.invalidateQueries({ queryKey: ['recipes'] });
-    queryClient.invalidateQueries({ queryKey: ['categories'] });
-    queryClient.invalidateQueries({ queryKey: ['tags'] });
-    setStep('complete');
-  }, [parseResult, startImport, queryClient]);
+  const handleStartImport = useCallback(
+    async (finalRecipes?: ParsedVaultRecipe[]) => {
+      if (!parseResult) return;
+      setStep('importing');
+      // Use passed recipes if available (contains latest edits), otherwise fall back to state
+      const recipesToImport = finalRecipes ?? parseResult.recipes;
+      await startImport(recipesToImport, parseResult.images);
+      // Invalidate all queries after import
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      setStep('complete');
+    },
+    [parseResult, startImport, queryClient]
+  );
 
   const handleCancel = useCallback(() => {
     setStep('upload');
@@ -236,7 +239,6 @@ export function ImportPage() {
           </ul>
         </div>
       )}
-
     </div>
   );
 }

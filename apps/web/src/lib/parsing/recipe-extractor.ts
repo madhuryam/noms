@@ -77,8 +77,11 @@ function normalizeInstructions(markdown: string): string {
     const trimmed = line.trim();
 
     // Section headers restart numbering
-    if (trimmed.startsWith('###') || trimmed.startsWith('## ') ||
-        (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':')))) {
+    if (
+      trimmed.startsWith('###') ||
+      trimmed.startsWith('## ') ||
+      (trimmed.startsWith('**') && (trimmed.endsWith('**') || trimmed.endsWith(':')))
+    ) {
       stepNumber = 1;
       result.push(line);
       continue;
@@ -337,7 +340,8 @@ function extractSourceUrlFromNotes(notes: string | null): string | null {
   if (linkMatch) return linkMatch[1];
 
   // Pattern 3: "Recipe from: URL" or similar
-  const recipeFromPattern = /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const recipeFromPattern =
+    /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
   const recipeFromMatch = notes.match(recipeFromPattern);
   if (recipeFromMatch) return recipeFromMatch[1];
 
@@ -356,7 +360,10 @@ function stripSourceFromNotes(notes: string | null): string | null {
     // Remove "[Source](url)" lines
     .replace(/^\[source\]\(https?:\/\/[^\)]+\)$/gim, '')
     // Remove "Recipe from: URL" lines
-    .replace(/^(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
+    .replace(
+      /^(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim,
+      ''
+    )
     // Clean up multiple blank lines
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -431,49 +438,49 @@ export function extractDetailedNutrition(content: string): DetailedNutrition {
 
   // Mapping of possible labels to nutrition keys
   const labelMap: Record<string, keyof DetailedNutrition> = {
-    'calories': 'calories',
-    'calorie': 'calories',
-    'cal': 'calories',
-    'carbohydrates': 'carbs',
-    'carbohydrate': 'carbs',
-    'carbs': 'carbs',
-    'carb': 'carbs',
-    'protein': 'protein',
-    'proteins': 'protein',
-    'fat': 'fat',
-    'fats': 'fat',
+    calories: 'calories',
+    calorie: 'calories',
+    cal: 'calories',
+    carbohydrates: 'carbs',
+    carbohydrate: 'carbs',
+    carbs: 'carbs',
+    carb: 'carbs',
+    protein: 'protein',
+    proteins: 'protein',
+    fat: 'fat',
+    fats: 'fat',
     'total fat': 'fat',
     'saturated fat': 'saturatedFat',
-    'saturatedfat': 'saturatedFat',
+    saturatedfat: 'saturatedFat',
     'sat fat': 'saturatedFat',
     'polyunsaturated fat': 'polyunsaturatedFat',
-    'polyunsaturatedfat': 'polyunsaturatedFat',
+    polyunsaturatedfat: 'polyunsaturatedFat',
     'poly fat': 'polyunsaturatedFat',
     'monounsaturated fat': 'monounsaturatedFat',
-    'monounsaturatedfat': 'monounsaturatedFat',
+    monounsaturatedfat: 'monounsaturatedFat',
     'mono fat': 'monounsaturatedFat',
     'trans fat': 'transFat',
-    'transfat': 'transFat',
-    'cholesterol': 'cholesterol',
-    'sodium': 'sodium',
-    'salt': 'sodium',
-    'potassium': 'potassium',
-    'fiber': 'fiber',
-    'fibre': 'fiber',
+    transfat: 'transFat',
+    cholesterol: 'cholesterol',
+    sodium: 'sodium',
+    salt: 'sodium',
+    potassium: 'potassium',
+    fiber: 'fiber',
+    fibre: 'fiber',
     'dietary fiber': 'fiber',
-    'sugar': 'sugar',
-    'sugars': 'sugar',
+    sugar: 'sugar',
+    sugars: 'sugar',
     'vitamin a': 'vitaminA',
-    'vitamina': 'vitaminA',
+    vitamina: 'vitaminA',
     'vit a': 'vitaminA',
     'vitamin c': 'vitaminC',
-    'vitaminc': 'vitaminC',
+    vitaminc: 'vitaminC',
     'vit c': 'vitaminC',
     'vitamin d': 'vitaminD',
-    'vitamind': 'vitaminD',
+    vitamind: 'vitaminD',
     'vit d': 'vitaminD',
-    'calcium': 'calcium',
-    'iron': 'iron',
+    calcium: 'calcium',
+    iron: 'iron',
   };
 
   // Pattern to match "Label: Value" pairs
@@ -514,7 +521,11 @@ function stripNutritionFromContent(content: string): string {
     const trimmed = line.trim();
 
     // Check for "Nutrition" header
-    if (/^#{1,3}\s*nutrition/i.test(trimmed) || /^\*\*nutrition\*\*/i.test(trimmed) || /^nutrition:?\s*$/i.test(trimmed)) {
+    if (
+      /^#{1,3}\s*nutrition/i.test(trimmed) ||
+      /^\*\*nutrition\*\*/i.test(trimmed) ||
+      /^nutrition:?\s*$/i.test(trimmed)
+    ) {
       inNutritionBlock = true;
       continue;
     }
@@ -535,7 +546,9 @@ function stripNutritionFromContent(content: string): string {
     }
 
     // Skip lines that are primarily nutrition data (multiple nutrition items)
-    const nutritionItems = trimmed.match(/(?:calories?|carbs?|carbohydrates?|protein|fat|fiber|sugar|sodium|cholesterol|potassium|vitamin\s*[a-d]|calcium|iron)\s*:\s*[\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?/gi);
+    const nutritionItems = trimmed.match(
+      /(?:calories?|carbs?|carbohydrates?|protein|fat|fiber|sugar|sodium|cholesterol|potassium|vitamin\s*[a-d]|calcium|iron)\s*:\s*[\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?/gi
+    );
     if (nutritionItems && nutritionItems.length >= 3) {
       continue;
     }

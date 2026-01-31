@@ -65,16 +65,17 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
 
   if (!isOpen) return null;
 
-  const displayedRecipes = searchQuery.length >= 2
-    ? suggestionsData?.suggestions.map((r) => ({
-        id: r.id,
-        title: r.title,
-        image_path: r.image_path,
-        prep_time_minutes: null,
-        cook_time_minutes: null,
-        servings: 1,
-      })) ?? []
-    : recentRecipes;
+  const displayedRecipes =
+    searchQuery.length >= 2
+      ? (suggestionsData?.suggestions.map((r) => ({
+          id: r.id,
+          title: r.title,
+          image_path: r.image_path,
+          prep_time_minutes: null,
+          cook_time_minutes: null,
+          servings: 1,
+        })) ?? [])
+      : recentRecipes;
 
   const hasSearchQuery = searchQuery.trim().length > 0;
   const hasResults = displayedRecipes.length > 0;
@@ -116,10 +117,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 dark:bg-black/70"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/50 dark:bg-black/70" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative bg-white dark:bg-onedark-bg-lighter rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
@@ -127,9 +125,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
         <div className="px-6 py-4 border-b border-gray-200 dark:border-onedark-bg-highlight">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
-                Add Meal
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">Add Meal</h2>
               <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
                 {slotName} - {formatDate(date)}
               </p>
@@ -139,7 +135,12 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
               className="p-2 text-gray-400 hover:text-gray-600 dark:text-onedark-fg-muted dark:hover:text-onedark-fg rounded-lg hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -180,7 +181,7 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto p-4"
         >
-          {(isSearching || (searchQuery.length < 2 && isLoadingRecipes)) ? (
+          {isSearching || (searchQuery.length < 2 && isLoadingRecipes) ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
             </div>
@@ -194,8 +195,18 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded bg-gray-100 dark:bg-onedark-bg-highlight flex items-center justify-center text-gray-400 dark:text-onedark-fg-muted">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M12 4v16m8-8H4"
+                        />
                       </svg>
                     </div>
                     <div>
@@ -239,8 +250,18 @@ export function AddMealModal({ isOpen, onClose, onSelect, slotName, date }: AddM
                             {isSelected && (
                               <div className="absolute inset-0 bg-blue-500/20 dark:bg-onedark-blue/20 flex items-center justify-center">
                                 <div className="w-8 h-8 rounded-full bg-blue-500 dark:bg-onedark-blue flex items-center justify-center">
-                                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  <svg
+                                    className="w-5 h-5 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
                                   </svg>
                                 </div>
                               </div>

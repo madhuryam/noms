@@ -45,7 +45,9 @@ function isNutritionLine(line: string): boolean {
     return true;
   }
   // Skip lines that are primarily nutrition data (multiple nutrition items)
-  const nutritionItems = trimmed.match(/(?:calories?|carbs?|carbohydrates?|protein|fat|fiber|sugar|sodium|cholesterol|potassium|vitamin\s*[a-d]|calcium|iron)\s*:\s*[\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?/gi);
+  const nutritionItems = trimmed.match(
+    /(?:calories?|carbs?|carbohydrates?|protein|fat|fiber|sugar|sodium|cholesterol|potassium|vitamin\s*[a-d]|calcium|iron)\s*:\s*[\d.]+\s*(?:kcal|cal|g|mg|iu|mcg|%)?/gi
+  );
   if (nutritionItems && nutritionItems.length >= 3) {
     return true;
   }
@@ -161,10 +163,9 @@ export function InstructionSteps({
   }, [onProgressChange]);
 
   // Count only non-section items for progress
-  const stepItems = instructions.filter(i => !i.isSection);
+  const stepItems = instructions.filter((i) => !i.isSection);
   const checkedCount = checkedItems.size;
   const totalCount = stepItems.length;
-
 
   if (instructions.length === 0) {
     return (
@@ -220,69 +221,73 @@ export function InstructionSteps({
             <div className="space-y-3">
               {(() => {
                 // Find the first unchecked step in this section
-                const firstUncheckedInSection = section.steps.find(s => !checkedItems.has(s.originalIndex))?.originalIndex;
+                const firstUncheckedInSection = section.steps.find(
+                  (s) => !checkedItems.has(s.originalIndex)
+                )?.originalIndex;
 
                 return section.steps.map((step, stepIndex) => {
-                const isChecked = checkedItems.has(step.originalIndex);
-                const stepNumber = stepIndex + 1;
-                const isCurrentStep = step.originalIndex === firstUncheckedInSection;
+                  const isChecked = checkedItems.has(step.originalIndex);
+                  const stepNumber = stepIndex + 1;
+                  const isCurrentStep = step.originalIndex === firstUncheckedInSection;
 
-                return (
-                  <div
-                    key={`${recipeId}-step-${step.originalIndex}`}
-                    className={`flex gap-4 group rounded-xl transition-all ${
-                      isCurrentStep
-                        ? 'border-2 border-gray-400 dark:border-onedark-fg-muted bg-white dark:bg-onedark-bg-lighter p-4 shadow-md scale-[1.02] -mx-1'
-                        : ''
-                    }`}
-                  >
-                    <div className="flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => toggleItem(step.originalIndex)}
-                        aria-pressed={isChecked}
-                        aria-label={isChecked ? `Uncheck step ${stepNumber}` : `Check step ${stepNumber}`}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                          isChecked
-                            ? 'bg-green-500 dark:bg-onedark-green text-white'
-                            : isCurrentStep
-                              ? 'bg-gray-900 dark:bg-onedark-fg text-white dark:text-onedark-bg'
-                              : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
-                        }`}
-                      >
-                        {isChecked ? (
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2.5}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        ) : (
-                          stepNumber
-                        )}
-                      </button>
-                    </div>
-                    <p
-                      className={`pt-1 transition-all ${
-                        isChecked
-                          ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
-                          : isCurrentStep
-                            ? 'text-gray-900 dark:text-onedark-fg font-medium'
-                            : 'text-gray-700 dark:text-onedark-fg'
+                  return (
+                    <div
+                      key={`${recipeId}-step-${step.originalIndex}`}
+                      className={`flex gap-4 group rounded-xl transition-all ${
+                        isCurrentStep
+                          ? 'border-2 border-gray-400 dark:border-onedark-fg-muted bg-white dark:bg-onedark-bg-lighter p-4 shadow-md scale-[1.02] -mx-1'
+                          : ''
                       }`}
                     >
-                      {step.text}
-                    </p>
-                  </div>
-                );
-              });
+                      <div className="flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => toggleItem(step.originalIndex)}
+                          aria-pressed={isChecked}
+                          aria-label={
+                            isChecked ? `Uncheck step ${stepNumber}` : `Check step ${stepNumber}`
+                          }
+                          className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
+                            isChecked
+                              ? 'bg-green-500 dark:bg-onedark-green text-white'
+                              : isCurrentStep
+                                ? 'bg-gray-900 dark:bg-onedark-fg text-white dark:text-onedark-bg'
+                                : 'bg-gray-100 dark:bg-onedark-bg-highlight text-gray-600 dark:text-onedark-fg-muted group-hover:bg-gray-200 dark:group-hover:bg-onedark-bg'
+                          }`}
+                        >
+                          {isChecked ? (
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2.5}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          ) : (
+                            stepNumber
+                          )}
+                        </button>
+                      </div>
+                      <p
+                        className={`pt-1 transition-all ${
+                          isChecked
+                            ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
+                            : isCurrentStep
+                              ? 'text-gray-900 dark:text-onedark-fg font-medium'
+                              : 'text-gray-700 dark:text-onedark-fg'
+                        }`}
+                      >
+                        {step.text}
+                      </p>
+                    </div>
+                  );
+                });
               })()}
             </div>
           </div>

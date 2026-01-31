@@ -16,7 +16,13 @@ import {
 } from '../components/recipes';
 import { calculateRecipeMacros } from '../lib/macroCalculation';
 import { MatchSummaryBadge } from '../components/suggestions';
-import { RecipeDetailSkeleton, ErrorState, EmptyState, EmptyStateIcons, getErrorMessage } from '../components/common';
+import {
+  RecipeDetailSkeleton,
+  ErrorState,
+  EmptyState,
+  EmptyStateIcons,
+  getErrorMessage,
+} from '../components/common';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
 import { DEFAULT_SERVINGS } from '../lib/constants';
 import { extractDetailedNutrition, type DetailedNutrition } from '../lib/parsing/recipe-extractor';
@@ -89,8 +95,14 @@ export function RecipeDetailPage() {
   const recipeId = recipe?.id;
   const { data: matchData } = useRecipeMatch(recipeId);
   const deleteRecipe = useDeleteRecipe();
-  const { ingredientsChecked, instructionsChecked, prepChecked, updateIngredients, updateInstructions, updatePrep } =
-    useRecipeProgress(recipeId);
+  const {
+    ingredientsChecked,
+    instructionsChecked,
+    prepChecked,
+    updateIngredients,
+    updateInstructions,
+    updatePrep,
+  } = useRecipeProgress(recipeId);
 
   const [servings, setServings] = useState<number | null>(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
@@ -219,7 +231,12 @@ export function RecipeDetailPage() {
           className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
           <span className="hidden sm:inline">Add to Calendar</span>
         </button>
@@ -296,8 +313,18 @@ export function RecipeDetailPage() {
                   onClick={() => setShowParsingDebug(true)}
                   className="mt-4 flex items-center gap-1.5 text-xs text-gray-400 dark:text-onedark-fg-muted hover:text-gray-600 dark:hover:text-onedark-fg transition-colors"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   View parsing details
                 </button>

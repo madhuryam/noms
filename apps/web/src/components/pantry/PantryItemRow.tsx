@@ -1,5 +1,10 @@
 import { useState, useCallback } from 'react';
-import { useUpdatePantryItem, useDeletePantryItem, useToggleRefill, useShelfLifeEntries } from '../../hooks';
+import {
+  useUpdatePantryItem,
+  useDeletePantryItem,
+  useToggleRefill,
+  useShelfLifeEntries,
+} from '../../hooks';
 import type { PantryItem, PantryLocation } from '../../hooks';
 import { useRenameItem } from '../../hooks/useCustomItems';
 
@@ -25,7 +30,12 @@ function getExpirationStatus(expirationDate: string | null): 'ok' | 'soon' | 'ex
   return 'ok';
 }
 
-export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode }: PantryItemRowProps) {
+export function PantryItemRow({
+  item,
+  isSelected,
+  onToggleSelect,
+  selectionMode,
+}: PantryItemRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [name, setName] = useState(item.name);
@@ -40,36 +50,38 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
   const renameItem = useRenameItem();
 
   // Calculate expiration date based on shelf life data for a given location
-  const getExpirationDate = useCallback((ingredientName: string, location: PantryLocation): string | null => {
-    // Only calculate for fridge/freezer
-    if (location !== 'fridge' && location !== 'freezer') {
-      return null;
-    }
+  const getExpirationDate = useCallback(
+    (ingredientName: string, location: PantryLocation): string | null => {
+      // Only calculate for fridge/freezer
+      if (location !== 'fridge' && location !== 'freezer') {
+        return null;
+      }
 
-    const nameLower = ingredientName.toLowerCase();
+      const nameLower = ingredientName.toLowerCase();
 
-    // Try exact match first
-    let entry = shelfLifeEntries.find(
-      (e) => e.ingredient_name.toLowerCase() === nameLower
-    );
+      // Try exact match first
+      let entry = shelfLifeEntries.find((e) => e.ingredient_name.toLowerCase() === nameLower);
 
-    // Try partial match if no exact match
-    if (!entry) {
-      entry = shelfLifeEntries.find(
-        (e) => nameLower.includes(e.ingredient_name.toLowerCase()) ||
-               e.ingredient_name.toLowerCase().includes(nameLower)
-      );
-    }
+      // Try partial match if no exact match
+      if (!entry) {
+        entry = shelfLifeEntries.find(
+          (e) =>
+            nameLower.includes(e.ingredient_name.toLowerCase()) ||
+            e.ingredient_name.toLowerCase().includes(nameLower)
+        );
+      }
 
-    if (!entry) return null;
+      if (!entry) return null;
 
-    const days = location === 'fridge' ? entry.fridge_days : entry.freezer_days;
-    if (!days) return null;
+      const days = location === 'fridge' ? entry.fridge_days : entry.freezer_days;
+      if (!days) return null;
 
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return date.toISOString().split('T')[0];
-  }, [shelfLifeEntries]);
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      return date.toISOString().split('T')[0];
+    },
+    [shelfLifeEntries]
+  );
 
   const expirationStatus = getExpirationStatus(item.expiration_date);
 
@@ -284,8 +296,8 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
             expirationStatus === 'expired'
               ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
               : expirationStatus === 'soon'
-              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-              : 'bg-gray-100 dark:bg-onedark-bg text-gray-600 dark:text-onedark-fg-muted'
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                : 'bg-gray-100 dark:bg-onedark-bg text-gray-600 dark:text-onedark-fg-muted'
           }`}
         >
           {expirationStatus === 'expired' ? 'Expired' : `Exp: ${item.expiration_date}`}
@@ -309,14 +321,27 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
 
       {/* Action buttons - hide in selection mode */}
       {!selectionMode && (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             onClick={handleToggleStaple}
             title={item.is_staple ? 'Remove from staples' : 'Mark as staple'}
             className="p-1.5 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 rounded"
           >
-            <svg className="w-4 h-4" fill={item.is_staple ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            <svg
+              className="w-4 h-4"
+              fill={item.is_staple ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+              />
             </svg>
           </button>
           <button
@@ -325,7 +350,12 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
             className={`p-1.5 rounded ${item.needs_refill ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 hover:text-blue-500 dark:hover:text-blue-400'}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           </button>
           <button
@@ -334,7 +364,12 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
             className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-onedark-blue rounded"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
           </button>
           <button
@@ -346,7 +381,12 @@ export function PantryItemRow({ item, isSelected, onToggleSelect, selectionMode 
             className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 rounded"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         </div>

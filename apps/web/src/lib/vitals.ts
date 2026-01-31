@@ -159,7 +159,9 @@ export function initWebVitals(onReport?: ReportHandler) {
   window.addEventListener('pagehide', reportCLS);
 
   // Time to First Byte
-  const navigationEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+  const navigationEntries = performance.getEntriesByType(
+    'navigation'
+  ) as PerformanceNavigationTiming[];
   if (navigationEntries.length > 0) {
     const nav = navigationEntries[0];
     const ttfb = nav.responseStart - nav.requestStart;

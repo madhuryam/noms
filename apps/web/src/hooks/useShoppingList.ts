@@ -44,11 +44,7 @@ export interface ShoppingListResponse {
   itemsInPantry: number;
 }
 
-export function useShoppingList(
-  planId: number | undefined,
-  startDate?: string,
-  endDate?: string
-) {
+export function useShoppingList(planId: number | undefined, startDate?: string, endDate?: string) {
   return useQuery({
     queryKey: ['shopping-list', planId, startDate, endDate],
     queryFn: async (): Promise<ShoppingListResponse> => {
@@ -353,9 +349,7 @@ export function useCustomCategories(planId: number | undefined) {
   }, []);
 
   const updateCategory = useCallback((id: string, name: string) => {
-    setCategories((prev) =>
-      prev.map((cat) => (cat.id === id ? { ...cat, name } : cat))
-    );
+    setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, name } : cat)));
   }, []);
 
   const deleteCategory = useCallback((id: string) => {

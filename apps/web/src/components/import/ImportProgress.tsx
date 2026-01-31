@@ -107,7 +107,9 @@ export function ImportProgress({
         <div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
             <span>Recipes</span>
-            <span>{processed}/{total}</span>
+            <span>
+              {processed}/{total}
+            </span>
           </div>
           <div className="bg-gray-200 dark:bg-onedark-bg-highlight rounded-full h-2.5 overflow-hidden">
             <div
@@ -128,7 +130,9 @@ export function ImportProgress({
           <div>
             <div className="flex justify-between text-xs text-gray-500 dark:text-onedark-fg-muted mb-1">
               <span>Images</span>
-              <span>{imageProcessed}/{imageTotal}</span>
+              <span>
+                {imageProcessed}/{imageTotal}
+              </span>
             </div>
             <div className="bg-gray-200 dark:bg-onedark-bg-highlight rounded-full h-2.5 overflow-hidden">
               <div

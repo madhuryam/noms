@@ -1,7 +1,21 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { recipes, tags, search, importRoutes, images, associations, pantry, pantryCategories, shelfLife, mealPlans, exportRoutes, nutrition } from './routes';
-import { validateAccessJWT } from './middleware';
+import {
+  recipes,
+  tags,
+  search,
+  importRoutes,
+  images,
+  associations,
+  pantry,
+  pantryCategories,
+  shelfLife,
+  mealPlans,
+  exportRoutes,
+  nutrition,
+  user,
+} from './routes';
+import { validateAccessJWT, requireUser } from './middleware';
 
 interface HealthResponse {
   status: 'ok' | 'error';
@@ -49,8 +63,11 @@ app.get('/health', (c) => {
 app.use('/api/*', async (c, next) => {
   const host = c.req.header('host') || '';
   const origin = c.req.header('origin') || '';
-  const isLocalDev = host.includes('localhost') || host.includes('127.0.0.1') ||
-                     origin.includes('localhost') || origin.includes('127.0.0.1');
+  const isLocalDev =
+    host.includes('localhost') ||
+    host.includes('127.0.0.1') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1');
 
   if (isLocalDev) {
     // Skip auth entirely for local development
@@ -62,6 +79,10 @@ app.use('/api/*', async (c, next) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return validateAccessJWT(c as any, next);
 });
+
+// User middleware - finds/creates user and sets user context
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use('/api/*', requireUser as any);
 
 // Database check endpoint
 app.get('/api/db-check', async (c) => {
@@ -132,6 +153,7 @@ app.get('/api/r2-check', async (c) => {
 });
 
 // Mount route groups
+app.route('/api/user', user);
 app.route('/api/recipes', recipes);
 app.route('/api/tags', tags);
 app.route('/api/search', search);

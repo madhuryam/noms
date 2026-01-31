@@ -57,9 +57,7 @@ export function usePantryItems(location?: PantryLocation) {
   return useQuery({
     queryKey: ['pantry', location ?? 'all'],
     queryFn: async (): Promise<PantryItem[]> => {
-      const url = location
-        ? `/api/pantry?location=${location}`
-        : '/api/pantry';
+      const url = location ? `/api/pantry?location=${location}` : '/api/pantry';
       const response = await api.get<PantryResponse>(url);
       return response.items;
     },
@@ -127,16 +125,18 @@ export function useBulkAddPantryItems() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (items: Array<{
-      name: string;
-      quantity?: number;
-      unit?: string;
-      location?: PantryLocation;
-      is_staple?: boolean;
-      expiration_date?: string;
-      category_id?: number;
-      original_name?: string;
-    }>): Promise<BulkAddResponse> => {
+    mutationFn: async (
+      items: Array<{
+        name: string;
+        quantity?: number;
+        unit?: string;
+        location?: PantryLocation;
+        is_staple?: boolean;
+        expiration_date?: string;
+        category_id?: number;
+        original_name?: string;
+      }>
+    ): Promise<BulkAddResponse> => {
       return api.post<BulkAddResponse>('/api/pantry/bulk', { items });
     },
     onSuccess: () => {

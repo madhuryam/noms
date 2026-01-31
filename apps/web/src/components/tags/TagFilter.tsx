@@ -148,7 +148,12 @@ export function TagFilter({
             className="text-xs text-blue-600 dark:text-onedark-blue hover:text-blue-700 dark:hover:text-onedark-blue/80 flex items-center gap-1"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add Tag
           </button>
@@ -157,8 +162,18 @@ export function TagFilter({
             className="text-xs text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg flex items-center gap-1"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             Manage
           </Link>
@@ -204,7 +219,12 @@ export function TagFilter({
             <div>
               <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
                 </svg>
                 Smart Tags
               </h4>
@@ -221,7 +241,9 @@ export function TagFilter({
                           : 'opacity-70 hover:opacity-100'
                       }`}
                       style={{
-                        backgroundColor: tag.color ? `${tag.color}${isSelected ? '30' : '15'}` : '#e5e7eb',
+                        backgroundColor: tag.color
+                          ? `${tag.color}${isSelected ? '30' : '15'}`
+                          : '#e5e7eb',
                         color: tag.color || '#374151',
                         ['--tw-ring-color' as string]: tag.color || '#3b82f6',
                       }}
@@ -246,7 +268,9 @@ export function TagFilter({
           {/* Category Tags Section */}
           {categoryTags.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2">Categories</h4>
+              <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2">
+                Categories
+              </h4>
               <div className="flex flex-wrap gap-2">
                 {categoryTags.map((tag) => {
                   const isSelected = selectedTags.includes(tag.name);
@@ -275,7 +299,9 @@ export function TagFilter({
           {regularTags.length > 0 && (
             <div>
               {categoryTags.length > 0 && (
-                <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2">Tags</h4>
+                <h4 className="text-xs font-medium text-gray-500 dark:text-onedark-fg-muted mb-2">
+                  Tags
+                </h4>
               )}
               <div className="flex flex-wrap gap-2">
                 {popularRegularTags.map((tag) => {
@@ -322,12 +348,7 @@ export function TagFilter({
               const tag = tags.find((t) => t.name === tagName);
               if (!tag) return null;
               return (
-                <TagPill
-                  key={tag.id}
-                  tag={tag}
-                  size="sm"
-                  onRemove={() => toggleTag(tagName)}
-                />
+                <TagPill key={tag.id} tag={tag} size="sm" onRemove={() => toggleTag(tagName)} />
               );
             })}
           </div>

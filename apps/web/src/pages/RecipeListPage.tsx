@@ -29,13 +29,19 @@ export function RecipeListPage() {
 
   // Convert tag names to IDs for the query
   const selectedTagIds = useMemo(() => {
-    return allTags
-      .filter((tag) => selectedTagNames.includes(tag.name))
-      .map((tag) => tag.id);
+    return allTags.filter((tag) => selectedTagNames.includes(tag.name)).map((tag) => tag.id);
   }, [allTags, selectedTagNames]);
 
-  const { data, isLoading, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteRecipes({ tags: selectedTagIds, smartTags: selectedSmartTags, tagMode });
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteRecipes({ tags: selectedTagIds, smartTags: selectedSmartTags, tagMode });
 
   // Update URL when tags change
   const handleTagsChange = (tags: string[]) => {
@@ -221,15 +227,29 @@ export function RecipeListPage() {
       {/* Empty State */}
       {!isLoading && !isError && recipes.length === 0 && (
         <EmptyState
-          icon={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? EmptyStateIcons.filter : EmptyStateIcons.recipes}
-          title={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? 'No matching recipes' : 'No recipes yet'}
+          icon={
+            selectedTagNames.length > 0 || selectedSmartTags.length > 0
+              ? EmptyStateIcons.filter
+              : EmptyStateIcons.recipes
+          }
+          title={
+            selectedTagNames.length > 0 || selectedSmartTags.length > 0
+              ? 'No matching recipes'
+              : 'No recipes yet'
+          }
           description={
             selectedTagNames.length > 0 || selectedSmartTags.length > 0
               ? 'Try adjusting your tag filters or search criteria'
               : 'Get started by adding your first recipe'
           }
-          actionLabel={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? undefined : 'Add Your First Recipe'}
-          actionLink={selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? undefined : '/recipes/new'}
+          actionLabel={
+            selectedTagNames.length > 0 || selectedSmartTags.length > 0
+              ? undefined
+              : 'Add Your First Recipe'
+          }
+          actionLink={
+            selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? undefined : '/recipes/new'
+          }
           secondaryAction={
             selectedTagNames.length > 0 || selectedSmartTags.length > 0 ? (
               <button

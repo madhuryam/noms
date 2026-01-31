@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { usePairings, useAddPairing, useRemovePairing, PAIRING_TYPES, useSearchSuggestions } from '../../hooks';
+import {
+  usePairings,
+  useAddPairing,
+  useRemovePairing,
+  PAIRING_TYPES,
+  useSearchSuggestions,
+} from '../../hooks';
 import type { Pairing, SearchSuggestion } from '../../hooks';
 import { RecipeImage } from '../common/RecipeImage';
 
@@ -14,18 +20,31 @@ function getPairingTypeLabel(type: string): string {
 
 function getPairingTypeColor(type: string): string {
   const colors: Record<string, string> = {
-    'side-dish': 'bg-green-50 dark:bg-onedark-green/10 text-green-700 dark:text-onedark-green border-green-200 dark:border-onedark-green/30',
-    'main-course': 'bg-blue-50 dark:bg-onedark-blue/10 text-blue-700 dark:text-onedark-blue border-blue-200 dark:border-onedark-blue/30',
-    'dessert': 'bg-pink-50 dark:bg-onedark-magenta/10 text-pink-700 dark:text-onedark-magenta border-pink-200 dark:border-onedark-magenta/30',
-    'drink': 'bg-purple-50 dark:bg-onedark-purple/10 text-purple-700 dark:text-onedark-purple border-purple-200 dark:border-onedark-purple/30',
-    'sauce': 'bg-orange-50 dark:bg-onedark-orange/10 text-orange-700 dark:text-onedark-orange border-orange-200 dark:border-onedark-orange/30',
-    'appetizer': 'bg-yellow-50 dark:bg-onedark-yellow/10 text-yellow-700 dark:text-onedark-yellow border-yellow-200 dark:border-onedark-yellow/30',
-    'salad': 'bg-emerald-50 dark:bg-onedark-cyan/10 text-emerald-700 dark:text-onedark-cyan border-emerald-200 dark:border-onedark-cyan/30',
-    'bread': 'bg-amber-50 dark:bg-onedark-orange/10 text-amber-700 dark:text-onedark-orange border-amber-200 dark:border-onedark-orange/30',
-    'garnish': 'bg-lime-50 dark:bg-onedark-green/10 text-lime-700 dark:text-onedark-green border-lime-200 dark:border-onedark-green/30',
-    'variation': 'bg-indigo-50 dark:bg-onedark-blue/10 text-indigo-700 dark:text-onedark-blue border-indigo-200 dark:border-onedark-blue/30',
+    'side-dish':
+      'bg-green-50 dark:bg-onedark-green/10 text-green-700 dark:text-onedark-green border-green-200 dark:border-onedark-green/30',
+    'main-course':
+      'bg-blue-50 dark:bg-onedark-blue/10 text-blue-700 dark:text-onedark-blue border-blue-200 dark:border-onedark-blue/30',
+    dessert:
+      'bg-pink-50 dark:bg-onedark-magenta/10 text-pink-700 dark:text-onedark-magenta border-pink-200 dark:border-onedark-magenta/30',
+    drink:
+      'bg-purple-50 dark:bg-onedark-purple/10 text-purple-700 dark:text-onedark-purple border-purple-200 dark:border-onedark-purple/30',
+    sauce:
+      'bg-orange-50 dark:bg-onedark-orange/10 text-orange-700 dark:text-onedark-orange border-orange-200 dark:border-onedark-orange/30',
+    appetizer:
+      'bg-yellow-50 dark:bg-onedark-yellow/10 text-yellow-700 dark:text-onedark-yellow border-yellow-200 dark:border-onedark-yellow/30',
+    salad:
+      'bg-emerald-50 dark:bg-onedark-cyan/10 text-emerald-700 dark:text-onedark-cyan border-emerald-200 dark:border-onedark-cyan/30',
+    bread:
+      'bg-amber-50 dark:bg-onedark-orange/10 text-amber-700 dark:text-onedark-orange border-amber-200 dark:border-onedark-orange/30',
+    garnish:
+      'bg-lime-50 dark:bg-onedark-green/10 text-lime-700 dark:text-onedark-green border-lime-200 dark:border-onedark-green/30',
+    variation:
+      'bg-indigo-50 dark:bg-onedark-blue/10 text-indigo-700 dark:text-onedark-blue border-indigo-200 dark:border-onedark-blue/30',
   };
-  return colors[type] || 'bg-gray-50 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg-muted border-gray-200 dark:border-onedark-bg-highlight';
+  return (
+    colors[type] ||
+    'bg-gray-50 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg-muted border-gray-200 dark:border-onedark-bg-highlight'
+  );
 }
 
 function ExistingPairingCard({
@@ -73,7 +92,12 @@ function ExistingPairingCard({
         title="Remove pairing"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </div>
@@ -100,8 +124,9 @@ export function PairingSelector({ recipeId }: PairingSelectorProps) {
 
   // Filter out already paired recipes
   const pairedRecipeIds = new Set(pairings.map((p) => p.paired_recipe_id).filter(Boolean));
-  const filteredSuggestions: SearchSuggestion[] =
-    suggestions.filter((s) => s.id !== recipeId && !pairedRecipeIds.has(s.id));
+  const filteredSuggestions: SearchSuggestion[] = suggestions.filter(
+    (s) => s.id !== recipeId && !pairedRecipeIds.has(s.id)
+  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -267,8 +292,19 @@ export function PairingSelector({ recipeId }: PairingSelectorProps) {
           >
             {addPairing.isPending ? (
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
             ) : (
               'Add'

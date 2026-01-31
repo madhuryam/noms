@@ -72,7 +72,13 @@ interface UseInfiniteRecipesOptions {
 }
 
 export function useInfiniteRecipes(options: UseInfiniteRecipesOptions = {}) {
-  const { tags = [], smartTags = [], tagMode = 'all', sortBy = 'last_accessed_at', sortOrder = 'desc' } = options;
+  const {
+    tags = [],
+    smartTags = [],
+    tagMode = 'all',
+    sortBy = 'last_accessed_at',
+    sortOrder = 'desc',
+  } = options;
 
   return useInfiniteQuery({
     queryKey: ['recipes', { tags, smartTags, tagMode, sortBy, sortOrder }],

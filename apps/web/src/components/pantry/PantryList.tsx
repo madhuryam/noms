@@ -24,15 +24,14 @@ export function PantryList({
   const { data: items = [], isLoading } = usePantryItems(location);
 
   // Filter by staple status if specified
-  const filteredItems = filterStaples === undefined
-    ? items
-    : items.filter((item) => (filterStaples ? item.is_staple === 1 : item.is_staple === 0));
+  const filteredItems =
+    filterStaples === undefined
+      ? items
+      : items.filter((item) => (filterStaples ? item.is_staple === 1 : item.is_staple === 0));
 
   if (isLoading) {
     return (
-      <div className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">
-        Loading...
-      </div>
+      <div className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">Loading...</div>
     );
   }
 
@@ -48,9 +47,7 @@ export function PantryList({
       )}
 
       {filteredItems.length === 0 ? (
-        <p className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">
-          {emptyMessage}
-        </p>
+        <p className="p-4 text-center text-gray-500 dark:text-onedark-fg-muted">{emptyMessage}</p>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-onedark-bg-highlight">
           {filteredItems.map((item) => (

@@ -335,13 +335,7 @@ export const fridgeItems: LocationItems = {
     },
     {
       name: 'Eggs',
-      items: [
-        'Eggs',
-        'Duck Eggs',
-        'Quail Eggs',
-        'Egg Whites',
-        'Liquid Eggs',
-      ],
+      items: ['Eggs', 'Duck Eggs', 'Quail Eggs', 'Egg Whites', 'Liquid Eggs'],
     },
     {
       name: 'Tofu & Soy',
@@ -809,7 +803,7 @@ export const spicesItems: LocationItems = {
         'Seven Spice (Japanese)',
         'Shichimi Togarashi',
         'Furikake',
-        'Za\'atar',
+        "Za'atar",
         'Ras el Hanout',
         'Berbere',
         'Baharat',
@@ -944,7 +938,7 @@ export const saucesItems: LocationItems = {
       items: [
         'Sriracha',
         'Tabasco',
-        'Frank\'s Red Hot',
+        "Frank's Red Hot",
         'Cholula',
         'Valentina',
         'Sambal',
@@ -998,13 +992,7 @@ export const saucesItems: LocationItems = {
     },
     {
       name: 'Vinegar-Based',
-      items: [
-        'Balsamic Glaze',
-        'Vinaigrette',
-        'Ponzu',
-        'Rice Vinegar (Seasoned)',
-        'Sushi Vinegar',
-      ],
+      items: ['Balsamic Glaze', 'Vinaigrette', 'Ponzu', 'Rice Vinegar (Seasoned)', 'Sushi Vinegar'],
     },
     {
       name: 'Nut & Seed Based',

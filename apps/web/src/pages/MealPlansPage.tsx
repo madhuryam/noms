@@ -21,7 +21,13 @@ import {
   exportAsMarkdown,
   type PlannedMeal,
 } from '../hooks';
-import { WeekCalendar, AddMealModal, MealPlanControls, PrepView, type MealSelection } from '../components/meal-plans';
+import {
+  WeekCalendar,
+  AddMealModal,
+  MealPlanControls,
+  PrepView,
+  type MealSelection,
+} from '../components/meal-plans';
 import { ShoppingList } from '../components/shopping-list';
 
 // Get the start of the week (Monday) for a given date
@@ -69,7 +75,10 @@ export function MealPlansPage() {
   const { data: slots = [] } = useMealSlots();
 
   // Find a plan that covers the current week
-  const { plan: weekPlan, isLoading: isPlansLoading } = useMealPlanForWeek(startDateKey, endDateKey);
+  const { plan: weekPlan, isLoading: isPlansLoading } = useMealPlanForWeek(
+    startDateKey,
+    endDateKey
+  );
 
   // Track active plan ID (either from found plan or newly created)
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
@@ -98,15 +107,25 @@ export function MealPlansPage() {
     startDateKey,
     endDateKey
   );
-  const { checkedItems, toggleItem, clearAll: clearAllChecked, checkAll, checkedCount } =
-    useCheckedItems(activePlanId ?? undefined);
+  const {
+    checkedItems,
+    toggleItem,
+    clearAll: clearAllChecked,
+    checkAll,
+    checkedCount,
+  } = useCheckedItems(activePlanId ?? undefined);
   const { overrides, setOverride, clearOverride } = useQuantityOverrides(activePlanId ?? undefined);
   const { deletedItems, deleteItem, restoreItem } = useDeletedItems(activePlanId ?? undefined);
-  const { categories: customCategories, addCategory, updateCategory, deleteCategory } =
-    useCustomCategories(activePlanId ?? undefined);
+  const {
+    categories: customCategories,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+  } = useCustomCategories(activePlanId ?? undefined);
   const { itemCategories, assignItem, assignItems } = useItemCategories(activePlanId ?? undefined);
   const { itemOrder, reorderItems } = useItemOrder(activePlanId ?? undefined);
-  const { togglePantryStatus, getEffectivePantryStatus, cleanupOrphanedOverrides } = usePantryOverrides(activePlanId ?? undefined);
+  const { togglePantryStatus, getEffectivePantryStatus, cleanupOrphanedOverrides } =
+    usePantryOverrides(activePlanId ?? undefined);
 
   // Clean up orphaned pantry overrides when shopping list changes
   // This ensures items reset to "buy" when recipes are removed and re-added
@@ -341,9 +360,7 @@ export function MealPlansPage() {
                     {weekMeals.length} meal{weekMeals.length !== 1 ? 's' : ''} planned
                   </span>
                   <span className="text-gray-300 dark:text-onedark-bg-highlight">|</span>
-                  <span>
-                    {weekMeals.filter((m) => m.is_completed).length} completed
-                  </span>
+                  <span>{weekMeals.filter((m) => m.is_completed).length} completed</span>
                 </div>
               )}
             </>
@@ -406,7 +423,10 @@ export function MealPlansPage() {
                   </button>
                   {showExportMenu && (
                     <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowExportMenu(false)}
+                      />
                       <div className="absolute left-0 mt-1 w-40 bg-white dark:bg-onedark-bg-lighter rounded-lg shadow-lg border border-gray-200 dark:border-onedark-bg-highlight py-1 z-20">
                         <button
                           onClick={() => handleExport('text')}
@@ -445,7 +465,9 @@ export function MealPlansPage() {
           {isShoppingLoading ? (
             <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
-              <p className="text-gray-500 dark:text-onedark-fg-muted mt-4">Loading shopping list...</p>
+              <p className="text-gray-500 dark:text-onedark-fg-muted mt-4">
+                Loading shopping list...
+              </p>
             </div>
           ) : !activePlanId ? (
             <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">

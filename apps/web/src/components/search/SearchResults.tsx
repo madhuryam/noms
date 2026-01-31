@@ -13,9 +13,7 @@ interface SearchResultsProps {
 function sanitizeHighlight(html: string | null): string {
   if (!html) return '';
   // Only allow <mark> and </mark> tags, escape everything else
-  return html
-    .replace(/<(?!\/?mark>)/g, '&lt;')
-    .replace(/(?<!<\/?)mark>/g, '&gt;');
+  return html.replace(/<(?!\/?mark>)/g, '&lt;').replace(/(?<!<\/?)mark>/g, '&gt;');
 }
 
 /**
@@ -73,8 +71,7 @@ export function SearchResults({ results, query }: SearchResultsProps) {
     <div className="space-y-4">
       {results.map((result) => {
         const matchField = getMatchField(result);
-        const totalTime =
-          (result.prep_time_minutes || 0) + (result.cook_time_minutes || 0) || null;
+        const totalTime = (result.prep_time_minutes || 0) + (result.cook_time_minutes || 0) || null;
 
         return (
           <Link
@@ -124,7 +121,12 @@ export function SearchResults({ results, query }: SearchResultsProps) {
                 <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-onedark-fg-muted mb-2">
                   {totalTime && (
                     <span className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -137,7 +139,12 @@ export function SearchResults({ results, query }: SearchResultsProps) {
                   )}
                   {result.servings && (
                     <span className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"

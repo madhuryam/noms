@@ -26,7 +26,13 @@ interface Recipe {
   fat_total: number | null;
   calories_total: number | null;
   macros_manual: boolean | number;
-  tags?: { id: number; name: string; display_name: string; color: string; is_category?: boolean | number }[];
+  tags?: {
+    id: number;
+    name: string;
+    display_name: string;
+    color: string;
+    is_category?: boolean | number;
+  }[];
   images?: { id: number; path: string; alt: string | null; sort_order: number }[];
 }
 
@@ -139,11 +145,12 @@ export function useRecipeIngredients(id: number | undefined) {
   return useQuery({
     queryKey: ['recipe-ingredients', id],
     queryFn: async (): Promise<ParsedIngredient[]> => {
-      const response = await api.get<{ ingredients: ParsedIngredient[] }>(`/api/recipes/${id}/ingredients`);
+      const response = await api.get<{ ingredients: ParsedIngredient[] }>(
+        `/api/recipes/${id}/ingredients`
+      );
       return response.ingredients;
     },
     enabled: !!id,
     staleTime: 30000, // Cache for 30 seconds
   });
 }
-

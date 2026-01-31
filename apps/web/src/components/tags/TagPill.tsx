@@ -49,7 +49,7 @@ function getContrastColor(hexColor: string): string {
 export function TagPill({ tag, onClick, onRemove, size = 'sm', className = '' }: TagPillProps) {
   const isCategory = Boolean(tag.is_category);
   // Category tags use gray styling, regular tags use colors
-  const bgColor = isCategory ? '#E5E7EB' : (tag.color || getDefaultColor(tag.name));
+  const bgColor = isCategory ? '#E5E7EB' : tag.color || getDefaultColor(tag.name);
   const textColor = isCategory ? '#374151' : getContrastColor(bgColor);
   const borderStyle = isCategory ? '2px solid #9CA3AF' : 'none';
 
@@ -76,7 +76,12 @@ export function TagPill({ tag, onClick, onRemove, size = 'sm', className = '' }:
           aria-label={`Remove ${tag.display_name || tag.name} tag`}
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       )}

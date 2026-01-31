@@ -27,18 +27,14 @@ export function WhatCanIMakePage() {
 
   // Group recipes by match quality
   const perfectMatches = recipes.filter((r) => r.match_percent === 100);
-  const almostMatches = recipes.filter(
-    (r) => r.match_percent >= 70 && r.match_percent < 100
-  );
+  const almostMatches = recipes.filter((r) => r.match_percent >= 70 && r.match_percent < 100);
   const partialMatches = recipes.filter((r) => r.match_percent < 70);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-onedark-fg">
-          What Can I Make?
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-onedark-fg">What Can I Make?</h1>
         <p className="text-gray-500 dark:text-onedark-fg-muted">
           Find recipes based on what's in your inventory
         </p>
@@ -115,7 +111,9 @@ export function WhatCanIMakePage() {
               {tags && tags.length > 0 && (
                 <optgroup label="Tags">
                   {[...tags]
-                    .sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name))
+                    .sort((a, b) =>
+                      (a.display_name || a.name).localeCompare(b.display_name || b.name)
+                    )
                     .map((tag) => (
                       <option key={`tag-${tag.id}`} value={`tag:${tag.id}`}>
                         {tag.display_name || tag.name}
@@ -126,7 +124,9 @@ export function WhatCanIMakePage() {
               {smartTags && smartTags.length > 0 && (
                 <optgroup label="Smart Tags">
                   {[...smartTags]
-                    .sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name))
+                    .sort((a, b) =>
+                      (a.display_name || a.name).localeCompare(b.display_name || b.name)
+                    )
                     .map((tag) => (
                       <option key={`smart-${tag.id}`} value={`smart:${tag.id}`}>
                         {tag.display_name || tag.name}
@@ -142,10 +142,7 @@ export function WhatCanIMakePage() {
         <div className="mt-4 pt-4 border-t border-gray-100 dark:border-onedark-bg-highlight">
           <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
             Searching against {pantryCount} items in your inventory.{' '}
-            <Link
-              to="/inventory"
-              className="text-blue-600 dark:text-onedark-blue hover:underline"
-            >
+            <Link to="/inventory" className="text-blue-600 dark:text-onedark-blue hover:underline">
               Manage inventory
             </Link>
           </p>
@@ -190,10 +187,7 @@ export function WhatCanIMakePage() {
           </h3>
           <p className="text-gray-500 dark:text-onedark-fg-muted max-w-md mx-auto">
             Try increasing the max missing ingredients, or{' '}
-            <Link
-              to="/inventory"
-              className="text-blue-600 dark:text-onedark-blue hover:underline"
-            >
+            <Link to="/inventory" className="text-blue-600 dark:text-onedark-blue hover:underline">
               add more items to your inventory
             </Link>
             .

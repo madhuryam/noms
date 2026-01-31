@@ -31,7 +31,11 @@ export function ConnectionStatus() {
     queryFn: checkStorage,
   });
 
-  const getStatus = (query: { isLoading: boolean; isError: boolean; data?: { status?: string } }) => {
+  const getStatus = (query: {
+    isLoading: boolean;
+    isError: boolean;
+    data?: { status?: string };
+  }) => {
     if (query.isLoading) return 'loading' as const;
     if (query.isError || query.data?.status === 'error') return 'error' as const;
     return 'ok' as const;

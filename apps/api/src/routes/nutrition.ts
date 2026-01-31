@@ -183,9 +183,7 @@ nutrition.put('/:id', async (c) => {
     updates.push("updated_at = datetime('now')");
     values.push(id);
 
-    await c.env.DB.prepare(
-      `UPDATE ingredient_nutrition SET ${updates.join(', ')} WHERE id = ?`
-    )
+    await c.env.DB.prepare(`UPDATE ingredient_nutrition SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...values)
       .run();
 

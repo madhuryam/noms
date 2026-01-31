@@ -15,8 +15,7 @@ interface SuggestionCardProps {
 }
 
 export function SuggestionCard({ recipe }: SuggestionCardProps) {
-  const totalTime =
-    (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
+  const totalTime = (recipe.prep_time_minutes ?? 0) + (recipe.cook_time_minutes ?? 0);
 
   return (
     <Link

@@ -35,15 +35,21 @@ export function RefillSection({ items, onMarkBought }: RefillSectionProps) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-blue-200 dark:border-blue-800/50">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <svg
+            className="w-5 h-5 text-blue-600 dark:text-blue-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
           </svg>
-          <h3 className="font-semibold text-blue-900 dark:text-blue-100">
-            Refill Items
-          </h3>
-          <span className="text-sm text-blue-600 dark:text-blue-400">
-            ({items.length})
-          </span>
+          <h3 className="font-semibold text-blue-900 dark:text-blue-100">Refill Items</h3>
+          <span className="text-sm text-blue-600 dark:text-blue-400">({items.length})</span>
         </div>
         <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
           Items from your inventory that need restocking
@@ -70,14 +76,21 @@ export function RefillSection({ items, onMarkBought }: RefillSectionProps) {
               >
                 {isChecked && (
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 )}
               </button>
 
               {/* Item info */}
               <div className="flex-1 min-w-0">
-                <span className={`font-medium text-blue-900 dark:text-blue-100 ${isChecked ? 'line-through' : ''}`}>
+                <span
+                  className={`font-medium text-blue-900 dark:text-blue-100 ${isChecked ? 'line-through' : ''}`}
+                >
                   {item.name}
                 </span>
                 {(item.quantity || item.unit) && (

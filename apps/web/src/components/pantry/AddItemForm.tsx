@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useIngredientSuggestions, useAddPantryItem, useShelfLifeLookup, useCustomItems, useAddCustomItem } from '../../hooks';
+import {
+  useIngredientSuggestions,
+  useAddPantryItem,
+  useShelfLifeLookup,
+  useCustomItems,
+  useAddCustomItem,
+} from '../../hooks';
 import type { PantryLocation } from '../../hooks';
 import { getItemsForLocation } from '../../data/inventoryItems';
 
@@ -61,9 +67,7 @@ export function AddItemForm({ location, onSuccess }: AddItemFormProps) {
   const predefinedSuggestions = useMemo(() => {
     if (!name.trim() || name.trim().length < 2) return [];
     const query = name.toLowerCase();
-    return allPredefinedItems
-      .filter((item) => item.toLowerCase().includes(query))
-      .slice(0, 10);
+    return allPredefinedItems.filter((item) => item.toLowerCase().includes(query)).slice(0, 10);
   }, [name, allPredefinedItems]);
 
   // Merge API suggestions with predefined suggestions

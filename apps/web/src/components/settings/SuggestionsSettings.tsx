@@ -86,17 +86,13 @@ export function SuggestionsSettings() {
         {/* Category Tags */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-onedark-fg">
-              Categories
-            </h3>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-onedark-fg">Categories</h3>
             {categoryTags.some((tag) => config.tagIds.includes(tag.id)) && (
               <button
                 onClick={() => {
                   setConfig((prev) => ({
                     ...prev,
-                    tagIds: prev.tagIds.filter(
-                      (id) => !categoryTags.some((cat) => cat.id === id)
-                    ),
+                    tagIds: prev.tagIds.filter((id) => !categoryTags.some((cat) => cat.id === id)),
                   }));
                   setHasChanges(true);
                 }}
@@ -137,17 +133,13 @@ export function SuggestionsSettings() {
         {/* Regular Tags */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-onedark-fg">
-              Tags
-            </h3>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-onedark-fg">Tags</h3>
             {regularTags.some((tag) => config.tagIds.includes(tag.id)) && (
               <button
                 onClick={() => {
                   setConfig((prev) => ({
                     ...prev,
-                    tagIds: prev.tagIds.filter(
-                      (id) => !regularTags.some((t) => t.id === id)
-                    ),
+                    tagIds: prev.tagIds.filter((id) => !regularTags.some((t) => t.id === id)),
                   }));
                   setHasChanges(true);
                 }}

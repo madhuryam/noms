@@ -101,8 +101,18 @@ export function MealSlotCell({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-onedark-fg-muted">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
                     </div>
                   )}
@@ -142,43 +152,51 @@ export function MealSlotCell({
                     {content}
                   </Link>
                 ) : (
-                  <div className="p-2">
-                    {content}
-                  </div>
+                  <div className="p-2">{content}</div>
                 )}
 
-              {/* Action buttons (show on hover) */}
-              <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onToggleComplete(meal);
-                  }}
-                  className={`p-1 rounded ${
-                    meal.is_completed
-                      ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-gray-100 text-gray-500 dark:bg-onedark-bg-highlight dark:text-onedark-fg-muted'
-                  } hover:scale-110 transition-transform`}
-                  title={meal.is_completed ? 'Mark as not done' : 'Mark as done'}
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onRemoveMeal(meal);
-                  }}
-                  className="p-1 rounded bg-gray-100 text-gray-500 dark:bg-onedark-bg-highlight dark:text-onedark-fg-muted hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
-                  title="Remove meal"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                {/* Action buttons (show on hover) */}
+                <div className="absolute top-1 right-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onToggleComplete(meal);
+                    }}
+                    className={`p-1 rounded ${
+                      meal.is_completed
+                        ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-gray-100 text-gray-500 dark:bg-onedark-bg-highlight dark:text-onedark-fg-muted'
+                    } hover:scale-110 transition-transform`}
+                    title={meal.is_completed ? 'Mark as not done' : 'Mark as done'}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onRemoveMeal(meal);
+                    }}
+                    className="p-1 rounded bg-gray-100 text-gray-500 dark:bg-onedark-bg-highlight dark:text-onedark-fg-muted hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
+                    title="Remove meal"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            </div>
             );
           })}
 
@@ -188,7 +206,12 @@ export function MealSlotCell({
             className="w-full py-1 text-xs text-gray-400 dark:text-onedark-fg-muted hover:text-blue-500 dark:hover:text-onedark-blue hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight rounded transition-colors flex items-center justify-center gap-1"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Add
           </button>

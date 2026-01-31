@@ -40,7 +40,10 @@ function isInIgnoredFolder(filePath: string): boolean {
  * Example: "Noms/Breakfast/Indian/recipe.md" -> category: "Breakfast", tags: ["Indian"]
  * Example: "export/Recipes/Breakfast/Indian/recipe.md" -> category: "Breakfast", tags: ["Indian"]
  */
-function extractCategoryAndTags(filePath: string): { categoryTag: string | null; folderTags: string[] } {
+function extractCategoryAndTags(filePath: string): {
+  categoryTag: string | null;
+  folderTags: string[];
+} {
   const parts = filePath.split('/');
   if (parts.length <= 1) return { categoryTag: null, folderTags: [] };
 

@@ -5,7 +5,8 @@ import type { ParsedVaultRecipe, ImportResult } from '../components/import/types
 
 const BATCH_SIZE = 1; // Send one recipe at a time to avoid Worker CPU limits
 const IMAGE_UPLOAD_CONCURRENCY = 3;
-const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
+const API_URL =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8787' : '');
 
 /**
  * Resolve a relative path from a base directory
@@ -98,51 +99,48 @@ export function useVaultImport() {
   const [results, setResults] = useState<ImportResult[]>([]);
   const [isComplete, setIsComplete] = useState(false);
 
-  const uploadImages = useCallback(
-    async (tasks: ImageUploadTask[]) => {
-      if (tasks.length === 0) return;
+  const uploadImages = useCallback(async (tasks: ImageUploadTask[]) => {
+    if (tasks.length === 0) return;
 
-      setImageProgress({ total: tasks.length, processed: 0 });
+    setImageProgress({ total: tasks.length, processed: 0 });
 
-      // Process images with limited concurrency
-      const uploadImage = async (task: ImageUploadTask): Promise<void> => {
-        try {
-          const formData = new FormData();
-          formData.append('recipe_id', task.recipeId.toString());
-          formData.append('file', task.file);
-          formData.append('original_path', task.imagePath);
+    // Process images with limited concurrency
+    const uploadImage = async (task: ImageUploadTask): Promise<void> => {
+      try {
+        const formData = new FormData();
+        formData.append('recipe_id', task.recipeId.toString());
+        formData.append('file', task.file);
+        formData.append('original_path', task.imagePath);
 
-          console.log(`[Image Upload] Uploading ${task.imagePath} for recipe ${task.recipeId}...`);
+        console.log(`[Image Upload] Uploading ${task.imagePath} for recipe ${task.recipeId}...`);
 
-          const response = await fetch(`${API_URL}/api/import/images`, {
-            method: 'POST',
-            body: formData,
-          });
+        const response = await fetch(`${API_URL}/api/import/images`, {
+          method: 'POST',
+          body: formData,
+        });
 
-          const result = await response.json();
-          if (result.success) {
-            console.log(`[Image Upload] SUCCESS: ${task.imagePath} -> ${result.path}`);
-          } else {
-            console.error(`[Image Upload] FAILED: ${task.imagePath}`, result.error);
-          }
-        } catch (error) {
-          console.error(`[Image Upload] ERROR uploading ${task.imagePath}:`, error);
-        } finally {
-          setImageProgress((prev) => ({
-            ...prev,
-            processed: prev.processed + 1,
-          }));
+        const result = await response.json();
+        if (result.success) {
+          console.log(`[Image Upload] SUCCESS: ${task.imagePath} -> ${result.path}`);
+        } else {
+          console.error(`[Image Upload] FAILED: ${task.imagePath}`, result.error);
         }
-      };
-
-      // Process in batches with concurrency limit
-      for (let i = 0; i < tasks.length; i += IMAGE_UPLOAD_CONCURRENCY) {
-        const batch = tasks.slice(i, i + IMAGE_UPLOAD_CONCURRENCY);
-        await Promise.all(batch.map(uploadImage));
+      } catch (error) {
+        console.error(`[Image Upload] ERROR uploading ${task.imagePath}:`, error);
+      } finally {
+        setImageProgress((prev) => ({
+          ...prev,
+          processed: prev.processed + 1,
+        }));
       }
-    },
-    []
-  );
+    };
+
+    // Process in batches with concurrency limit
+    for (let i = 0; i < tasks.length; i += IMAGE_UPLOAD_CONCURRENCY) {
+      const batch = tasks.slice(i, i + IMAGE_UPLOAD_CONCURRENCY);
+      await Promise.all(batch.map(uploadImage));
+    }
+  }, []);
 
   const startImport = useCallback(
     async (recipes: ParsedVaultRecipe[], images?: Map<string, File>) => {
@@ -215,14 +213,20 @@ export function useVaultImport() {
                 // Get the directory of the recipe file for resolving relative paths
                 const recipeDir = originalRecipe.filePath.split('/').slice(0, -1).join('/');
 
-                console.log(`[Image Debug] Recipe "${result.title}" has images:`, result.imagePaths);
+                console.log(
+                  `[Image Debug] Recipe "${result.title}" has images:`,
+                  result.imagePaths
+                );
                 console.log(`[Image Debug] Recipe dir: ${recipeDir}`);
 
                 for (const imagePath of result.imagePaths) {
                   const imageFilename = imagePath.split('/').pop()?.toLowerCase() || '';
                   const candidates = filenameIndex.get(imageFilename) || [];
 
-                  console.log(`[Image Debug] Looking for "${imagePath}" -> filename "${imageFilename}", candidates:`, candidates);
+                  console.log(
+                    `[Image Debug] Looking for "${imagePath}" -> filename "${imageFilename}", candidates:`,
+                    candidates
+                  );
 
                   let matchingKey: string | undefined;
 

@@ -28,9 +28,7 @@ export function ShelfLifeSettings() {
   const [editFreezerDays, setEditFreezerDays] = useState('');
 
   const filteredEntries = searchQuery
-    ? entries.filter((e) =>
-        e.ingredient_name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? entries.filter((e) => e.ingredient_name.toLowerCase().includes(searchQuery.toLowerCase()))
     : entries;
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -192,7 +190,10 @@ export function ShelfLifeSettings() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-onedark-bg-highlight">
               {filteredEntries.map((entry) => (
-                <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight group">
+                <tr
+                  key={entry.id}
+                  className="hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight group"
+                >
                   {deleteConfirmId === entry.id ? (
                     // Delete confirmation row
                     <td colSpan={4} className="px-3 py-2">
@@ -268,8 +269,18 @@ export function ShelfLifeSettings() {
                               className="p-1 text-green-600 hover:text-green-700"
                               title="Save"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                             </button>
                             <button
@@ -277,8 +288,18 @@ export function ShelfLifeSettings() {
                               className="p-1 text-gray-400 hover:text-gray-600"
                               title="Cancel"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
                               </svg>
                             </button>
                           </div>
@@ -289,8 +310,18 @@ export function ShelfLifeSettings() {
                               className="p-1 text-gray-400 hover:text-blue-600"
                               title="Edit"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
                               </svg>
                             </button>
                             <button
@@ -301,8 +332,18 @@ export function ShelfLifeSettings() {
                               className="p-1 text-gray-400 hover:text-red-600"
                               title="Delete"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
                               </svg>
                             </button>
                           </div>

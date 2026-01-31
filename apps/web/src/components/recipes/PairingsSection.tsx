@@ -16,16 +16,19 @@ function getPairingTypeColor(type: string): string {
   const colors: Record<string, string> = {
     'side-dish': 'bg-green-50 dark:bg-onedark-green/10 text-green-700 dark:text-onedark-green',
     'main-course': 'bg-blue-50 dark:bg-onedark-blue/10 text-blue-700 dark:text-onedark-blue',
-    'dessert': 'bg-pink-50 dark:bg-onedark-magenta/10 text-pink-700 dark:text-onedark-magenta',
-    'drink': 'bg-purple-50 dark:bg-onedark-purple/10 text-purple-700 dark:text-onedark-purple',
-    'sauce': 'bg-orange-50 dark:bg-onedark-orange/10 text-orange-700 dark:text-onedark-orange',
-    'appetizer': 'bg-yellow-50 dark:bg-onedark-yellow/10 text-yellow-700 dark:text-onedark-yellow',
-    'salad': 'bg-emerald-50 dark:bg-onedark-cyan/10 text-emerald-700 dark:text-onedark-cyan',
-    'bread': 'bg-amber-50 dark:bg-onedark-orange/10 text-amber-700 dark:text-onedark-orange',
-    'garnish': 'bg-lime-50 dark:bg-onedark-green/10 text-lime-700 dark:text-onedark-green',
-    'variation': 'bg-indigo-50 dark:bg-onedark-blue/10 text-indigo-700 dark:text-onedark-blue',
+    dessert: 'bg-pink-50 dark:bg-onedark-magenta/10 text-pink-700 dark:text-onedark-magenta',
+    drink: 'bg-purple-50 dark:bg-onedark-purple/10 text-purple-700 dark:text-onedark-purple',
+    sauce: 'bg-orange-50 dark:bg-onedark-orange/10 text-orange-700 dark:text-onedark-orange',
+    appetizer: 'bg-yellow-50 dark:bg-onedark-yellow/10 text-yellow-700 dark:text-onedark-yellow',
+    salad: 'bg-emerald-50 dark:bg-onedark-cyan/10 text-emerald-700 dark:text-onedark-cyan',
+    bread: 'bg-amber-50 dark:bg-onedark-orange/10 text-amber-700 dark:text-onedark-orange',
+    garnish: 'bg-lime-50 dark:bg-onedark-green/10 text-lime-700 dark:text-onedark-green',
+    variation: 'bg-indigo-50 dark:bg-onedark-blue/10 text-indigo-700 dark:text-onedark-blue',
   };
-  return colors[type] || 'bg-gray-50 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg-muted';
+  return (
+    colors[type] ||
+    'bg-gray-50 dark:bg-onedark-bg-highlight text-gray-700 dark:text-onedark-fg-muted'
+  );
 }
 
 function PairingCard({ pairing }: { pairing: Pairing }) {
@@ -73,9 +76,7 @@ function PairingCard({ pairing }: { pairing: Pairing }) {
   return (
     <div className="bg-white dark:bg-onedark-bg-lighter rounded-lg border border-gray-200 dark:border-onedark-bg-highlight p-3">
       <div className="flex items-center gap-2">
-        <span className="text-2xl">
-          {getTextPairingEmoji(pairing.pairing_text || '')}
-        </span>
+        <span className="text-2xl">{getTextPairingEmoji(pairing.pairing_text || '')}</span>
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-gray-900 dark:text-onedark-fg capitalize">
             {pairing.pairing_text}
@@ -86,9 +87,7 @@ function PairingCard({ pairing }: { pairing: Pairing }) {
         </div>
       </div>
       {pairing.notes && (
-        <p className="mt-2 text-xs text-gray-500 dark:text-onedark-fg-muted">
-          {pairing.notes}
-        </p>
+        <p className="mt-2 text-xs text-gray-500 dark:text-onedark-fg-muted">{pairing.notes}</p>
       )}
     </div>
   );
@@ -141,9 +140,7 @@ export function PairingsSection({ recipeId }: PairingsSectionProps) {
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
-          Goes well with
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">Goes well with</h2>
         <div className="animate-pulse space-y-3">
           <div className="h-20 bg-gray-100 dark:bg-onedark-bg-highlight rounded-lg" />
           <div className="h-20 bg-gray-100 dark:bg-onedark-bg-highlight rounded-lg" />
@@ -154,9 +151,7 @@ export function PairingsSection({ recipeId }: PairingsSectionProps) {
 
   return (
     <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
-        Goes well with
-      </h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">Goes well with</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {pairings!.map((pairing) => (
           <PairingCard key={pairing.id} pairing={pairing} />

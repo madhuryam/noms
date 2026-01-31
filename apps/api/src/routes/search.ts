@@ -1,11 +1,16 @@
 import { Hono } from 'hono';
+import type { UserContext } from '../middleware';
 
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
 };
 
-const search = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+  user: UserContext;
+};
+
+const search = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
  * Calculate Levenshtein distance between two strings
@@ -128,6 +133,7 @@ async function buildFtsQuery(query: string, db: D1Database): Promise<string | nu
 
 // GET /api/search?q=query - Full-text search using FTS5
 search.get('/', async (c) => {
+  const { userId } = c.get('user');
   const query = c.req.query('q');
   const limit = Math.min(Number(c.req.query('limit')) || 20, 100);
   const offset = Number(c.req.query('offset')) || 0;
@@ -171,12 +177,12 @@ search.get('/', async (c) => {
         snippet(recipes_fts, 3, '<mark>', '</mark>', '...', 32) as instructions_snippet
       FROM recipes_fts
       JOIN recipes r ON recipes_fts.rowid = r.id
-      WHERE recipes_fts MATCH ?
+      WHERE recipes_fts MATCH ? AND r.user_id = ?
       ORDER BY rank
       LIMIT ? OFFSET ?
     `
     )
-      .bind(ftsQuery, limit, offset)
+      .bind(ftsQuery, userId, limit, offset)
       .all();
 
     // Get total count
@@ -184,10 +190,11 @@ search.get('/', async (c) => {
       `
       SELECT COUNT(*) as total
       FROM recipes_fts
-      WHERE recipes_fts MATCH ?
+      JOIN recipes r ON recipes_fts.rowid = r.id
+      WHERE recipes_fts MATCH ? AND r.user_id = ?
     `
     )
-      .bind(ftsQuery)
+      .bind(ftsQuery, userId)
       .first<{ total: number }>();
 
     // Get expanded terms for display
@@ -216,6 +223,7 @@ search.get('/', async (c) => {
 
 // GET /api/search/suggestions?q=query - Autocomplete suggestions
 search.get('/suggestions', async (c) => {
+  const { userId } = c.get('user');
   const query = c.req.query('q');
 
   if (!query || query.trim().length < 2) {
@@ -239,12 +247,12 @@ search.get('/suggestions', async (c) => {
         bm25(recipes_fts, 10.0, 1.0, 1.0, 1.0, 1.0) as rank
       FROM recipes_fts
       JOIN recipes r ON recipes_fts.rowid = r.id
-      WHERE recipes_fts MATCH ?
+      WHERE recipes_fts MATCH ? AND r.user_id = ?
       ORDER BY rank
       LIMIT 5
     `
     )
-      .bind(ftsQuery)
+      .bind(ftsQuery, userId)
       .all();
 
     return c.json({
@@ -314,6 +322,7 @@ search.post('/rebuild', async (c) => {
 
 // GET /api/search/spell-check?q=query - Suggest similar terms for typos
 search.get('/spell-check', async (c) => {
+  const { userId } = c.get('user');
   const query = c.req.query('q');
 
   if (!query || query.trim().length < 2) {
@@ -336,10 +345,12 @@ search.get('/spell-check', async (c) => {
       // Table may not exist
     }
 
-    // 2. Words from recipe titles
+    // 2. Words from recipe titles (filtered by user)
     const titlesResult = await c.env.DB.prepare(
-      `SELECT DISTINCT title FROM recipes`
-    ).all();
+      `SELECT DISTINCT title FROM recipes WHERE user_id = ?`
+    )
+      .bind(userId)
+      .all();
     (titlesResult.results as { title: string }[]).forEach((r) => {
       // Split title into words and add each
       r.title.split(/\s+/).forEach((word) => {
@@ -350,10 +361,14 @@ search.get('/spell-check', async (c) => {
       });
     });
 
-    // 3. Ingredient names
+    // 3. Ingredient names (filtered by user's recipes)
     const ingredientsResult = await c.env.DB.prepare(
-      `SELECT DISTINCT name FROM ingredients WHERE name IS NOT NULL`
-    ).all();
+      `SELECT DISTINCT i.name FROM ingredients i
+       JOIN recipes r ON i.recipe_id = r.id
+       WHERE i.name IS NOT NULL AND r.user_id = ?`
+    )
+      .bind(userId)
+      .all();
     (ingredientsResult.results as { name: string }[]).forEach((r) => {
       r.name.split(/\s+/).forEach((word) => {
         const cleaned = word.toLowerCase().replace(/[^a-z]/g, '');
@@ -364,9 +379,7 @@ search.get('/spell-check', async (c) => {
     });
 
     // 4. Tag names
-    const tagsResult = await c.env.DB.prepare(
-      `SELECT DISTINCT name FROM tags`
-    ).all();
+    const tagsResult = await c.env.DB.prepare(`SELECT DISTINCT name FROM tags`).all();
     (tagsResult.results as { name: string }[]).forEach((r) => {
       allTerms.add(r.name.toLowerCase());
     });

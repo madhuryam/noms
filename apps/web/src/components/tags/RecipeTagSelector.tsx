@@ -157,15 +157,18 @@ export function RecipeTagSelector({ tag, onClose }: RecipeTagSelectorProps) {
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-onedark-bg-highlight">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">
-              Edit Tag
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg">Edit Tag</h2>
             <button
               onClick={onClose}
               className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -266,7 +269,10 @@ export function RecipeTagSelector({ tag, onClose }: RecipeTagSelectorProps) {
           {isLoading ? (
             <div className="space-y-2">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-14 bg-gray-100 dark:bg-onedark-bg-highlight rounded-lg animate-pulse" />
+                <div
+                  key={i}
+                  className="h-14 bg-gray-100 dark:bg-onedark-bg-highlight rounded-lg animate-pulse"
+                />
               ))}
             </div>
           ) : filteredRecipes.length === 0 ? (
@@ -298,8 +304,18 @@ export function RecipeTagSelector({ tag, onClose }: RecipeTagSelectorProps) {
                       }`}
                     >
                       {selected && (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                       )}
                     </div>
@@ -338,10 +354,14 @@ export function RecipeTagSelector({ tag, onClose }: RecipeTagSelectorProps) {
             <div className="text-sm text-gray-500 dark:text-onedark-fg-muted">
               {hasChanges ? (
                 <span>
-                  {addCount > 0 && <span className="text-green-600 dark:text-onedark-green">+{addCount}</span>}
+                  {addCount > 0 && (
+                    <span className="text-green-600 dark:text-onedark-green">+{addCount}</span>
+                  )}
                   {addCount > 0 && removeCount > 0 && ' / '}
-                  {removeCount > 0 && <span className="text-red-600 dark:text-onedark-red">-{removeCount}</span>}
-                  {' '}pending changes
+                  {removeCount > 0 && (
+                    <span className="text-red-600 dark:text-onedark-red">-{removeCount}</span>
+                  )}{' '}
+                  pending changes
                 </span>
               ) : (
                 <span>{recipesWithTag.size} recipes have this tag</span>

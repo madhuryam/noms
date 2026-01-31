@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { useBulkDeletePantryItems, useBulkUpdatePantryItems, usePantryCategories, useCreatePantryCategory } from '../../hooks';
+import {
+  useBulkDeletePantryItems,
+  useBulkUpdatePantryItems,
+  usePantryCategories,
+  useCreatePantryCategory,
+} from '../../hooks';
 import type { PantryLocation } from '../../hooks';
 
 interface BulkEditBarProps {
@@ -172,7 +177,17 @@ export function BulkEditBar({
                 <div className="w-px h-5 bg-gray-300 dark:bg-onedark-bg-highlight" />
                 <button
                   onClick={handleUpdate}
-                  disabled={bulkUpdate.isPending || createCategory.isPending || (quantity === '' && unit === '' && expirationDate === '' && location === '' && isStaple === null && needsRefill === null && categoryName === 'unchanged')}
+                  disabled={
+                    bulkUpdate.isPending ||
+                    createCategory.isPending ||
+                    (quantity === '' &&
+                      unit === '' &&
+                      expirationDate === '' &&
+                      location === '' &&
+                      isStaple === null &&
+                      needsRefill === null &&
+                      categoryName === 'unchanged')
+                  }
                   className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {bulkUpdate.isPending || createCategory.isPending ? 'Saving...' : 'Save'}
@@ -226,7 +241,9 @@ export function BulkEditBar({
               </select>
               <select
                 value={isStaple === null ? '' : isStaple ? 'true' : 'false'}
-                onChange={(e) => setIsStaple(e.target.value === '' ? null : e.target.value === 'true')}
+                onChange={(e) =>
+                  setIsStaple(e.target.value === '' ? null : e.target.value === 'true')
+                }
                 className="px-3 py-2 text-sm border border-gray-300 dark:border-onedark-bg-highlight rounded-lg bg-white dark:bg-onedark-bg text-gray-900 dark:text-onedark-fg"
               >
                 <option value="">Staple...</option>
@@ -235,7 +252,9 @@ export function BulkEditBar({
               </select>
               <select
                 value={needsRefill === null ? '' : needsRefill ? 'true' : 'false'}
-                onChange={(e) => setNeedsRefill(e.target.value === '' ? null : e.target.value === 'true')}
+                onChange={(e) =>
+                  setNeedsRefill(e.target.value === '' ? null : e.target.value === 'true')
+                }
                 className="px-3 py-2 text-sm border border-gray-300 dark:border-onedark-bg-highlight rounded-lg bg-white dark:bg-onedark-bg text-gray-900 dark:text-onedark-fg"
               >
                 <option value="">Refill...</option>
@@ -243,7 +262,9 @@ export function BulkEditBar({
                 <option value="false">No refill needed</option>
               </select>
               <select
-                value={categoryName === 'unchanged' ? '' : categoryName === null ? 'none' : categoryName}
+                value={
+                  categoryName === 'unchanged' ? '' : categoryName === null ? 'none' : categoryName
+                }
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === '') {

@@ -28,7 +28,11 @@ interface IngredientResult {
   parsed: ParsedInfo | null;
 }
 
-export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: IngredientParsingModalProps) {
+export function IngredientParsingModal({
+  recipeId,
+  recipeTitle,
+  onClose,
+}: IngredientParsingModalProps) {
   const [ingredients, setIngredients] = useState<IngredientResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,18 +80,15 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
         id: number;
         ingredientName: string;
         normalizationKey: string;
-      }>(
-        `/api/recipes/${recipeId}/ingredients/${ingredientId}`,
-        { ingredientName: editValue.trim() }
-      );
+      }>(`/api/recipes/${recipeId}/ingredients/${ingredientId}`, {
+        ingredientName: editValue.trim(),
+      });
 
       if (response.success) {
         // Update local state directly with the response
         setIngredients((prevIngredients) =>
           prevIngredients.map((ing) =>
-            ing.id === ingredientId
-              ? { ...ing, normalizationKey: response.normalizationKey }
-              : ing
+            ing.id === ingredientId ? { ...ing, normalizationKey: response.normalizationKey } : ing
           )
         );
       }
@@ -131,7 +132,12 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
               title="How parsing works"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </button>
           </div>
@@ -140,7 +146,12 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -165,27 +176,40 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
           {/* Help Panel */}
           {showHelp && (
             <div className="mb-4 bg-blue-50 dark:bg-onedark-blue/10 border border-blue-200 dark:border-onedark-blue/30 rounded-lg p-4">
-              <h3 className="font-medium text-blue-900 dark:text-onedark-blue mb-2">How Ingredient Parsing Works</h3>
+              <h3 className="font-medium text-blue-900 dark:text-onedark-blue mb-2">
+                How Ingredient Parsing Works
+              </h3>
               <div className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
                 <p>
-                  Ingredients are parsed using <code className="bg-blue-100 dark:bg-onedark-bg px-1 rounded text-xs">@jlucaspains/sharp-recipe-parser</code>,
-                  which extracts structured data from ingredient text.
+                  Ingredients are parsed using{' '}
+                  <code className="bg-blue-100 dark:bg-onedark-bg px-1 rounded text-xs">
+                    @jlucaspains/sharp-recipe-parser
+                  </code>
+                  , which extracts structured data from ingredient text.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                   <div>
                     <p className="font-medium mb-1">What gets extracted:</p>
                     <ul className="list-disc list-inside text-xs space-y-0.5">
-                      <li><strong>Quantity</strong> - numeric amounts (1, 1/2, 1.5)</li>
-                      <li><strong>Unit</strong> - measurements (cup, tbsp, oz)</li>
-                      <li><strong>Ingredient</strong> - the main item name</li>
-                      <li><strong>Extra</strong> - preparation notes (diced, melted)</li>
+                      <li>
+                        <strong>Quantity</strong> - numeric amounts (1, 1/2, 1.5)
+                      </li>
+                      <li>
+                        <strong>Unit</strong> - measurements (cup, tbsp, oz)
+                      </li>
+                      <li>
+                        <strong>Ingredient</strong> - the main item name
+                      </li>
+                      <li>
+                        <strong>Extra</strong> - preparation notes (diced, melted)
+                      </li>
                     </ul>
                   </div>
                   <div>
                     <p className="font-medium mb-1">Normalization Key:</p>
                     <p className="text-xs">
-                      Used to match ingredients across recipes and with your pantry.
-                      If parsing produces an incorrect key, click the edit button to set it manually.
+                      Used to match ingredients across recipes and with your pantry. If parsing
+                      produces an incorrect key, click the edit button to set it manually.
                     </p>
                   </div>
                 </div>
@@ -198,12 +222,24 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-onedark-bg-highlight">
-                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">Original</th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">Qty</th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">Unit</th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">Parsed Ingredient</th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">Extra</th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">Normalization Key</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">
+                      Original
+                    </th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">
+                      Qty
+                    </th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">
+                      Unit
+                    </th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">
+                      Parsed Ingredient
+                    </th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">
+                      Extra
+                    </th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg">
+                      Normalization Key
+                    </th>
                     <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-onedark-fg w-20"></th>
                   </tr>
                 </thead>
@@ -230,9 +266,7 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
                             {ing.parsed.ingredient}
                           </span>
                         ) : (
-                          <span className="text-yellow-600 dark:text-yellow-400">
-                            Not parsed
-                          </span>
+                          <span className="text-yellow-600 dark:text-yellow-400">Not parsed</span>
                         )}
                       </td>
                       <td className="py-2 px-2 text-gray-500 dark:text-onedark-fg-muted text-xs max-w-[120px]">
@@ -266,8 +300,18 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
                               className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
                               title="Save"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
                               </svg>
                             </button>
                             <button
@@ -275,8 +319,18 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
                               className="p-1 text-gray-400 hover:text-gray-600"
                               title="Cancel"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
                               </svg>
                             </button>
                           </div>
@@ -286,8 +340,18 @@ export function IngredientParsingModal({ recipeId, recipeTitle, onClose }: Ingre
                             className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-onedark-fg"
                             title="Edit ingredient name"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
                             </svg>
                           </button>
                         )}

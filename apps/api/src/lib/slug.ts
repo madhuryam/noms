@@ -36,7 +36,10 @@ export async function generateUniqueSlug(
     bindings.push(excludeRecipeId);
   }
 
-  const existing = await db.prepare(query).bind(...bindings).first();
+  const existing = await db
+    .prepare(query)
+    .bind(...bindings)
+    .first();
 
   if (!existing) {
     return baseSlug;
@@ -55,7 +58,10 @@ export async function generateUniqueSlug(
       checkBindings.push(excludeRecipeId);
     }
 
-    const check = await db.prepare(checkQuery).bind(...checkBindings).first();
+    const check = await db
+      .prepare(checkQuery)
+      .bind(...checkBindings)
+      .first();
 
     if (!check) {
       return candidateSlug;

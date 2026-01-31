@@ -5,7 +5,11 @@ import { SuggestionsBar } from '../components/suggestions';
 
 export function HomePage() {
   const queryClient = useQueryClient();
-  const { recipes: suggestions, isLoading: suggestionsLoading, isFetching: suggestionsRefreshing } = useDailySuggestions();
+  const {
+    recipes: suggestions,
+    isLoading: suggestionsLoading,
+    isFetching: suggestionsRefreshing,
+  } = useDailySuggestions();
 
   const handleRefreshSuggestions = () => {
     queryClient.invalidateQueries({ queryKey: ['suggestions', 'daily'] });

@@ -27,129 +27,129 @@ export interface RecipeMacros {
 // Values are approximate and based on common density assumptions
 const UNIT_TO_GRAMS: Record<string, number> = {
   // Volume measurements (using water density as baseline, adjust for specific ingredients)
-  'cup': 240,
-  'cups': 240,
-  'c': 240,
-  'tablespoon': 15,
-  'tablespoons': 15,
-  'tbsp': 15,
-  'tbs': 15,
-  'tb': 15,
-  'teaspoon': 5,
-  'teaspoons': 5,
-  'tsp': 5,
-  'ts': 5,
-  't': 5,
+  cup: 240,
+  cups: 240,
+  c: 240,
+  tablespoon: 15,
+  tablespoons: 15,
+  tbsp: 15,
+  tbs: 15,
+  tb: 15,
+  teaspoon: 5,
+  teaspoons: 5,
+  tsp: 5,
+  ts: 5,
+  t: 5,
   'fluid ounce': 30,
   'fluid ounces': 30,
   'fl oz': 30,
   'fl. oz': 30,
-  'ml': 1,
-  'milliliter': 1,
-  'milliliters': 1,
-  'millilitre': 1,
-  'millilitres': 1,
-  'liter': 1000,
-  'liters': 1000,
-  'litre': 1000,
-  'litres': 1000,
-  'l': 1000,
-  'pint': 473,
-  'pints': 473,
-  'pt': 473,
-  'quart': 946,
-  'quarts': 946,
-  'qt': 946,
-  'gallon': 3785,
-  'gallons': 3785,
-  'gal': 3785,
+  ml: 1,
+  milliliter: 1,
+  milliliters: 1,
+  millilitre: 1,
+  millilitres: 1,
+  liter: 1000,
+  liters: 1000,
+  litre: 1000,
+  litres: 1000,
+  l: 1000,
+  pint: 473,
+  pints: 473,
+  pt: 473,
+  quart: 946,
+  quarts: 946,
+  qt: 946,
+  gallon: 3785,
+  gallons: 3785,
+  gal: 3785,
 
   // Weight measurements
-  'gram': 1,
-  'grams': 1,
-  'g': 1,
-  'kilogram': 1000,
-  'kilograms': 1000,
-  'kg': 1000,
-  'ounce': 28.35,
-  'ounces': 28.35,
-  'oz': 28.35,
-  'pound': 453.6,
-  'pounds': 453.6,
-  'lb': 453.6,
-  'lbs': 453.6,
+  gram: 1,
+  grams: 1,
+  g: 1,
+  kilogram: 1000,
+  kilograms: 1000,
+  kg: 1000,
+  ounce: 28.35,
+  ounces: 28.35,
+  oz: 28.35,
+  pound: 453.6,
+  pounds: 453.6,
+  lb: 453.6,
+  lbs: 453.6,
 
   // Count-based (approximate grams for common items)
-  'piece': 100,
-  'pieces': 100,
-  'slice': 30,
-  'slices': 30,
-  'clove': 3,
-  'cloves': 3,
-  'pinch': 0.5,
-  'pinches': 0.5,
-  'dash': 0.5,
-  'dashes': 0.5,
-  'stick': 113, // butter stick
-  'sticks': 113,
-  'can': 400,
-  'cans': 400,
-  'bunch': 100,
-  'bunches': 100,
-  'head': 500,
-  'heads': 500,
-  'sprig': 2,
-  'sprigs': 2,
-  'leaf': 1,
-  'leaves': 1,
-  'handful': 30,
-  'handfuls': 30,
+  piece: 100,
+  pieces: 100,
+  slice: 30,
+  slices: 30,
+  clove: 3,
+  cloves: 3,
+  pinch: 0.5,
+  pinches: 0.5,
+  dash: 0.5,
+  dashes: 0.5,
+  stick: 113, // butter stick
+  sticks: 113,
+  can: 400,
+  cans: 400,
+  bunch: 100,
+  bunches: 100,
+  head: 500,
+  heads: 500,
+  sprig: 2,
+  sprigs: 2,
+  leaf: 1,
+  leaves: 1,
+  handful: 30,
+  handfuls: 30,
 };
 
 // Ingredient-specific density adjustments (multipliers for cup measurements)
 const DENSITY_ADJUSTMENTS: Record<string, number> = {
   // Flours and dry goods are lighter per cup
-  'flour': 0.52,          // ~125g per cup
+  flour: 0.52, // ~125g per cup
   'all-purpose flour': 0.52,
   'bread flour': 0.54,
   'whole wheat flour': 0.5,
   'almond flour': 0.4,
-  'sugar': 0.83,          // ~200g per cup
-  'brown sugar': 0.92,    // ~220g per cup
-  'powdered sugar': 0.5,  // ~120g per cup
+  sugar: 0.83, // ~200g per cup
+  'brown sugar': 0.92, // ~220g per cup
+  'powdered sugar': 0.5, // ~120g per cup
   'cocoa powder': 0.35,
-  'cornstarch': 0.53,
-  'oats': 0.38,           // ~90g per cup
+  cornstarch: 0.53,
+  oats: 0.38, // ~90g per cup
   'rolled oats': 0.38,
-  'rice': 0.79,           // ~190g per cup
+  rice: 0.79, // ~190g per cup
 
   // Oils and liquids
-  'oil': 0.92,            // ~220g per cup
+  oil: 0.92, // ~220g per cup
   'olive oil': 0.92,
   'vegetable oil': 0.92,
-  'butter': 0.95,         // ~227g per cup (2 sticks)
-  'honey': 1.4,           // ~340g per cup
+  butter: 0.95, // ~227g per cup (2 sticks)
+  honey: 1.4, // ~340g per cup
   'maple syrup': 1.33,
-  'milk': 1.03,
+  milk: 1.03,
 
   // Nuts and seeds
-  'almonds': 0.6,
-  'walnuts': 0.5,
-  'pecans': 0.44,
-  'peanuts': 0.6,
-  'cashews': 0.55,
+  almonds: 0.6,
+  walnuts: 0.5,
+  pecans: 0.44,
+  peanuts: 0.6,
+  cashews: 0.55,
   'sunflower seeds': 0.6,
 
   // Cheese
-  'parmesan': 0.42,       // ~100g per cup grated
-  'cheddar': 0.47,
-  'mozzarella': 0.47,
+  parmesan: 0.42, // ~100g per cup grated
+  cheddar: 0.47,
+  mozzarella: 0.47,
 
   // Vegetables
-  'spinach': 0.13,        // ~30g per cup (raw, packed)
-  'lettuce': 0.15,
-  'kale': 0.28,
-  'broccoli': 0.38,
+  spinach: 0.13, // ~30g per cup (raw, packed)
+  lettuce: 0.15,
+  kale: 0.28,
+  broccoli: 0.38,
 };
 
 // Parse a quantity string like "1/2", "1 1/2", "2", "0.5" into a number
@@ -174,7 +174,9 @@ function parseQuantity(quantityStr: string): number {
 }
 
 // Extract quantity and unit from an ingredient line
-function parseIngredientLine(line: string): { quantity: number; unit: string; ingredient: string } | null {
+function parseIngredientLine(
+  line: string
+): { quantity: number; unit: string; ingredient: string } | null {
   const trimmed = line.trim();
 
   // Skip empty lines and group headers
@@ -190,7 +192,8 @@ function parseIngredientLine(line: string): { quantity: number; unit: string; in
 
   // Pattern: quantity unit ingredient
   // Examples: "2 cups flour", "1/2 tsp salt", "1 lb chicken breast"
-  const quantityUnitPattern = /^([\d\s\/\.]+)\s*(cup|cups|c|tablespoon|tablespoons|tbsp|tbs|tb|teaspoon|teaspoons|tsp|ts|t|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|ml|l|pint|pints|pt|quart|quarts|qt|gallon|gallons|gal|fl oz|piece|pieces|slice|slices|clove|cloves|pinch|pinches|dash|dashes|stick|sticks|can|cans|bunch|bunches|head|heads|sprig|sprigs|leaf|leaves|handful|handfuls)s?\b\.?\s+(.+)/i;
+  const quantityUnitPattern =
+    /^([\d\s\/\.]+)\s*(cup|cups|c|tablespoon|tablespoons|tbsp|tbs|tb|teaspoon|teaspoons|tsp|ts|t|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|ml|l|pint|pints|pt|quart|quarts|qt|gallon|gallons|gal|fl oz|piece|pieces|slice|slices|clove|cloves|pinch|pinches|dash|dashes|stick|sticks|can|cans|bunch|bunches|head|heads|sprig|sprigs|leaf|leaves|handful|handfuls)s?\b\.?\s+(.+)/i;
 
   const match = cleaned.match(quantityUnitPattern);
   if (match) {
@@ -225,10 +228,13 @@ function parseIngredientLine(line: string): { quantity: number; unit: string; in
 function normalizeIngredientName(name: string): string {
   return name
     .toLowerCase()
-    .replace(/,.*$/, '')           // Remove everything after comma (e.g., "chicken, boneless" -> "chicken")
-    .replace(/\([^)]*\)/g, '')     // Remove parentheses and contents
-    .replace(/\s+/g, ' ')          // Normalize whitespace
-    .replace(/^(fresh|dried|frozen|canned|raw|cooked|chopped|minced|diced|sliced|grated|shredded|crushed|ground|whole|large|medium|small|extra|boneless|skinless|low-fat|fat-free|unsalted|salted)\s+/gi, '')
+    .replace(/,.*$/, '') // Remove everything after comma (e.g., "chicken, boneless" -> "chicken")
+    .replace(/\([^)]*\)/g, '') // Remove parentheses and contents
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(
+      /^(fresh|dried|frozen|canned|raw|cooked|chopped|minced|diced|sliced|grated|shredded|crushed|ground|whole|large|medium|small|extra|boneless|skinless|low-fat|fat-free|unsalted|salted)\s+/gi,
+      ''
+    )
     .trim();
 }
 
@@ -245,7 +251,12 @@ function findNutrition(
   ingredientName: string,
   customEntries?: CustomNutritionEntry[]
 ): {
-  nutrition: { carbs_per_100g: number | null; protein_per_100g: number | null; fat_per_100g: number | null; calories_per_100g: number | null };
+  nutrition: {
+    carbs_per_100g: number | null;
+    protein_per_100g: number | null;
+    fat_per_100g: number | null;
+    calories_per_100g: number | null;
+  };
   matchedName: string;
 } | null {
   const normalized = normalizeIngredientName(ingredientName);
@@ -254,7 +265,11 @@ function findNutrition(
   if (customEntries) {
     for (const entry of customEntries) {
       const customNormalized = entry.ingredient_name.toLowerCase();
-      if (normalized === customNormalized || normalized.includes(customNormalized) || customNormalized.includes(normalized)) {
+      if (
+        normalized === customNormalized ||
+        normalized.includes(customNormalized) ||
+        customNormalized.includes(normalized)
+      ) {
         return { nutrition: entry, matchedName: entry.ingredient_name };
       }
     }
@@ -282,7 +297,7 @@ function findNutrition(
   }
 
   // Try matching individual words
-  const words = normalized.split(' ').filter(w => w.length > 2);
+  const words = normalized.split(' ').filter((w) => w.length > 2);
   for (const word of words) {
     entry = defaultNutritionMap.get(word);
     if (entry) {
@@ -309,8 +324,25 @@ function convertToGrams(quantity: number, unit: string, ingredientName: string):
   }
 
   // Only apply density adjustments for volume measurements
-  const isVolumeUnit = ['cup', 'cups', 'c', 'tablespoon', 'tablespoons', 'tbsp', 'tbs', 'tb',
-    'teaspoon', 'teaspoons', 'tsp', 'ts', 't', 'ml', 'l', 'liter', 'liters'].includes(unit.toLowerCase());
+  const isVolumeUnit = [
+    'cup',
+    'cups',
+    'c',
+    'tablespoon',
+    'tablespoons',
+    'tbsp',
+    'tbs',
+    'tb',
+    'teaspoon',
+    'teaspoons',
+    'tsp',
+    'ts',
+    't',
+    'ml',
+    'l',
+    'liter',
+    'liters',
+  ].includes(unit.toLowerCase());
 
   return quantity * baseGrams * (isVolumeUnit ? densityMultiplier : 1);
 }
@@ -344,10 +376,22 @@ function calculateIngredientMacros(
   return {
     ingredient_name: matchedName,
     raw_text,
-    carbs: nutrition.carbs_per_100g !== null ? Math.round(nutrition.carbs_per_100g * factor * 10) / 10 : null,
-    protein: nutrition.protein_per_100g !== null ? Math.round(nutrition.protein_per_100g * factor * 10) / 10 : null,
-    fat: nutrition.fat_per_100g !== null ? Math.round(nutrition.fat_per_100g * factor * 10) / 10 : null,
-    calories: nutrition.calories_per_100g !== null ? Math.round(nutrition.calories_per_100g * factor) : null,
+    carbs:
+      nutrition.carbs_per_100g !== null
+        ? Math.round(nutrition.carbs_per_100g * factor * 10) / 10
+        : null,
+    protein:
+      nutrition.protein_per_100g !== null
+        ? Math.round(nutrition.protein_per_100g * factor * 10) / 10
+        : null,
+    fat:
+      nutrition.fat_per_100g !== null
+        ? Math.round(nutrition.fat_per_100g * factor * 10) / 10
+        : null,
+    calories:
+      nutrition.calories_per_100g !== null
+        ? Math.round(nutrition.calories_per_100g * factor)
+        : null,
     grams: Math.round(grams),
     found: true,
     is_group_header: false,

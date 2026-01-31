@@ -32,8 +32,8 @@ function parseSteps(raw: string): string[] {
 
   return raw
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
+    .map((line) => line.trim())
+    .filter((line) => {
       if (!line) return false;
       // Skip section headers
       if (line.startsWith('###') || line.startsWith('## ')) return false;
@@ -41,7 +41,7 @@ function parseSteps(raw: string): string[] {
       if (/^[A-Z][A-Z\s]+:?$/.test(line) && line.length > 3) return false;
       return true;
     })
-    .map(line => {
+    .map((line) => {
       // Remove bullet points, checkboxes, and numbers
       return line
         .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
@@ -49,7 +49,7 @@ function parseSteps(raw: string): string[] {
         .replace(/^\d+[.):]\s*/, '')
         .trim();
     })
-    .filter(line => line.length > 0);
+    .filter((line) => line.length > 0);
 }
 
 function formatDate(dateStr: string): string {
@@ -57,7 +57,7 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 
@@ -65,7 +65,7 @@ function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr + 'T12:00:00');
   return date.toLocaleDateString('en-US', {
     weekday: 'short',
-    day: 'numeric'
+    day: 'numeric',
   });
 }
 
@@ -147,43 +147,52 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
 
   const [editingMealId, setEditingMealId] = useState<number | null>(null);
 
-  const toggleStep = useCallback((stepKey: string) => {
-    setCompletedSteps(prev => {
-      const next = new Set(prev);
-      if (next.has(stepKey)) {
-        next.delete(stepKey);
-      } else {
-        next.add(stepKey);
-      }
-      if (planId) {
-        savePrepCompletion(planId, next);
-      }
-      return next;
-    });
-  }, [planId]);
+  const toggleStep = useCallback(
+    (stepKey: string) => {
+      setCompletedSteps((prev) => {
+        const next = new Set(prev);
+        if (next.has(stepKey)) {
+          next.delete(stepKey);
+        } else {
+          next.add(stepKey);
+        }
+        if (planId) {
+          savePrepCompletion(planId, next);
+        }
+        return next;
+      });
+    },
+    [planId]
+  );
 
-  const setPrepDate = useCallback((mealId: number, date: string) => {
-    setPrepDateOverrides(prev => {
-      const next = { ...prev, [mealId]: date };
-      if (planId) {
-        savePrepDates(planId, next);
-      }
-      return next;
-    });
-    setEditingMealId(null);
-  }, [planId]);
+  const setPrepDate = useCallback(
+    (mealId: number, date: string) => {
+      setPrepDateOverrides((prev) => {
+        const next = { ...prev, [mealId]: date };
+        if (planId) {
+          savePrepDates(planId, next);
+        }
+        return next;
+      });
+      setEditingMealId(null);
+    },
+    [planId]
+  );
 
   // Get available dates for prep (week dates up to and including meal date)
-  const getAvailablePrepDates = useCallback((mealDate: string): string[] => {
-    const dates: string[] = [];
-    for (const date of weekDates) {
-      const dateKey = dateToKey(date);
-      if (dateKey <= mealDate) {
-        dates.push(dateKey);
+  const getAvailablePrepDates = useCallback(
+    (mealDate: string): string[] => {
+      const dates: string[] = [];
+      for (const date of weekDates) {
+        const dateKey = dateToKey(date);
+        if (dateKey <= mealDate) {
+          dates.push(dateKey);
+        }
       }
-    }
-    return dates;
-  }, [weekDates]);
+      return dates;
+    },
+    [weekDates]
+  );
 
   // Extract prep tasks from meals with custom dates
   const prepTasks = useMemo((): PrepTask[] => {
@@ -209,7 +218,9 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
     }
 
     // Sort by prep date
-    tasks.sort((a, b) => a.prepDate.localeCompare(b.prepDate) || a.mealDate.localeCompare(b.mealDate));
+    tasks.sort(
+      (a, b) => a.prepDate.localeCompare(b.prepDate) || a.mealDate.localeCompare(b.mealDate)
+    );
 
     return tasks;
   }, [meals, prepDateOverrides]);
@@ -230,14 +241,25 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
   if (prepTasks.length === 0) {
     return (
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-12 text-center">
-        <svg className="w-12 h-12 mx-auto text-gray-400 dark:text-onedark-fg-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        <svg
+          className="w-12 h-12 mx-auto text-gray-400 dark:text-onedark-fg-muted mb-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+          />
         </svg>
         <h3 className="text-lg font-medium text-gray-900 dark:text-onedark-fg mb-2">
           No prep tasks
         </h3>
         <p className="text-gray-500 dark:text-onedark-fg-muted">
-          Recipes with prep steps will appear here. Add prep steps when editing a recipe to see them in this view.
+          Recipes with prep steps will appear here. Add prep steps when editing a recipe to see them
+          in this view.
         </p>
       </div>
     );
@@ -259,20 +281,24 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
             } overflow-hidden`}
           >
             {/* Date header */}
-            <div className={`px-6 py-3 border-b ${
-              dateIsToday
-                ? 'bg-amber-50 dark:bg-onedark-yellow/10 border-amber-200 dark:border-onedark-yellow/30'
-                : dateIsPast
-                  ? 'bg-gray-50 dark:bg-onedark-bg border-gray-200 dark:border-onedark-bg-highlight'
-                  : 'bg-gray-50 dark:bg-onedark-bg border-gray-200 dark:border-onedark-bg-highlight'
-            }`}>
+            <div
+              className={`px-6 py-3 border-b ${
+                dateIsToday
+                  ? 'bg-amber-50 dark:bg-onedark-yellow/10 border-amber-200 dark:border-onedark-yellow/30'
+                  : dateIsPast
+                    ? 'bg-gray-50 dark:bg-onedark-bg border-gray-200 dark:border-onedark-bg-highlight'
+                    : 'bg-gray-50 dark:bg-onedark-bg border-gray-200 dark:border-onedark-bg-highlight'
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h3 className={`font-semibold ${
-                    dateIsToday
-                      ? 'text-amber-700 dark:text-onedark-yellow'
-                      : 'text-gray-900 dark:text-onedark-fg'
-                  }`}>
+                  <h3
+                    className={`font-semibold ${
+                      dateIsToday
+                        ? 'text-amber-700 dark:text-onedark-yellow'
+                        : 'text-gray-900 dark:text-onedark-fg'
+                    }`}
+                  >
                     {formatDate(date)}
                     {dateIsToday && (
                       <span className="ml-2 text-xs font-medium bg-amber-200 dark:bg-onedark-yellow/30 text-amber-800 dark:text-onedark-yellow px-2 py-0.5 rounded-full">
@@ -320,7 +346,7 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
                           <span className="text-gray-300 dark:text-onedark-bg-highlight">•</span>
                           {isEditing ? (
                             <div className="flex items-center gap-1 flex-wrap">
-                              {availableDates.map(d => (
+                              {availableDates.map((d) => (
                                 <button
                                   key={d}
                                   onClick={() => setPrepDate(task.mealId, d)}
@@ -345,8 +371,18 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
                               onClick={() => setEditingMealId(task.mealId)}
                               className="text-sm text-amber-600 dark:text-onedark-yellow hover:text-amber-700 dark:hover:text-onedark-yellow/80 flex items-center gap-1"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
                               </svg>
                               Change prep day
                             </button>
@@ -354,11 +390,13 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
                         </div>
                       </div>
                       {task.steps.length > 1 && (
-                        <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
-                          allComplete
-                            ? 'bg-green-100 dark:bg-onedark-green/20 text-green-700 dark:text-onedark-green'
-                            : 'bg-amber-100 dark:bg-onedark-yellow/20 text-amber-700 dark:text-onedark-yellow'
-                        }`}>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
+                            allComplete
+                              ? 'bg-green-100 dark:bg-onedark-green/20 text-green-700 dark:text-onedark-green'
+                              : 'bg-amber-100 dark:bg-onedark-yellow/20 text-amber-700 dark:text-onedark-yellow'
+                          }`}
+                        >
                           {completedInTask}/{task.steps.length}
                         </span>
                       )}
@@ -371,10 +409,7 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
                         const isComplete = completedSteps.has(stepKey);
 
                         return (
-                          <div
-                            key={stepKey}
-                            className="flex gap-3 group"
-                          >
+                          <div key={stepKey} className="flex gap-3 group">
                             <button
                               type="button"
                               onClick={() => toggleStep(stepKey)}
@@ -385,18 +420,30 @@ export function PrepView({ meals, planId, weekDates }: PrepViewProps) {
                               }`}
                             >
                               {isComplete ? (
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                <svg
+                                  className="w-3.5 h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2.5}
+                                    d="M5 13l4 4L19 7"
+                                  />
                                 </svg>
                               ) : (
                                 <span className="text-xs font-medium">{stepIndex + 1}</span>
                               )}
                             </button>
-                            <p className={`text-sm pt-0.5 transition-all ${
-                              isComplete
-                                ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
-                                : 'text-gray-700 dark:text-onedark-fg'
-                            }`}>
+                            <p
+                              className={`text-sm pt-0.5 transition-all ${
+                                isComplete
+                                  ? 'text-gray-400 dark:text-onedark-fg-muted line-through'
+                                  : 'text-gray-700 dark:text-onedark-fg'
+                              }`}
+                            >
                               {step}
                             </p>
                           </div>

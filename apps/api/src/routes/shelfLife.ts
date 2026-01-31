@@ -39,9 +39,7 @@ shelfLife.get('/lookup/:name', async (c) => {
 
   try {
     // Try exact match first
-    let entry = await c.env.DB.prepare(
-      'SELECT * FROM shelf_life WHERE LOWER(ingredient_name) = ?'
-    )
+    let entry = await c.env.DB.prepare('SELECT * FROM shelf_life WHERE LOWER(ingredient_name) = ?')
       .bind(name)
       .first<ShelfLifeEntry>();
 
@@ -103,11 +101,7 @@ shelfLife.post('/', async (c) => {
       `INSERT INTO shelf_life (ingredient_name, fridge_days, freezer_days)
        VALUES (?, ?, ?)`
     )
-      .bind(
-        body.ingredient_name.trim(),
-        body.fridge_days ?? null,
-        body.freezer_days ?? null
-      )
+      .bind(body.ingredient_name.trim(), body.fridge_days ?? null, body.freezer_days ?? null)
       .run();
 
     const newEntry = await c.env.DB.prepare('SELECT * FROM shelf_life WHERE id = ?')
@@ -165,9 +159,7 @@ shelfLife.put('/:id', async (c) => {
     updates.push("updated_at = datetime('now')");
     values.push(id);
 
-    await c.env.DB.prepare(
-      `UPDATE shelf_life SET ${updates.join(', ')} WHERE id = ?`
-    )
+    await c.env.DB.prepare(`UPDATE shelf_life SET ${updates.join(', ')} WHERE id = ?`)
       .bind(...values)
       .run();
 

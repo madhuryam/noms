@@ -277,8 +277,14 @@ export function keysMatch(
   }
 
   // Split on '|' to get all alternatives
-  const keys1 = key1.split('|').map(k => k.trim()).filter(k => k.length > 0);
-  const keys2 = key2.split('|').map(k => k.trim()).filter(k => k.length > 0);
+  const keys1 = key1
+    .split('|')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
+  const keys2 = key2
+    .split('|')
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
 
   // Check all combinations - return best match type found
   let bestMatch: 'exact' | 'flexible' | 'none' = 'none';

@@ -63,14 +63,11 @@ export function DndProvider({ children }: DndProviderProps) {
     setOverId(over?.id?.toString() ?? null);
   }, []);
 
-  const handleDragEnd = useCallback(
-    (_event: DragEndEvent) => {
-      // Shopping items are handled by their own component via useSortable
-      setActiveItem(null);
-      setOverId(null);
-    },
-    []
-  );
+  const handleDragEnd = useCallback((_event: DragEndEvent) => {
+    // Shopping items are handled by their own component via useSortable
+    setActiveItem(null);
+    setOverId(null);
+  }, []);
 
   const handleDragCancel = useCallback(() => {
     setActiveItem(null);
@@ -85,9 +82,7 @@ export function DndProvider({ children }: DndProviderProps) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <DndStateContext.Provider value={{ activeItem, overId }}>
-        {children}
-      </DndStateContext.Provider>
+      <DndStateContext.Provider value={{ activeItem, overId }}>{children}</DndStateContext.Provider>
     </DndContext>
   );
 }

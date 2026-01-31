@@ -3,6 +3,7 @@ import { parseIngredient } from '@jlucaspains/sharp-recipe-parser';
 import { getUnits } from '@jlucaspains/sharp-recipe-parser/src/units.js';
 import { normalizeIngredientKey } from '../lib/ingredient-normalizer';
 import { generateUniqueSlug } from '../lib/slug';
+import type { UserContext } from '../middleware';
 
 // Add custom units to sharp-recipe-parser
 const englishUnits = getUnits('en');
@@ -40,19 +41,44 @@ function preprocessPlusNotation(rawText: string): string {
 
     // Common measurement units - if before+ only has these + numbers, the ingredient is after +
     const units = new Set([
-      'cup', 'cups', 'tbsp', 'tsp', 'tablespoon', 'tablespoons',
-      'teaspoon', 'teaspoons', 'ounce', 'ounces', 'oz', 'pound', 'pounds',
-      'lb', 'lbs', 'gram', 'grams', 'g', 'kg', 'ml', 'l', 'quart', 'quarts',
-      'pint', 'pints', 'gallon', 'gallons', 'large', 'medium', 'small', 'whole',
+      'cup',
+      'cups',
+      'tbsp',
+      'tsp',
+      'tablespoon',
+      'tablespoons',
+      'teaspoon',
+      'teaspoons',
+      'ounce',
+      'ounces',
+      'oz',
+      'pound',
+      'pounds',
+      'lb',
+      'lbs',
+      'gram',
+      'grams',
+      'g',
+      'kg',
+      'ml',
+      'l',
+      'quart',
+      'quarts',
+      'pint',
+      'pints',
+      'gallon',
+      'gallons',
+      'large',
+      'medium',
+      'small',
+      'whole',
     ]);
 
     // Check if the part before + contains an ingredient word (not just qty/unit)
     const words = beforePlus.toLowerCase().split(/\s+/);
-    const hasIngredientWord = words.some(word => {
+    const hasIngredientWord = words.some((word) => {
       const cleaned = word.replace(/[^\w]/g, '');
-      return cleaned.length >= 2 &&
-             !/^\d+$/.test(cleaned) &&
-             !units.has(cleaned);
+      return cleaned.length >= 2 && !/^\d+$/.test(cleaned) && !units.has(cleaned);
     });
 
     if (hasIngredientWord) {
@@ -63,7 +89,8 @@ function preprocessPlusNotation(rawText: string): string {
   }
 
   // Fall back to removing "+ quantity unit" patterns (for cases like "2 cups + 2 tbsp flour")
-  const plusPattern = /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
+  const plusPattern =
+    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
   let cleaned = rawText.replace(plusPattern, ' ');
 
   // Also remove parenthetical weight notations like "(265g)"
@@ -99,7 +126,10 @@ function extractIngredientName(rawText: string): string {
   // Fallback: basic cleanup if parser fails
   let text = rawText.trim();
   text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
-  text = text.replace(/^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i, '');
+  text = text.replace(
+    /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i,
+    ''
+  );
   text = text.replace(/^of\s+/i, '');
 
   return stripExtraSuffixes(text.trim());
@@ -123,10 +153,10 @@ function generateNormalizationKeys(rawText: string): string {
 
   // Generate a normalization key for each alternative
   const keys = alternatives
-    .map(alt => alt.trim())
-    .filter(alt => alt.length > 0)
-    .map(alt => normalizeIngredientKey(stripExtraSuffixes(alt)))
-    .filter(key => key.length > 0);
+    .map((alt) => alt.trim())
+    .filter((alt) => alt.length > 0)
+    .map((alt) => normalizeIngredientKey(stripExtraSuffixes(alt)))
+    .filter((key) => key.length > 0);
 
   // Remove duplicates and join with pipe
   const uniqueKeys = [...new Set(keys)];
@@ -136,6 +166,10 @@ function generateNormalizationKeys(rawText: string): string {
 type Bindings = {
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
+};
+
+type Variables = {
+  user: UserContext;
 };
 
 interface ParsedIngredient {
@@ -201,18 +235,20 @@ interface ImportResult {
   imagePaths?: string[];
 }
 
-const importRoutes = new Hono<{ Bindings: Bindings }>();
+const importRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
  * Strip checkbox markers and list prefixes from an ingredient line
  */
 function cleanIngredientLine(line: string): string {
-  return line
-    // Remove checkbox patterns: "- [ ]", "- [x]", "- [X]", "* [ ]", etc.
-    .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
-    // Remove list markers: "- ", "* ", "• "
-    .replace(/^[-*•]\s+/, '')
-    .trim();
+  return (
+    line
+      // Remove checkbox patterns: "- [ ]", "- [x]", "- [X]", "* [ ]", etc.
+      .replace(/^(\s*[-*]?\s*)\[[ xX]?\]\s*/, '')
+      // Remove list markers: "- ", "* ", "• "
+      .replace(/^[-*•]\s+/, '')
+      .trim()
+  );
 }
 
 /**
@@ -299,7 +335,7 @@ function detectQuickAndEasy(recipe: ImportRecipe): boolean {
   // Check total time (prep + cook)
   const prepTime = recipe.metadata?.prepTime ?? 0;
   const cookTime = recipe.metadata?.cookTime ?? 0;
-  const totalTime = recipe.metadata?.totalTime ?? (prepTime + cookTime);
+  const totalTime = recipe.metadata?.totalTime ?? prepTime + cookTime;
 
   // If we have time data and it's under 30 minutes
   if (totalTime > 0 && totalTime <= 30) {
@@ -357,7 +393,10 @@ function cleanText(text: string | null): string | null {
     // Remove HTML img tags
     .replace(/<img[^>]*>/gi, '')
     // Remove recipe/source markdown links: [Source](url), [Insta Recipe](url), etc.
-    .replace(/\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\(https?:\/\/[^\)]+\)/gi, '')
+    .replace(
+      /\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\(https?:\/\/[^\)]+\)/gi,
+      ''
+    )
     // Remove "Source: URL" lines
     .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
     // Remove bare URLs on their own line
@@ -418,29 +457,34 @@ function normalizeInstructions(text: string | null): string | null {
 /**
  * Get or create a tag by name
  * @param isCategory - if true, creates a category tag (is_category = 1)
+ * @param userId - the user ID to associate with the tag
  */
-async function getOrCreateTag(db: D1Database, tagName: string, isCategory: boolean = false): Promise<number> {
+async function getOrCreateTag(
+  db: D1Database,
+  tagName: string,
+  isCategory: boolean = false,
+  userId: number
+): Promise<number> {
   const normalized = tagName.toLowerCase().trim();
 
   const existing = await db
-    .prepare('SELECT id, is_category FROM tags WHERE name = ?')
-    .bind(normalized)
+    .prepare('SELECT id, is_category FROM tags WHERE name = ? AND user_id = ?')
+    .bind(normalized, userId)
     .first<{ id: number; is_category: number }>();
 
   if (existing) {
     // If this tag should be a category but isn't marked as one, upgrade it
     if (isCategory && !existing.is_category) {
-      await db
-        .prepare('UPDATE tags SET is_category = 1 WHERE id = ?')
-        .bind(existing.id)
-        .run();
+      await db.prepare('UPDATE tags SET is_category = 1 WHERE id = ?').bind(existing.id).run();
     }
     return existing.id;
   }
 
   const result = await db
-    .prepare('INSERT INTO tags (name, display_name, usage_count, is_category) VALUES (?, ?, 0, ?)')
-    .bind(normalized, tagName.trim(), isCategory ? 1 : 0)
+    .prepare(
+      'INSERT INTO tags (name, display_name, usage_count, is_category, user_id) VALUES (?, ?, 0, ?, ?)'
+    )
+    .bind(normalized, tagName.trim(), isCategory ? 1 : 0, userId)
     .run();
 
   return result.meta.last_row_id as number;
@@ -449,6 +493,7 @@ async function getOrCreateTag(db: D1Database, tagName: string, isCategory: boole
 // POST /api/import/vault - Import recipes from vault
 // Imports a SINGLE recipe at a time (client batches requests)
 importRoutes.post('/vault', async (c) => {
+  const { userId } = c.get('user');
   try {
     const body = await c.req.json<ImportRequest>();
     const { recipes } = body;
@@ -464,8 +509,10 @@ importRoutes.post('/vault', async (c) => {
     try {
       // Check for duplicate by title only
       // (We don't check source_path because user may have edited title to import as new recipe)
-      const existingByTitle = await c.env.DB.prepare('SELECT id, title FROM recipes WHERE title = ?')
-        .bind(recipe.title)
+      const existingByTitle = await c.env.DB.prepare(
+        'SELECT id, title FROM recipes WHERE title = ? AND user_id = ?'
+      )
+        .bind(recipe.title, userId)
         .first<{ id: number; title: string }>();
 
       if (existingByTitle) {
@@ -502,9 +549,8 @@ importRoutes.post('/vault', async (c) => {
 
       // Extract nutrition data if present
       const nutrition = recipe.metadata?.nutrition;
-      const hasNutrition = nutrition && (
-        nutrition.calories || nutrition.protein || nutrition.carbs || nutrition.fat
-      );
+      const hasNutrition =
+        nutrition && (nutrition.calories || nutrition.protein || nutrition.carbs || nutrition.fat);
 
       // Generate unique slug for the recipe
       const slug = await generateUniqueSlug(c.env.DB, recipe.title);
@@ -515,8 +561,9 @@ importRoutes.post('/vault', async (c) => {
           title, slug, source_path, source_url, markdown_content, description,
           ingredients_raw, instructions_raw, prep_instructions_raw, notes,
           prep_time_minutes, cook_time_minutes, servings, servings_unit,
-          calories_total, protein_total, carbs_total, fat_total, macros_manual
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          calories_total, protein_total, carbs_total, fat_total, macros_manual,
+          user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           recipe.title,
@@ -537,7 +584,8 @@ importRoutes.post('/vault', async (c) => {
           hasNutrition ? (nutrition.protein ?? null) : null,
           hasNutrition ? (nutrition.carbs ?? null) : null,
           hasNutrition ? (nutrition.fat ?? null) : null,
-          hasNutrition ? 0 : null  // macros_manual = 0 means imported/calculated, not manually entered
+          hasNutrition ? 0 : null, // macros_manual = 0 means imported/calculated, not manually entered
+          userId
         )
         .run();
 
@@ -548,13 +596,13 @@ importRoutes.post('/vault', async (c) => {
 
       // Category tag (from top-level folder)
       if (recipe.categoryTag) {
-        const categoryTagId = await getOrCreateTag(c.env.DB, recipe.categoryTag, true);
+        const categoryTagId = await getOrCreateTag(c.env.DB, recipe.categoryTag, true, userId);
         tagIds.push(categoryTagId);
       }
 
       // Folder tags (from subfolders)
       for (const folderTag of recipe.folderTags || []) {
-        const folderTagId = await getOrCreateTag(c.env.DB, folderTag, false);
+        const folderTagId = await getOrCreateTag(c.env.DB, folderTag, false, userId);
         tagIds.push(folderTagId);
       }
 
@@ -574,7 +622,16 @@ importRoutes.post('/vault', async (c) => {
           c.env.DB.prepare(
             `INSERT INTO recipe_ingredients (recipe_id, quantity, unit, raw_text, preparation, group_name, sort_order, normalization_key)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(recipeId, ing.quantity, ing.unit, cleanedRaw, ing.preparation, currentGroup, sortOrder++, normalizationKey)
+          ).bind(
+            recipeId,
+            ing.quantity,
+            ing.unit,
+            cleanedRaw,
+            ing.preparation,
+            currentGroup,
+            sortOrder++,
+            normalizationKey
+          )
         );
       }
 
@@ -582,23 +639,25 @@ importRoutes.post('/vault', async (c) => {
       const tagsToProcess = [...(recipe.metadata?.tags ?? [])];
 
       // Auto-detect quick-and-easy tag
-      if (detectQuickAndEasy(recipe) && !tagsToProcess.some((t) => t.toLowerCase() === 'quick-and-easy')) {
+      if (
+        detectQuickAndEasy(recipe) &&
+        !tagsToProcess.some((t) => t.toLowerCase() === 'quick-and-easy')
+      ) {
         tagsToProcess.push('quick-and-easy');
       }
 
       // Add frontmatter tags (as regular tags, not category tags)
       for (const tagName of tagsToProcess) {
-        const tagId = await getOrCreateTag(c.env.DB, tagName, false);
+        const tagId = await getOrCreateTag(c.env.DB, tagName, false, userId);
         tagIds.push(tagId);
       }
 
       // Add all tag links to batch (category tags, folder tags, and frontmatter tags)
       for (const tagId of tagIds) {
         statements.push(
-          c.env.DB.prepare(`INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)`).bind(
-            recipeId,
-            tagId
-          )
+          c.env.DB.prepare(
+            `INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)`
+          ).bind(recipeId, tagId)
         );
         statements.push(
           c.env.DB.prepare(`UPDATE tags SET usage_count = usage_count + 1 WHERE id = ?`).bind(tagId)
@@ -650,6 +709,7 @@ importRoutes.post('/vault', async (c) => {
 
 // POST /api/import/images - Upload image for a recipe
 importRoutes.post('/images', async (c) => {
+  const { userId } = c.get('user');
   try {
     const formData = await c.req.formData();
     const recipeId = formData.get('recipe_id');
@@ -664,9 +724,9 @@ importRoutes.post('/images', async (c) => {
       return c.json({ error: 'file is required' }, 400);
     }
 
-    // Verify recipe exists
-    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ?')
-      .bind(Number(recipeId))
+    // Verify recipe exists and belongs to user
+    const recipe = await c.env.DB.prepare('SELECT id FROM recipes WHERE id = ? AND user_id = ?')
+      .bind(Number(recipeId), userId)
       .first();
 
     if (!recipe) {
@@ -733,6 +793,7 @@ importRoutes.post('/images', async (c) => {
 
 // POST /api/import/check-duplicates - Check which recipes already exist
 importRoutes.post('/check-duplicates', async (c) => {
+  const { userId } = c.get('user');
   try {
     const body = await c.req.json<{
       recipes: Array<{ title: string; filePath: string }>;
@@ -742,13 +803,16 @@ importRoutes.post('/check-duplicates', async (c) => {
       return c.json({ error: 'recipes array is required' }, 400);
     }
 
-    const duplicates: Record<string, { id: number; title: string; matchType: 'title' | 'path' }> = {};
+    const duplicates: Record<string, { id: number; title: string; matchType: 'title' | 'path' }> =
+      {};
 
     // Check each recipe for duplicates by title only
     // (User can change title to import as new recipe)
     for (const recipe of body.recipes) {
-      const byTitle = await c.env.DB.prepare('SELECT id, title FROM recipes WHERE title = ?')
-        .bind(recipe.title)
+      const byTitle = await c.env.DB.prepare(
+        'SELECT id, title FROM recipes WHERE title = ? AND user_id = ?'
+      )
+        .bind(recipe.title, userId)
         .first<{ id: number; title: string }>();
 
       if (byTitle) {
@@ -767,20 +831,23 @@ importRoutes.post('/check-duplicates', async (c) => {
 
 // GET /api/import/status - Get import statistics
 importRoutes.get('/status', async (c) => {
+  const { userId } = c.get('user');
   try {
     const stats = await c.env.DB.prepare(
       `SELECT
-        (SELECT COUNT(*) FROM recipes) as total_recipes,
-        (SELECT COUNT(*) FROM tags) as total_tags,
-        (SELECT COUNT(*) FROM tags WHERE is_category = 1) as total_category_tags,
-        (SELECT COUNT(*) FROM recipe_ingredients) as total_ingredients
+        (SELECT COUNT(*) FROM recipes WHERE user_id = ?) as total_recipes,
+        (SELECT COUNT(*) FROM tags WHERE user_id = ?) as total_tags,
+        (SELECT COUNT(*) FROM tags WHERE is_category = 1 AND user_id = ?) as total_category_tags,
+        (SELECT COUNT(*) FROM recipe_ingredients WHERE recipe_id IN (SELECT id FROM recipes WHERE user_id = ?)) as total_ingredients
       `
-    ).first<{
-      total_recipes: number;
-      total_tags: number;
-      total_category_tags: number;
-      total_ingredients: number;
-    }>();
+    )
+      .bind(userId, userId, userId, userId)
+      .first<{
+        total_recipes: number;
+        total_tags: number;
+        total_category_tags: number;
+        total_ingredients: number;
+      }>();
 
     return c.json({
       status: 'ok',
@@ -799,6 +866,7 @@ importRoutes.get('/status', async (c) => {
 // POST /api/import/backfill-normalization - Backfill normalization_key for existing data
 // Query param ?force=true to re-process all items, not just those with NULL keys
 importRoutes.post('/backfill-normalization', async (c) => {
+  const { userId } = c.get('user');
   try {
     const force = c.req.query('force') === 'true';
     let pantryUpdated = 0;
@@ -806,31 +874,39 @@ importRoutes.post('/backfill-normalization', async (c) => {
 
     // Backfill pantry items
     const pantryQuery = force
-      ? 'SELECT id, name FROM pantry_items'
-      : 'SELECT id, name FROM pantry_items WHERE normalization_key IS NULL';
-    const pantryItems = await c.env.DB.prepare(pantryQuery).all();
+      ? 'SELECT id, name FROM pantry_items WHERE user_id = ?'
+      : 'SELECT id, name FROM pantry_items WHERE normalization_key IS NULL AND user_id = ?';
+    const pantryItems = await c.env.DB.prepare(pantryQuery).bind(userId).all();
 
     for (const item of (pantryItems.results ?? []) as Array<{ id: number; name: string }>) {
       const normalizationKey = normalizeIngredientKey(item.name);
-      await c.env.DB.prepare(`
+      await c.env.DB.prepare(
+        `
         UPDATE pantry_items SET normalization_key = ? WHERE id = ?
-      `).bind(normalizationKey, item.id).run();
+      `
+      )
+        .bind(normalizationKey, item.id)
+        .run();
       pantryUpdated++;
     }
 
     // Backfill recipe ingredients using sharp-recipe-parser
     const ingredientsQuery = force
-      ? 'SELECT id, raw_text FROM recipe_ingredients'
-      : 'SELECT id, raw_text FROM recipe_ingredients WHERE normalization_key IS NULL';
-    const ingredients = await c.env.DB.prepare(ingredientsQuery).all();
+      ? 'SELECT ri.id, ri.raw_text FROM recipe_ingredients ri JOIN recipes r ON ri.recipe_id = r.id WHERE r.user_id = ?'
+      : 'SELECT ri.id, ri.raw_text FROM recipe_ingredients ri JOIN recipes r ON ri.recipe_id = r.id WHERE ri.normalization_key IS NULL AND r.user_id = ?';
+    const ingredients = await c.env.DB.prepare(ingredientsQuery).bind(userId).all();
 
     for (const ing of (ingredients.results ?? []) as Array<{ id: number; raw_text: string }>) {
       // Use sharp-recipe-parser to extract ingredient name
       // Handles "or" alternatives (e.g., "butter or margarine" -> "butter|margarine")
       const normalizationKey = generateNormalizationKeys(ing.raw_text);
-      await c.env.DB.prepare(`
+      await c.env.DB.prepare(
+        `
         UPDATE recipe_ingredients SET normalization_key = ? WHERE id = ?
-      `).bind(normalizationKey, ing.id).run();
+      `
+      )
+        .bind(normalizationKey, ing.id)
+        .run();
       ingredientsUpdated++;
     }
 
@@ -851,13 +927,16 @@ importRoutes.post('/backfill-normalization', async (c) => {
 
 // POST /api/import/backfill-slugs - Generate slugs for recipes that don't have them
 importRoutes.post('/backfill-slugs', async (c) => {
+  const { userId } = c.get('user');
   try {
     let updated = 0;
 
-    // Get all recipes without slugs
+    // Get all recipes without slugs for this user
     const recipes = await c.env.DB.prepare(
-      'SELECT id, title FROM recipes WHERE slug IS NULL OR slug = ""'
-    ).all();
+      'SELECT id, title FROM recipes WHERE (slug IS NULL OR slug = "") AND user_id = ?'
+    )
+      .bind(userId)
+      .all();
 
     for (const recipe of (recipes.results ?? []) as Array<{ id: number; title: string }>) {
       const slug = await generateUniqueSlug(c.env.DB, recipe.title, recipe.id);

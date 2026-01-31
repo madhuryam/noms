@@ -46,7 +46,8 @@ function MacroTooltip({ macro, ingredients, divisor }: TooltipProps) {
       <div className="space-y-1.5 max-h-48 overflow-y-auto">
         {sorted.slice(0, 8).map((ing, i) => {
           const value = ing[macro]! / divisor;
-          const displayValue = macro === 'calories' ? Math.round(value) : Math.round(value * 10) / 10;
+          const displayValue =
+            macro === 'calories' ? Math.round(value) : Math.round(value * 10) / 10;
           return (
             <div key={i} className="flex justify-between gap-2">
               <span className="truncate text-gray-300">{ing.raw_text}</span>
@@ -83,7 +84,9 @@ export function MacroDisplay({
   onAddMissingNutrition,
 }: MacroDisplayProps) {
   const [showPerServing, setShowPerServing] = useState(true);
-  const [hoveredMacro, setHoveredMacro] = useState<'calories' | 'protein' | 'carbs' | 'fat' | null>(null);
+  const [hoveredMacro, setHoveredMacro] = useState<'calories' | 'protein' | 'carbs' | 'fat' | null>(
+    null
+  );
   const hasServings = servings && servings > 1;
 
   // Calculate per-serving values
@@ -97,7 +100,8 @@ export function MacroDisplay({
   const hasData = carbs !== null || protein !== null || fat !== null || calories !== null;
 
   // Check if all ingredients are matched
-  const hasUnmatchedIngredients = matchedCount !== undefined && totalCount !== undefined && matchedCount < totalCount;
+  const hasUnmatchedIngredients =
+    matchedCount !== undefined && totalCount !== undefined && matchedCount < totalCount;
 
   // If no data, return null
   if (!hasData) return null;
@@ -107,17 +111,24 @@ export function MacroDisplay({
       <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-onedark-fg-muted">
         {displayCalories !== null && (
           <span>
-            <span className="font-medium text-gray-700 dark:text-onedark-fg">{displayCalories}</span> cal
+            <span className="font-medium text-gray-700 dark:text-onedark-fg">
+              {displayCalories}
+            </span>{' '}
+            cal
           </span>
         )}
         {displayProtein !== null && (
           <span>
-            <span className="font-medium text-gray-700 dark:text-onedark-fg">{displayProtein}g</span> P
+            <span className="font-medium text-gray-700 dark:text-onedark-fg">
+              {displayProtein}g
+            </span>{' '}
+            P
           </span>
         )}
         {displayCarbs !== null && (
           <span>
-            <span className="font-medium text-gray-700 dark:text-onedark-fg">{displayCarbs}g</span> C
+            <span className="font-medium text-gray-700 dark:text-onedark-fg">{displayCarbs}g</span>{' '}
+            C
           </span>
         )}
         {displayFat !== null && (
@@ -134,19 +145,32 @@ export function MacroDisplay({
     return (
       <div className="border border-gray-200 dark:border-onedark-bg-highlight rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-gray-500 dark:text-onedark-fg-muted flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="w-5 h-5 text-gray-500 dark:text-onedark-fg-muted flex-shrink-0 mt-0.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-700 dark:text-onedark-fg">
               Incomplete nutrition data
             </p>
             <p className="text-sm text-gray-500 dark:text-onedark-fg-muted mt-1">
-              {matchedCount} of {totalCount} ingredients have nutrition info. Add the missing data for accurate macros.
+              {matchedCount} of {totalCount} ingredients have nutrition info. Add the missing data
+              for accurate macros.
             </p>
             {unmatchedIngredients && unmatchedIngredients.length > 0 && (
               <div className="mt-3 space-y-1">
-                <p className="text-xs font-medium text-gray-600 dark:text-onedark-fg-muted">Missing:</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-onedark-fg-muted">
+                  Missing:
+                </p>
                 <div className="flex flex-wrap gap-1">
                   {unmatchedIngredients.slice(0, 5).map((ing, i) => (
                     <button
@@ -201,7 +225,9 @@ export function MacroDisplay({
           onMouseEnter={() => ingredients && setHoveredMacro('calories')}
           onMouseLeave={() => setHoveredMacro(null)}
         >
-          <div className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}>
+          <div
+            className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}
+          >
             <p className="text-lg font-bold text-gray-900 dark:text-onedark-fg">
               {displayCalories ?? '—'}
             </p>
@@ -218,7 +244,9 @@ export function MacroDisplay({
           onMouseEnter={() => ingredients && setHoveredMacro('protein')}
           onMouseLeave={() => setHoveredMacro(null)}
         >
-          <div className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}>
+          <div
+            className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}
+          >
             <p className="text-lg font-bold text-gray-900 dark:text-onedark-fg">
               {displayProtein !== null ? `${displayProtein}g` : '—'}
             </p>
@@ -235,7 +263,9 @@ export function MacroDisplay({
           onMouseEnter={() => ingredients && setHoveredMacro('carbs')}
           onMouseLeave={() => setHoveredMacro(null)}
         >
-          <div className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}>
+          <div
+            className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}
+          >
             <p className="text-lg font-bold text-gray-900 dark:text-onedark-fg">
               {displayCarbs !== null ? `${displayCarbs}g` : '—'}
             </p>
@@ -252,7 +282,9 @@ export function MacroDisplay({
           onMouseEnter={() => ingredients && setHoveredMacro('fat')}
           onMouseLeave={() => setHoveredMacro(null)}
         >
-          <div className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}>
+          <div
+            className={`p-2 bg-gray-50 dark:bg-onedark-bg rounded-lg mb-1 ${ingredients ? 'cursor-help' : ''}`}
+          >
             <p className="text-lg font-bold text-gray-900 dark:text-onedark-fg">
               {displayFat !== null ? `${displayFat}g` : '—'}
             </p>
