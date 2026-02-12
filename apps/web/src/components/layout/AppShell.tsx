@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { ProfileSetupPrompt } from './ProfileSetupPrompt';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -15,6 +16,8 @@ export function AppShell() {
       >
         Skip to main content
       </a>
+
+      <ProfileSetupPrompt />
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

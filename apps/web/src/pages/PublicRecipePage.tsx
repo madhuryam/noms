@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useRecipe, useDeleteRecipe, useRecipeMatch, useWakeLock, useUpdateRecipe, useUser } from '../hooks';
+import { usePublicRecipe, useCopyRecipe, useUser, useWakeLock } from '../hooks';
 import {
   RecipeHeader,
   RecipeMetadata,
@@ -8,24 +8,16 @@ import {
   IngredientList,
   InstructionSteps,
   PrepSteps,
-  PairingsSection,
   MacroDisplay,
-  AddToCalendarModal,
   NutritionModal,
-  IngredientParsingModal,
 } from '../components/recipes';
 import { calculateRecipeMacros } from '../lib/macroCalculation';
-import { MatchSummaryBadge } from '../components/suggestions';
 import {
   RecipeDetailSkeleton,
   ErrorState,
-  EmptyState,
-  EmptyStateIcons,
-  getErrorMessage,
 } from '../components/common';
 import { loadProgress, saveProgress, cleanupExpiredProgress } from '../lib/recipeProgress';
 import { DEFAULT_SERVINGS } from '../lib/constants';
-import { extractDetailedNutrition, type DetailedNutrition } from '../lib/parsing/recipe-extractor';
 
 // Hook to manage combined recipe progress (ingredients + instructions + prep)
 function useRecipeProgress(recipeId: number | undefined) {
@@ -84,19 +76,16 @@ function useRecipeProgress(recipeId: number | undefined) {
   };
 }
 
-export function RecipeDetailPage() {
-  const { id } = useParams<{ id: string }>();
+export function PublicRecipePage() {
+  const { username, recipeId: recipeIdParam } = useParams<{ username: string; recipeId: string }>();
   const navigate = useNavigate();
-  // Support both numeric ID and slug-based lookups
-  const recipeIdOrSlug = id;
+  const recipeId = Number(recipeIdParam);
 
-  const { data: recipe, isLoading, isError, error, refetch } = useRecipe(recipeIdOrSlug);
-  // Once we have the recipe, use its ID for match and progress tracking
-  const recipeId = recipe?.id;
-  const { data: matchData } = useRecipeMatch(recipeId);
-  const deleteRecipe = useDeleteRecipe();
-  const updateRecipe = useUpdateRecipe(recipeId ?? 0);
   const { data: currentUser } = useUser();
+  const { data: recipe, isLoading, error, refetch } = usePublicRecipe(username, recipeId);
+  const copyRecipe = useCopyRecipe();
+  const wakeLock = useWakeLock();
+
   const {
     ingredientsChecked,
     instructionsChecked,
@@ -107,38 +96,18 @@ export function RecipeDetailPage() {
   } = useRecipeProgress(recipeId);
 
   const [servings, setServings] = useState<number | null>(null);
-  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
-  const [showParsingDebug, setShowParsingDebug] = useState(false);
-
-  // Wake lock for cooking mode - keeps screen on
-  const wakeLock = useWakeLock();
+  const [copied, setCopied] = useState(false);
 
   // Initialize servings when recipe loads
   const currentServings = servings ?? recipe?.servings ?? DEFAULT_SERVINGS;
   const originalServings = recipe?.servings ?? DEFAULT_SERVINGS;
   const scaleFactor = currentServings / originalServings;
 
-  // Get macros - either stored or calculated
+  // Get macros - calculated from ingredients
   const macros = useMemo(() => {
-    if (!recipe) return null;
+    if (!recipe?.ingredients_raw) return null;
 
-    // If recipe has stored macros, use them (scaled)
-    if (recipe.carbs_total !== null || recipe.protein_total !== null || recipe.fat_total !== null) {
-      return {
-        carbs: recipe.carbs_total !== null ? recipe.carbs_total * scaleFactor : null,
-        protein: recipe.protein_total !== null ? recipe.protein_total * scaleFactor : null,
-        fat: recipe.fat_total !== null ? recipe.fat_total * scaleFactor : null,
-        calories: recipe.calories_total !== null ? recipe.calories_total * scaleFactor : null,
-        isManual: !!recipe.macros_manual,
-        matchedCount: undefined,
-        totalCount: undefined,
-        ingredients: undefined,
-        unmatchedIngredients: undefined,
-      };
-    }
-
-    // Otherwise calculate from ingredients
     const calculated = calculateRecipeMacros(recipe.ingredients_raw);
     return {
       carbs: calculated.carbs_total * scaleFactor || null,
@@ -151,38 +120,19 @@ export function RecipeDetailPage() {
       ingredients: calculated.ingredients,
       unmatchedIngredients: calculated.unmatched_ingredients,
     };
-  }, [recipe, scaleFactor]);
+  }, [recipe?.ingredients_raw, scaleFactor]);
 
-  // Extract detailed nutrition from markdown content
-  const detailedNutrition = useMemo((): DetailedNutrition | null => {
-    if (!recipe?.markdown_content) return null;
-    const nutrition = extractDetailedNutrition(recipe.markdown_content);
-    // Check if we found any nutrition data
-    const hasAnyData = Object.values(nutrition).some((v) => v !== null);
-    return hasAnyData ? nutrition : null;
-  }, [recipe?.markdown_content]);
-
-  const handleDelete = async () => {
-    if (!recipeId) return;
-
-    if (window.confirm('Are you sure you want to delete this recipe?')) {
-      try {
-        await deleteRecipe.mutateAsync(recipeId);
-        navigate('/recipes');
-      } catch {
-        // Error handled by mutation state
-      }
-    }
-  };
-
-  const handleTogglePublic = async () => {
+  const handleCopy = async () => {
     if (!recipe) return;
     try {
-      await updateRecipe.mutateAsync({ is_public: recipe.is_public ? 0 : 1 });
-      // Refetch to update the UI (handles slug vs id cache key mismatch)
-      refetch();
-    } catch {
-      // Error handled by mutation state
+      const result = await copyRecipe.mutateAsync(recipe.id);
+      setCopied(true);
+      // Navigate to the copied recipe after a short delay
+      setTimeout(() => {
+        navigate(`/recipes/${result.slug || result.id}`);
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to copy recipe:', err);
     }
   };
 
@@ -190,69 +140,82 @@ export function RecipeDetailPage() {
     return <RecipeDetailSkeleton />;
   }
 
-  if (isError) {
+  if (error || !recipe) {
     return (
       <div className="max-w-6xl mx-auto">
         <ErrorState
           variant="full"
-          title="Failed to load recipe"
-          message={getErrorMessage(error)}
+          title="Recipe not found"
+          message="This recipe doesn't exist, is private, or has been deleted."
           onRetry={() => refetch()}
           action={
-            <Link
-              to="/recipes"
-              className="px-4 py-2 border border-gray-200 dark:border-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight transition-colors"
-            >
-              Back to Recipes
-            </Link>
+            username ? (
+              <Link
+                to={`/u/${username}`}
+                className="px-4 py-2 border border-gray-200 dark:border-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight transition-colors"
+              >
+                Back to Profile
+              </Link>
+            ) : undefined
           }
         />
       </div>
     );
   }
 
-  if (!recipe) {
-    return (
-      <div className="max-w-6xl mx-auto">
-        <EmptyState
-          icon={EmptyStateIcons.recipes}
-          title="Recipe not found"
-          description="This recipe may have been deleted or doesn't exist."
-          actionLabel="Back to Recipes"
-          actionLink="/recipes"
-        />
-      </div>
-    );
-  }
+  const isOwnRecipe = currentUser?.username === username;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Breadcrumb + Add to Calendar */}
+      {/* Breadcrumb */}
       <div className="flex items-center justify-between gap-4">
         <nav className="flex items-center gap-2 text-sm min-w-0">
           <Link
-            to="/recipes"
+            to={`/u/${username}`}
             className="text-gray-500 dark:text-onedark-fg-muted hover:text-gray-700 dark:hover:text-onedark-fg flex-shrink-0"
           >
-            Recipes
+            @{username}
           </Link>
           <span className="text-gray-400 dark:text-onedark-fg-muted flex-shrink-0">/</span>
           <span className="text-gray-900 dark:text-onedark-fg truncate">{recipe.title}</span>
         </nav>
-        <button
-          onClick={() => setShowCalendarModal(true)}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-shrink-0"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <span className="hidden sm:inline">Add to Calendar</span>
-        </button>
+
+        {/* Copy button for non-owners */}
+        {!isOwnRecipe && currentUser && (
+          <button
+            onClick={handleCopy}
+            disabled={copyRecipe.isPending || copied}
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors flex-shrink-0 ${
+              copied
+                ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            } disabled:opacity-50`}
+          >
+            {copied ? (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="hidden sm:inline">Copied!</span>
+              </>
+            ) : copyRecipe.isPending ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="hidden sm:inline">Copying...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span className="hidden sm:inline">Copy to My Recipes</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Header: Image, Title, Description */}
@@ -263,25 +226,19 @@ export function RecipeDetailPage() {
         recipeId={recipe.id}
       />
 
+      {/* Recipe owner */}
+      <p className="text-sm text-gray-500 dark:text-onedark-fg-muted">
+        Shared by{' '}
+        <Link
+          to={`/u/${username}`}
+          className="text-blue-600 dark:text-onedark-blue hover:underline font-medium"
+        >
+          {recipe.owner?.displayName || `@${recipe.owner?.username || username}`}
+        </Link>
+      </p>
+
       {/* Tags */}
       <RecipeTags tags={recipe.tags} />
-
-      {/* Pantry Match Badge */}
-      {matchData && matchData.total_count > 0 && (
-        <div className="flex items-center gap-3">
-          <MatchSummaryBadge
-            matchPercent={matchData.match_percent}
-            matchedCount={matchData.matched_count}
-            totalCount={matchData.total_count}
-          />
-          <Link
-            to="/what-can-i-make"
-            className="text-sm text-blue-600 dark:text-onedark-blue hover:underline"
-          >
-            Find more recipes
-          </Link>
-        </div>
-      )}
 
       {/* Metadata: Times, Servings, and Source */}
       <RecipeMetadata
@@ -312,36 +269,13 @@ export function RecipeDetailPage() {
         <div className="lg:col-span-1">
           <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6 lg:sticky lg:top-24">
             {recipe.ingredients_raw ? (
-              <>
-                <IngredientList
-                  recipeId={recipe.id}
-                  ingredientsRaw={recipe.ingredients_raw}
-                  scaleFactor={scaleFactor}
-                  checkedItems={ingredientsChecked}
-                  onProgressChange={updateIngredients}
-                  pantryMatches={matchData?.ingredients}
-                />
-                {/* Parsing details button */}
-                <button
-                  onClick={() => setShowParsingDebug(true)}
-                  className="mt-4 flex items-center gap-1.5 text-xs text-gray-400 dark:text-onedark-fg-muted hover:text-gray-600 dark:hover:text-onedark-fg transition-colors"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  View parsing details
-                </button>
-              </>
+              <IngredientList
+                recipeId={recipe.id}
+                ingredientsRaw={recipe.ingredients_raw}
+                scaleFactor={scaleFactor}
+                checkedItems={ingredientsChecked}
+                onProgressChange={updateIngredients}
+              />
             ) : (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-onedark-fg mb-4">
@@ -431,14 +365,11 @@ export function RecipeDetailPage() {
               </div>
             </div>
           )}
-
-          {/* Pairings */}
-          <PairingsSection recipeId={recipe.id} />
         </div>
       </div>
 
       {/* Nutrition - at the bottom */}
-      {macros && (
+      {macros && macros.totalCount && macros.totalCount > 0 && (
         <MacroDisplay
           carbs={macros.carbs}
           protein={macros.protein}
@@ -458,115 +389,51 @@ export function RecipeDetailPage() {
       <div className="flex items-center justify-between gap-3 pt-6 border-t border-gray-200 dark:border-onedark-bg-highlight">
         <div className="flex items-center gap-3">
           <Link
-            to={`/recipes/${recipe.slug || recipe.id}/edit`}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-onedark-blue text-white rounded-lg hover:bg-blue-700 dark:hover:bg-onedark-blue/90 transition-colors"
+            to={`/u/${username}`}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-onedark-bg-highlight text-gray-700 dark:text-onedark-fg rounded-lg hover:bg-gray-50 dark:hover:bg-onedark-bg-highlight transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Edit Recipe
+            Back to Profile
           </Link>
-          {/* Public Toggle */}
-          {currentUser?.username && (
+
+          {/* Copy button - larger version at bottom */}
+          {!isOwnRecipe && currentUser && (
             <button
-              onClick={handleTogglePublic}
-              disabled={updateRecipe.isPending}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                recipe.is_public
-                  ? 'border-green-300 dark:border-green-600/50 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 hover:border-green-400 dark:hover:border-green-500/50 active:bg-green-200 dark:active:bg-green-900/40'
-                  : 'border-gray-300 dark:border-onedark-bg-highlight bg-gray-50 dark:bg-onedark-bg text-gray-700 dark:text-onedark-fg-muted hover:bg-gray-100 dark:hover:bg-onedark-bg-highlight hover:border-gray-400 dark:hover:border-onedark-fg-muted/30 active:bg-gray-200 dark:active:bg-onedark-bg-highlight/80'
-              }`}
-              title={recipe.is_public ? 'Click to make private' : 'Click to make public'}
+              onClick={handleCopy}
+              disabled={copyRecipe.isPending || copied}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                copied
+                  ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700/30'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              } disabled:opacity-50`}
             >
-              {updateRecipe.isPending ? (
-                <>
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Updating...
-                </>
-              ) : recipe.is_public ? (
+              {copied ? (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Public
+                  Copied to My Recipes
+                </>
+              ) : copyRecipe.isPending ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Copying...
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
-                  Private
+                  Copy to My Recipes
                 </>
               )}
             </button>
           )}
-          <button
-            onClick={handleDelete}
-            disabled={deleteRecipe.isPending}
-            className="flex items-center gap-2 px-4 py-2 border border-red-200 dark:border-onedark-red/30 text-red-600 dark:text-onedark-red rounded-lg hover:bg-red-50 dark:hover:bg-onedark-red/10 disabled:opacity-50 transition-colors"
-          >
-            {deleteRecipe.isPending ? (
-              <>
-                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Deleting...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-                Delete
-              </>
-            )}
-          </button>
         </div>
 
         {/* Share button */}
@@ -586,33 +453,14 @@ export function RecipeDetailPage() {
         </button>
       </div>
 
-      {/* Add to Calendar Modal */}
-      {showCalendarModal && (
-        <AddToCalendarModal
-          recipeId={recipe.id}
-          recipeTitle={recipe.title}
-          defaultServings={recipe.servings ?? DEFAULT_SERVINGS}
-          onClose={() => setShowCalendarModal(false)}
-        />
-      )}
-
       {/* Nutrition Modal */}
       {showNutritionModal && macros && (
         <NutritionModal
           recipeTitle={recipe.title}
           servings={currentServings}
           macros={macros}
-          detailedNutrition={detailedNutrition}
+          detailedNutrition={null}
           onClose={() => setShowNutritionModal(false)}
-        />
-      )}
-
-      {/* Ingredient Parsing Modal */}
-      {showParsingDebug && (
-        <IngredientParsingModal
-          recipeId={recipe.id}
-          recipeTitle={recipe.title}
-          onClose={() => setShowParsingDebug(false)}
         />
       )}
     </div>

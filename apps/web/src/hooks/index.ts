@@ -117,5 +117,7 @@ export {
 } from './useNutrition';
 export type { NutritionEntry, NutritionEntryWithSource } from './useNutrition';
 export { useWakeLock } from './useWakeLock';
-export { useUser, useUpdateUser } from './useUser';
+export { useUser, useUpdateUser, useCheckUsername, useUserSearch } from './useUser';
 export type { User } from './useUser';
+export { usePublicProfile, usePublicRecipes, usePublicRecipe, useCopyRecipe } from './usePublicProfile';
+export type { PublicProfile, PublicRecipe, PublicRecipeDetail } from './usePublicProfile';

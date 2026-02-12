@@ -55,6 +55,15 @@ const SettingsPage = lazy(() =>
 const WhatCanIMakePage = lazy(() =>
   import('./pages/WhatCanIMakePage').then((m) => ({ default: m.WhatCanIMakePage }))
 );
+const ProfileSetupPage = lazy(() =>
+  import('./pages/ProfileSetupPage').then((m) => ({ default: m.ProfileSetupPage }))
+);
+const PublicProfilePage = lazy(() =>
+  import('./pages/PublicProfilePage').then((m) => ({ default: m.PublicProfilePage }))
+);
+const PublicRecipePage = lazy(() =>
+  import('./pages/PublicRecipePage').then((m) => ({ default: m.PublicRecipePage }))
+);
 const NotFoundPage = lazy(() =>
   import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
 );
@@ -90,6 +99,9 @@ function AppWithDnd() {
               <Route path="/import" element={<ImportPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/profile/setup" element={<ProfileSetupPage />} />
+              <Route path="/u/:username/recipes/:recipeId" element={<PublicRecipePage />} />
+              <Route path="/u/:username" element={<PublicProfilePage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Routes>

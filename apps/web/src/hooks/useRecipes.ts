@@ -19,6 +19,7 @@ export interface Recipe {
   cook_time_minutes: number | null;
   servings: number | null;
   created_at: string;
+  is_public?: number;
   tags?: RecipeTag[];
 }
 

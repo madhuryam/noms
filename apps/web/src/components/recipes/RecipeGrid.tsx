@@ -30,6 +30,7 @@ export function RecipeGrid({ recipes, loading = false }: RecipeGridProps) {
           cookTime={recipe.cook_time_minutes}
           servings={recipe.servings}
           tags={recipe.tags}
+          isPublic={recipe.is_public}
         />
       ))}
     </div>

@@ -393,7 +393,7 @@ recipes.get('/', async (c) => {
   try {
     let query = `
       SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes,
-             r.cook_time_minutes, r.servings, r.created_at, r.updated_at
+             r.cook_time_minutes, r.servings, r.created_at, r.updated_at, r.is_public
       FROM recipes r
     `;
     let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
@@ -796,9 +796,9 @@ recipes.get('/suggestions/pantry', async (c) => {
         SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
         FROM recipes r
         JOIN recipe_tags rt ON r.id = rt.recipe_id
-        WHERE rt.tag_id IN (${placeholders})
+        WHERE r.user_id = ? AND rt.tag_id IN (${placeholders})
       `;
-      recipeBindings.push(...tagIds);
+      recipeBindings.push(userId, ...tagIds);
     } else if (smartTagIds.length > 0) {
       // Filter by smart tags - recipe must have at least one of the specified smart tags
       const placeholders = smartTagIds.map(() => '?').join(',');
@@ -806,14 +806,16 @@ recipes.get('/suggestions/pantry', async (c) => {
         SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
         FROM recipes r
         JOIN recipe_smart_tags rst ON r.id = rst.recipe_id
-        WHERE rst.smart_tag_id IN (${placeholders})
+        WHERE r.user_id = ? AND rst.smart_tag_id IN (${placeholders})
       `;
-      recipeBindings.push(...smartTagIds);
+      recipeBindings.push(userId, ...smartTagIds);
     } else {
       recipesQuery = `
         SELECT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes, r.cook_time_minutes, r.servings
         FROM recipes r
+        WHERE r.user_id = ?
       `;
+      recipeBindings.push(userId);
     }
 
     const recipesResult = await c.env.DB.prepare(recipesQuery)
@@ -1304,6 +1306,7 @@ recipes.post('/', async (c) => {
       prep_time_minutes,
       cook_time_minutes,
       notes,
+      is_public,
     } = body;
 
     if (!title) {
@@ -1317,8 +1320,8 @@ recipes.post('/', async (c) => {
       `
       INSERT INTO recipes (
         user_id, title, slug, markdown_content, description, ingredients_raw, instructions_raw,
-        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes, is_public
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -1334,7 +1337,8 @@ recipes.post('/', async (c) => {
         servings_unit ?? 'servings',
         prep_time_minutes ?? null,
         cook_time_minutes ?? null,
-        notes ?? null
+        notes ?? null,
+        is_public ? 1 : 0
       )
       .run();
 
@@ -1426,6 +1430,7 @@ recipes.put('/:id', async (c) => {
       'fat_total',
       'calories_total',
       'macros_manual',
+      'is_public',
     ];
 
     const updates: string[] = [];
@@ -1570,6 +1575,170 @@ recipes.delete('/', async (c) => {
       {
         error: error instanceof Error ? error.message : 'Failed to delete all recipes',
       },
+      500
+    );
+  }
+});
+
+// POST /api/recipes/:id/copy - Copy a public recipe to user's collection
+recipes.post('/:id/copy', async (c) => {
+  const { userId } = c.get('user');
+  const id = Number(c.req.param('id'));
+
+  try {
+    // Get the source recipe - must be public or owned by user
+    const sourceRecipe = await c.env.DB.prepare(
+      `SELECT r.*, u.id as owner_id, u.username as owner_username
+       FROM recipes r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.id = ?`
+    )
+      .bind(id)
+      .first<{
+        id: number;
+        user_id: number;
+        title: string;
+        markdown_content: string | null;
+        description: string | null;
+        ingredients_raw: string | null;
+        instructions_raw: string | null;
+        prep_instructions_raw: string | null;
+        servings: number | null;
+        servings_unit: string | null;
+        prep_time_minutes: number | null;
+        cook_time_minutes: number | null;
+        notes: string | null;
+        source_url: string | null;
+        is_public: number;
+        owner_id: number;
+        owner_username: string | null;
+      }>();
+
+    if (!sourceRecipe) {
+      return c.json({ error: 'Recipe not found' }, 404);
+    }
+
+    // Must be public or owned by user to copy
+    if (sourceRecipe.is_public !== 1 && sourceRecipe.user_id !== userId) {
+      return c.json({ error: 'Cannot copy a private recipe' }, 403);
+    }
+
+    // Don't allow copying your own recipe
+    if (sourceRecipe.user_id === userId) {
+      return c.json({ error: 'Cannot copy your own recipe' }, 400);
+    }
+
+    // Generate a unique slug for the copy
+    const slug = await generateUniqueSlug(c.env.DB, sourceRecipe.title);
+
+    // Create the copied recipe
+    const result = await c.env.DB.prepare(
+      `INSERT INTO recipes (
+        user_id, title, slug, markdown_content, description, ingredients_raw, instructions_raw,
+        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes,
+        notes, source_url, is_public, source_recipe_id, source_user_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        userId,
+        sourceRecipe.title,
+        slug,
+        sourceRecipe.markdown_content,
+        sourceRecipe.description,
+        sourceRecipe.ingredients_raw,
+        sourceRecipe.instructions_raw,
+        sourceRecipe.prep_instructions_raw,
+        sourceRecipe.servings,
+        sourceRecipe.servings_unit ?? 'servings',
+        sourceRecipe.prep_time_minutes,
+        sourceRecipe.cook_time_minutes,
+        sourceRecipe.notes,
+        sourceRecipe.source_url,
+        0, // New copy is private by default
+        sourceRecipe.id, // source_recipe_id
+        sourceRecipe.user_id // source_user_id
+      )
+      .run();
+
+    const newRecipeId = result.meta.last_row_id as number;
+
+    // Copy recipe_ingredients
+    if (sourceRecipe.ingredients_raw) {
+      const parsedIngredients = parseIngredientsRaw(sourceRecipe.ingredients_raw);
+      let sortOrder = 0;
+
+      for (const ing of parsedIngredients) {
+        const normalizationKey = generateNormalizationKeys(ing.rawText);
+        const parsed = parseIngredientLine(ing.rawText);
+        const minQty = parsed?.minQuantity ?? parsed?.quantity ?? null;
+        const maxQty = parsed?.maxQuantity ?? parsed?.quantity ?? null;
+        const unit = parsed?.unit || null;
+
+        await c.env.DB.prepare(
+          `INSERT INTO recipe_ingredients (recipe_id, raw_text, group_name, sort_order, normalization_key, min_quantity, max_quantity, unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+          .bind(newRecipeId, ing.rawText, ing.groupName, sortOrder++, normalizationKey, minQty, maxQty, unit)
+          .run();
+      }
+    }
+
+    // Copy tags - create user's own tag copies if they don't exist
+    const sourceTags = await c.env.DB.prepare(
+      `SELECT t.name, t.display_name, t.color, t.is_category
+       FROM tags t
+       JOIN recipe_tags rt ON t.id = rt.tag_id
+       WHERE rt.recipe_id = ?`
+    )
+      .bind(id)
+      .all<{
+        name: string;
+        display_name: string;
+        color: string | null;
+        is_category: number;
+      }>();
+
+    for (const tag of sourceTags.results ?? []) {
+      // Check if user already has this tag
+      let userTag = await c.env.DB.prepare('SELECT id FROM tags WHERE user_id = ? AND name = ?')
+        .bind(userId, tag.name)
+        .first<{ id: number }>();
+
+      // Create tag if not exists
+      if (!userTag) {
+        const tagResult = await c.env.DB.prepare(
+          'INSERT INTO tags (user_id, name, display_name, color, is_category) VALUES (?, ?, ?, ?, ?)'
+        )
+          .bind(userId, tag.name, tag.display_name, tag.color, tag.is_category)
+          .run();
+        userTag = { id: tagResult.meta.last_row_id as number };
+      }
+
+      // Link tag to recipe
+      await c.env.DB.prepare('INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)')
+        .bind(newRecipeId, userTag.id)
+        .run();
+    }
+
+    // Fetch the new recipe
+    const newRecipe = await c.env.DB.prepare('SELECT * FROM recipes WHERE id = ?')
+      .bind(newRecipeId)
+      .first();
+
+    return c.json(
+      {
+        ...newRecipe,
+        source: {
+          recipeId: sourceRecipe.id,
+          userId: sourceRecipe.user_id,
+          username: sourceRecipe.owner_username,
+        },
+      },
+      201
+    );
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to copy recipe' },
       500
     );
   }

@@ -26,6 +26,10 @@ interface Recipe {
   fat_total: number | null;
   calories_total: number | null;
   macros_manual: boolean | number;
+  // Public profile fields
+  is_public: number;
+  source_recipe_id: number | null;
+  source_user_id: number | null;
   tags?: {
     id: number;
     name: string;
@@ -58,6 +62,8 @@ interface UpdateRecipeInput extends Partial<CreateRecipeInput> {
   fat_total?: number | null;
   calories_total?: number | null;
   macros_manual?: boolean | number;
+  // Public profile fields
+  is_public?: boolean | number;
 }
 
 export function useRecipe(idOrSlug: number | string | undefined) {
@@ -101,6 +107,9 @@ export function useUpdateRecipe(id: number) {
       // Invalidate recipe-related data since ingredients may have changed
       queryClient.invalidateQueries({ queryKey: ['recipe-match', id] });
       queryClient.invalidateQueries({ queryKey: ['recipe-ingredients', id] });
+      // Invalidate public profile data in case is_public changed
+      queryClient.invalidateQueries({ queryKey: ['public-recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['public-profile'] });
     },
   });
 }
@@ -115,6 +124,9 @@ export function useDeleteRecipe() {
     onSuccess: (_, id) => {
       queryClient.removeQueries({ queryKey: ['recipe', id] });
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      // Invalidate public profile data in case deleted recipe was public
+      queryClient.invalidateQueries({ queryKey: ['public-recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['public-profile'] });
     },
   });
 }

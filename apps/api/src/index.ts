@@ -14,6 +14,7 @@ import {
   exportRoutes,
   nutrition,
   user,
+  profiles,
 } from './routes';
 import { validateAccessJWT, requireUser } from './middleware';
 
@@ -59,8 +60,18 @@ app.get('/health', (c) => {
   return c.json(response);
 });
 
-// Cloudflare Access JWT validation for all /api/* routes (skip for local dev)
+// Public profile routes - no auth required
+app.route('/api/profiles', profiles);
+
+// Cloudflare Access JWT validation for all /api/* routes (skip for local dev and public routes)
 app.use('/api/*', async (c, next) => {
+  // Skip auth for public profile routes (already handled above)
+  const path = c.req.path;
+  if (path.startsWith('/api/profiles')) {
+    await next();
+    return;
+  }
+
   const host = c.req.header('host') || '';
   const origin = c.req.header('origin') || '';
   const isLocalDev =
@@ -80,9 +91,17 @@ app.use('/api/*', async (c, next) => {
   return validateAccessJWT(c as any, next);
 });
 
-// User middleware - finds/creates user and sets user context
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.use('/api/*', requireUser as any);
+// User middleware - finds/creates user and sets user context (skip for public routes)
+app.use('/api/*', async (c, next) => {
+  // Skip for public profile routes
+  const path = c.req.path;
+  if (path.startsWith('/api/profiles')) {
+    await next();
+    return;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (requireUser as any)(c, next);
+});
 
 // Database check endpoint
 app.get('/api/db-check', async (c) => {

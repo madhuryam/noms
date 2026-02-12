@@ -54,7 +54,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Search Bar - hidden on search page to avoid duplicate search inputs */}
         {!isSearchPage && (
           <div className="flex-1 max-w-xl mx-4 hidden sm:block" role="search">
-            <SearchBar placeholder="Search recipes..." />
+            <SearchBar placeholder="Search..." />
           </div>
         )}
 
