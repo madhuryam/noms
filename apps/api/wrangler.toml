@@ -57,23 +57,27 @@ binding = "IMAGES_BUCKET"
 bucket_name = "noms-images"
 
 # =============================================================================
-# Staging Environment (Optional)
+# Preview Environment (for GitHub PR preview deployments)
 # =============================================================================
-# Uncomment and configure to enable a staging environment
-# Deploy with: npx wrangler deploy --env staging
+# Cloudflare Workers preview environments allow each PR to get its own
+# deployment URL. Used by Cloudflare's GitHub integration or CI workflows.
+# Deploy with: npx wrangler versions upload --env preview
 #
-# [env.staging]
-# name = "noms-staging"
-#
-# [[env.staging.d1_databases]]
-# binding = "DB"
-# database_name = "noms-db-staging"
-# database_id = "your-staging-database-id"
-# migrations_dir = "migrations"
-#
-# [[env.staging.r2_buckets]]
-# binding = "IMAGES_BUCKET"
-# bucket_name = "noms-images-staging"
+# Preview uses separate D1 and R2 resources so PR deployments don't affect
+# production data.
+
+[env.preview]
+name = "noms-preview"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "noms-db-preview"
+database_id = "preview"
+migrations_dir = "migrations"
+
+[[env.preview.r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "noms-images-preview"
 
 # =============================================================================
 # Custom Domain (Optional)
