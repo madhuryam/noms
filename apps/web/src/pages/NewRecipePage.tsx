@@ -303,7 +303,10 @@ export function NewRecipePage() {
 
       {/* Form Card */}
       <div className="bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight p-6">
-        <RecipeForm key={importedData?.title || videoData?.title || 'new'} initialData={formInitialData} />
+        <RecipeForm
+          key={importedData?.title || videoData?.title || 'new'}
+          initialData={formInitialData}
+        />
       </div>
     </div>
   );

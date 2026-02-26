@@ -253,7 +253,7 @@ function formatInstructions(raw: string): string {
     let stepText = trimmed;
     // Remove leading bullet, dash, asterisk, or existing number
     stepText = stepText.replace(/^[-*•]\s*/, '');
-    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+    stepText = stepText.replace(/^\d+[.)]\s*/, '');
 
     if (stepText) {
       result.push(`${stepNumber}. ${stepText}`);

@@ -193,14 +193,14 @@ function preprocessPlusNotation(rawText: string): string {
 
     if (hasIngredientWord) {
       // The part before + has an ingredient (e.g., "1 large egg"), use just that
-      let cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
+      const cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
       return cleaned.replace(/\s+/g, ' ').trim();
     }
   }
 
   // Fall back to removing "+ quantity unit" patterns (for cases like "2 cups + 2 tbsp flour")
   const plusPattern =
-    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
+    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞/\s.-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
   let cleaned = rawText.replace(plusPattern, ' ');
 
   // Also remove standalone parenthetical weight measurements like (265g)
@@ -210,35 +210,6 @@ function preprocessPlusNotation(rawText: string): string {
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   return cleaned;
-}
-
-/**
- * Extract ingredient name from raw text.
- * Uses sharp-recipe-parser for accurate extraction, with fallback to raw text.
- * Handles "+" notation for combined measurements (e.g., "2 cups + 2 tbsp flour").
- */
-function extractIngredientName(rawText: string): string {
-  // Preprocess to handle "+" combined measurements
-  const preprocessed = preprocessPlusNotation(rawText);
-
-  const parsed = parseIngredientLine(preprocessed);
-
-  if (parsed && parsed.ingredient) {
-    return stripExtraSuffixes(parsed.ingredient);
-  }
-
-  // Fallback: basic cleanup if parser fails
-  let text = preprocessed.trim();
-  // Remove leading numbers, fractions, and ranges
-  text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
-  // Remove common units
-  text = text.replace(
-    /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i,
-    ''
-  );
-  text = text.replace(/^of\s+/i, '');
-
-  return stripExtraSuffixes(text.trim());
 }
 
 /**
@@ -361,7 +332,7 @@ function normalizeInstructions(text: string | null): string | null {
     let stepText = trimmed;
     // Remove leading bullet, dash, asterisk, or existing number
     stepText = stepText.replace(/^[-*•]\s*/, '');
-    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+    stepText = stepText.replace(/^\d+[.)]\s*/, '');
 
     if (stepText) {
       result.push(`${stepNumber}. ${stepText}`);
@@ -488,7 +459,7 @@ recipes.get('/', async (c) => {
 
     // Get tags for each recipe
     const recipeIds = (results.results ?? []).map((r) => (r as { id: number }).id);
-    let recipeTags: Record<
+    const recipeTags: Record<
       number,
       Array<{
         id: number;
@@ -498,7 +469,7 @@ recipes.get('/', async (c) => {
         is_category: number;
       }>
     > = {};
-    let recipeSmartTags: Record<
+    const recipeSmartTags: Record<
       number,
       Array<{
         id: number;
@@ -948,7 +919,7 @@ recipes.get('/suggestions/pantry', async (c) => {
 
     // Get tags for the recipes
     const recipeIds = limitedResults.map((r) => r.recipe.id);
-    let recipeTags: Record<
+    const recipeTags: Record<
       number,
       Array<{
         id: number;

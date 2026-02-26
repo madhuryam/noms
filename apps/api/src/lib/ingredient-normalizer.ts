@@ -215,7 +215,7 @@ export function normalizeIngredientKey(name: string): string {
   normalized = normalized.replace(/\([^)]*\)/g, '');
 
   // 3. Remove punctuation and hyphens (replace with space to preserve word boundaries)
-  normalized = normalized.replace(/[,.\-:;'"!?\/]/g, ' ');
+  normalized = normalized.replace(/[,.\-:;'"!?/]/g, ' ');
 
   // 4. Remove numbers and fractions
   normalized = normalized.replace(/\d+\/\d+/g, ' '); // fractions like 1/2

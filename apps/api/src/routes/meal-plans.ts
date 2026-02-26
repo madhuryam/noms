@@ -18,26 +18,6 @@ interface MealPlan {
   created_at: string;
 }
 
-interface PlannedMeal {
-  id: number;
-  meal_plan_id: number;
-  recipe_id: number | null;
-  custom_title: string | null;
-  meal_slot_id: number;
-  planned_date: string;
-  scaling_factor: number;
-  notes: string | null;
-  is_completed: number;
-}
-
-interface MealSlot {
-  id: number;
-  name: string;
-  display_name: string;
-  sort_order: number;
-  default_servings: number;
-}
-
 const mealPlans = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // GET /api/meal-plans - List all meal plans

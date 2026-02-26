@@ -141,9 +141,7 @@ function parseNutritionValue(value: string | number | undefined): number | null 
 
 // --- Servings parser ---
 
-function parseServings(
-  recipeYield: string | string[] | number | undefined
-): number | null {
+function parseServings(recipeYield: string | string[] | number | undefined): number | null {
   if (recipeYield === undefined || recipeYield === null) return null;
   if (typeof recipeYield === 'number') return recipeYield;
 
@@ -173,7 +171,8 @@ function extractJsonLdFromHtml(html: string): unknown[] {
 function hasType(obj: Record<string, unknown>, type: string): boolean {
   const t = obj['@type'];
   if (typeof t === 'string') return t.toLowerCase() === type.toLowerCase();
-  if (Array.isArray(t)) return t.some((v) => typeof v === 'string' && v.toLowerCase() === type.toLowerCase());
+  if (Array.isArray(t))
+    return t.some((v) => typeof v === 'string' && v.toLowerCase() === type.toLowerCase());
   return false;
 }
 
@@ -188,7 +187,11 @@ function findRecipeInJsonLd(jsonLdBlocks: unknown[]): SchemaRecipe | null {
       // Array of objects (e.g., @graph pattern)
       if (Array.isArray(block)) {
         for (const item of block) {
-          if (item && typeof item === 'object' && hasType(item as Record<string, unknown>, 'Recipe')) {
+          if (
+            item &&
+            typeof item === 'object' &&
+            hasType(item as Record<string, unknown>, 'Recipe')
+          ) {
             return item as SchemaRecipe;
           }
         }
@@ -198,7 +201,11 @@ function findRecipeInJsonLd(jsonLdBlocks: unknown[]): SchemaRecipe | null {
       const asRecord = block as Record<string, unknown>;
       if (Array.isArray(asRecord['@graph'])) {
         for (const item of asRecord['@graph'] as unknown[]) {
-          if (item && typeof item === 'object' && hasType(item as Record<string, unknown>, 'Recipe')) {
+          if (
+            item &&
+            typeof item === 'object' &&
+            hasType(item as Record<string, unknown>, 'Recipe')
+          ) {
             return item as SchemaRecipe;
           }
         }
@@ -239,9 +246,10 @@ function extractInstructions(
         // Section steps
         if (Array.isArray(section.itemListElement)) {
           for (const subItem of section.itemListElement) {
-            const text = typeof subItem === 'string'
-              ? subItem.replace(/<[^>]*>/g, '').trim()
-              : (subItem as SchemaHowToStep)?.text?.replace(/<[^>]*>/g, '').trim();
+            const text =
+              typeof subItem === 'string'
+                ? subItem.replace(/<[^>]*>/g, '').trim()
+                : (subItem as SchemaHowToStep)?.text?.replace(/<[^>]*>/g, '').trim();
             if (text) {
               lines.push(`${stepNumber}. ${text}`);
               stepNumber++;
@@ -295,9 +303,7 @@ function extractTags(recipe: SchemaRecipe): string[] {
   }
 
   if (recipe.keywords) {
-    const keywords = Array.isArray(recipe.keywords)
-      ? recipe.keywords
-      : recipe.keywords.split(',');
+    const keywords = Array.isArray(recipe.keywords) ? recipe.keywords : recipe.keywords.split(',');
     tags.push(...keywords.map((k) => k.trim()).filter(Boolean));
   }
 
@@ -397,7 +403,10 @@ scrapeRoutes.post('/scrape-url', async (c) => {
       }
     } catch {
       return c.json(
-        { success: false, error: 'Invalid URL. Please provide a valid HTTP(S) URL.' } satisfies ScrapeResult,
+        {
+          success: false,
+          error: 'Invalid URL. Please provide a valid HTTP(S) URL.',
+        } satisfies ScrapeResult,
         400
       );
     }
@@ -409,7 +418,10 @@ scrapeRoutes.post('/scrape-url', async (c) => {
       const videoId = getYouTubeVideoId(normalizedUrl);
       if (!videoId) {
         return c.json(
-          { success: false, error: 'Could not parse YouTube video ID from URL' } satisfies ScrapeResult,
+          {
+            success: false,
+            error: 'Could not parse YouTube video ID from URL',
+          } satisfies ScrapeResult,
           400
         );
       }
@@ -421,7 +433,11 @@ scrapeRoutes.post('/scrape-url', async (c) => {
 
         if (!oembedResponse.ok) {
           return c.json(
-            { success: false, error: 'Could not fetch YouTube video information. The video may be private or unavailable.' } satisfies ScrapeResult,
+            {
+              success: false,
+              error:
+                'Could not fetch YouTube video information. The video may be private or unavailable.',
+            } satisfies ScrapeResult,
             400
           );
         }
@@ -611,7 +627,8 @@ scrapeRoutes.post('/scrape-url', async (c) => {
         return c.json(
           {
             success: false,
-            error: 'URL does not point to an HTML page. Recipe extraction only works with web pages.',
+            error:
+              'URL does not point to an HTML page. Recipe extraction only works with web pages.',
           } satisfies ScrapeResult,
           400
         );

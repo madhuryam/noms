@@ -83,14 +83,14 @@ function preprocessPlusNotation(rawText: string): string {
 
     if (hasIngredientWord) {
       // The part before + has an ingredient (e.g., "1 large egg"), use just that
-      let cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
+      const cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
       return cleaned.replace(/\s+/g, ' ').trim();
     }
   }
 
   // Fall back to removing "+ quantity unit" patterns (for cases like "2 cups + 2 tbsp flour")
   const plusPattern =
-    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
+    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞/\s.-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
   let cleaned = rawText.replace(plusPattern, ' ');
 
   // Also remove parenthetical weight notations like "(265g)"
@@ -125,7 +125,7 @@ function extractIngredientName(rawText: string): string {
 
   // Fallback: basic cleanup if parser fails
   let text = rawText.trim();
-  text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
+  text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞/\s\-.]+/, '');
   text = text.replace(
     /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i,
     ''
@@ -283,23 +283,23 @@ function extractSourceUrlFromText(text: string | null): string | null {
 
   // Pattern 1: Markdown links with recipe/source-related text
   const recipeLinkPattern =
-    /\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\((https?:\/\/[^\)]+)\)/i;
+    /\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\((https?:\/\/[^)]+)\)/i;
   const recipeLinkMatch = text.match(recipeLinkPattern);
   if (recipeLinkMatch) return recipeLinkMatch[1];
 
   // Pattern 2: "Source: URL" or "source: URL"
-  const sourcePattern = /source:?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const sourcePattern = /source:?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s)]+)\)?/i;
   const sourceMatch = text.match(sourcePattern);
   if (sourceMatch) return sourceMatch[1];
 
   // Pattern 3: "Recipe from: URL" or similar
   const recipeFromPattern =
-    /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+    /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s)]+)\)?/i;
   const recipeFromMatch = text.match(recipeFromPattern);
   if (recipeFromMatch) return recipeFromMatch[1];
 
   // Pattern 4: Any standalone markdown link (not an image)
-  const anyLinkPattern = /(?<!!)\[[^\]]+\]\((https?:\/\/[^\)]+)\)/;
+  const anyLinkPattern = /(?<!!)\[[^\]]+\]\((https?:\/\/[^)]+)\)/;
   const anyLinkMatch = text.match(anyLinkPattern);
   if (anyLinkMatch) return anyLinkMatch[1];
 
@@ -394,11 +394,11 @@ function cleanText(text: string | null): string | null {
     .replace(/<img[^>]*>/gi, '')
     // Remove recipe/source markdown links: [Source](url), [Insta Recipe](url), etc.
     .replace(
-      /\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\(https?:\/\/[^\)]+\)/gi,
+      /\[(?:source|recipe|insta\s*recipe|original|from|via)[^\]]*\]\(https?:\/\/[^)]+\)/gi,
       ''
     )
     // Remove "Source: URL" lines
-    .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
+    .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s)]+\)?$/gim, '')
     // Remove bare URLs on their own line
     .replace(/^https?:\/\/[^\s]+$/gm, '')
     // Clean up multiple blank lines
@@ -443,7 +443,7 @@ function normalizeInstructions(text: string | null): string | null {
     let stepText = trimmed;
     // Remove leading bullet, dash, asterisk, or existing number
     stepText = stepText.replace(/^[-*•]\s*/, '');
-    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+    stepText = stepText.replace(/^\d+[.)]\s*/, '');
 
     if (stepText) {
       result.push(`${stepNumber}. ${stepText}`);
