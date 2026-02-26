@@ -90,3 +90,4 @@ bucket_name = "noms-images-preview"
 # [routes]
 # pattern = "noms.yourdomain.com/*"
 # custom_domain = true
+
