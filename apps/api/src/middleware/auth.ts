@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { getCookie } from 'hono/cookie';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 // Cloudflare Access configuration
@@ -23,7 +24,7 @@ export interface AccessJWTPayload {
 
 /**
  * Middleware to validate Cloudflare Access JWT tokens
- * Extracts the token from CF-Access-JWT-Assertion header and validates it
+ * Extracts the token from CF-Access-JWT-Assertion header or CF_Authorization cookie
  */
 export const validateAccessJWT = createMiddleware<{
   Variables: {
@@ -31,7 +32,7 @@ export const validateAccessJWT = createMiddleware<{
     userEmail: string;
   };
 }>(async (c, next) => {
-  const token = c.req.header('CF-Access-JWT-Assertion');
+  const token = c.req.header('CF-Access-JWT-Assertion') || getCookie(c, 'CF_Authorization');
 
   if (!token) {
     return c.json({ error: 'Missing authorization token' }, 403);
