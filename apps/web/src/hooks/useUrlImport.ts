@@ -37,10 +37,17 @@ interface ScrapeResponse {
   error?: string;
 }
 
+// Scraping external URLs can be slow — use a longer timeout than the default 10s
+const SCRAPE_TIMEOUT = 30000;
+
 export function useUrlImport() {
   return useMutation({
     mutationFn: async (url: string): Promise<ScrapeData> => {
-      const response = await api.post<ScrapeResponse>('/api/import/scrape-url', { url });
+      const response = await api.post<ScrapeResponse>(
+        '/api/import/scrape-url',
+        { url },
+        SCRAPE_TIMEOUT
+      );
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to extract recipe data from URL');
       }

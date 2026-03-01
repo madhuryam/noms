@@ -20,9 +20,9 @@ export class ApiError extends Error {
   }
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function fetchApi<T>(endpoint: string, options?: RequestInit, timeout?: number): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout ?? DEFAULT_TIMEOUT);
 
   try {
     const response = await fetch(`${API_URL}${endpoint}`, {
@@ -98,8 +98,8 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
 export const api = {
   get: <T>(endpoint: string) => fetchApi<T>(endpoint),
-  post: <T>(endpoint: string, data: unknown) =>
-    fetchApi<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
+  post: <T>(endpoint: string, data: unknown, timeout?: number) =>
+    fetchApi<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }, timeout),
   put: <T>(endpoint: string, data: unknown) =>
     fetchApi<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
   patch: <T>(endpoint: string, data: unknown) =>
