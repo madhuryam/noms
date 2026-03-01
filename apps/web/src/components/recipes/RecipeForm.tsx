@@ -173,6 +173,7 @@ interface FormData {
   cook_time_minutes: string;
   notes: string;
   source_url: string;
+  video_url: string;
   // Macro fields
   carbs_total: string;
   protein_total: string;
@@ -207,6 +208,7 @@ interface RecipeFormProps {
     cook_time_minutes: number | null;
     notes: string | null;
     source_url: string | null;
+    video_url?: string | null;
     tags?: RecipeTag[];
     image_path?: string | null;
     // Macro fields
@@ -262,6 +264,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
     cook_time_minutes: '',
     notes: '',
     source_url: '',
+    video_url: '',
     carbs_total: '',
     protein_total: '',
     fat_total: '',
@@ -315,6 +318,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
         cook_time_minutes: initialData.cook_time_minutes?.toString() ?? '',
         notes: initialData.notes ?? '',
         source_url: initialData.source_url ?? '',
+        video_url: initialData.video_url ?? '',
         carbs_total: initialData.carbs_total?.toString() ?? '',
         protein_total: initialData.protein_total?.toString() ?? '',
         fat_total: initialData.fat_total?.toString() ?? '',
@@ -387,6 +391,7 @@ export function RecipeForm({ mode = 'create', recipeId, initialData }: RecipeFor
       cook_time_minutes: formData.cook_time_minutes ? Number(formData.cook_time_minutes) : null,
       notes: formData.notes.trim() || null,
       source_url: formData.source_url.trim() || null,
+      video_url: formData.video_url.trim() || null,
       ...macroValues,
       macros_manual: macrosManual ? 1 : 0,
     };

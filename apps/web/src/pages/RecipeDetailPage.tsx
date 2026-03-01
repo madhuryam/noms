@@ -247,6 +247,7 @@ export function RecipeDetailPage() {
         title={recipe.title}
         description={recipe.description}
         imagePath={recipe.image_path}
+        videoUrl={recipe.video_url}
         recipeId={recipe.id}
       />
 

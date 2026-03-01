@@ -121,7 +121,7 @@ export function initWebVitals(onReport?: ReportHandler) {
 
   // Cumulative Layout Shift
   let clsValue = 0;
-  let clsEntries: PerformanceEntry[] = [];
+  const clsEntries: PerformanceEntry[] = [];
 
   const clsObserver = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {

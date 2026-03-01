@@ -185,15 +185,15 @@ function parseIngredientLine(
   }
 
   // Remove leading bullets, numbers, dashes
-  let cleaned = trimmed
+  const cleaned = trimmed
     .replace(/^[-*•]\s*/, '')
-    .replace(/^\d+[\.)]\s*/, '')
+    .replace(/^\d+[.)]\s*/, '')
     .trim();
 
   // Pattern: quantity unit ingredient
   // Examples: "2 cups flour", "1/2 tsp salt", "1 lb chicken breast"
   const quantityUnitPattern =
-    /^([\d\s\/\.]+)\s*(cup|cups|c|tablespoon|tablespoons|tbsp|tbs|tb|teaspoon|teaspoons|tsp|ts|t|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|ml|l|pint|pints|pt|quart|quarts|qt|gallon|gallons|gal|fl oz|piece|pieces|slice|slices|clove|cloves|pinch|pinches|dash|dashes|stick|sticks|can|cans|bunch|bunches|head|heads|sprig|sprigs|leaf|leaves|handful|handfuls)s?\b\.?\s+(.+)/i;
+    /^([\d\s/.]+)\s*(cup|cups|c|tablespoon|tablespoons|tbsp|tbs|tb|teaspoon|teaspoons|tsp|ts|t|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|ml|l|pint|pints|pt|quart|quarts|qt|gallon|gallons|gal|fl oz|piece|pieces|slice|slices|clove|cloves|pinch|pinches|dash|dashes|stick|sticks|can|cans|bunch|bunches|head|heads|sprig|sprigs|leaf|leaves|handful|handfuls)s?\b\.?\s+(.+)/i;
 
   const match = cleaned.match(quantityUnitPattern);
   if (match) {
@@ -206,7 +206,7 @@ function parseIngredientLine(
 
   // Pattern: quantity ingredient (no unit, assume "piece" or count)
   // Examples: "2 eggs", "3 carrots", "1 onion"
-  const quantityOnlyPattern = /^([\d\s\/\.]+)\s+(.+)/;
+  const quantityOnlyPattern = /^([\d\s/.]+)\s+(.+)/;
   const quantityMatch = cleaned.match(quantityOnlyPattern);
   if (quantityMatch) {
     return {

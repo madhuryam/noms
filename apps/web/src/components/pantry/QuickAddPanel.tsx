@@ -193,7 +193,7 @@ export function QuickAddPanel({ location, onClose }: QuickAddPanelProps) {
         }
       }
     }
-  }, [pantryItems, location]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pantryItems, location]);
 
   // Calculate expiration date based on shelf life data
   const getExpirationDate = useCallback(

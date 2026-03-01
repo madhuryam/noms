@@ -97,7 +97,7 @@ function normalizeInstructions(markdown: string): string {
     let stepText = trimmed;
     // Remove leading bullet, dash, asterisk, or existing number
     stepText = stepText.replace(/^[-*•]\s*/, '');
-    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+    stepText = stepText.replace(/^\d+[.)]\s*/, '');
 
     if (stepText) {
       result.push(`${stepNumber}. ${stepText}`);
@@ -330,18 +330,18 @@ function extractSourceUrlFromNotes(notes: string | null): string | null {
   if (!notes) return null;
 
   // Pattern 1: "Source: URL" or "source: URL" (with or without markdown link)
-  const sourcePattern = /source:?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+  const sourcePattern = /source:?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s)]+)\)?/i;
   const sourceMatch = notes.match(sourcePattern);
   if (sourceMatch) return sourceMatch[1];
 
   // Pattern 2: Markdown link with "source" text: [Source](url) or [source](url)
-  const linkPattern = /\[source\]\((https?:\/\/[^\)]+)\)/i;
+  const linkPattern = /\[source\]\((https?:\/\/[^)]+)\)/i;
   const linkMatch = notes.match(linkPattern);
   if (linkMatch) return linkMatch[1];
 
   // Pattern 3: "Recipe from: URL" or similar
   const recipeFromPattern =
-    /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s\)]+)\)?/i;
+    /(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?(https?:\/\/[^\s)]+)\)?/i;
   const recipeFromMatch = notes.match(recipeFromPattern);
   if (recipeFromMatch) return recipeFromMatch[1];
 
@@ -356,12 +356,12 @@ function stripSourceFromNotes(notes: string | null): string | null {
 
   const cleaned = notes
     // Remove "Source: URL" lines
-    .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim, '')
+    .replace(/^source:?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s)]+\)?$/gim, '')
     // Remove "[Source](url)" lines
-    .replace(/^\[source\]\(https?:\/\/[^\)]+\)$/gim, '')
+    .replace(/^\[source\]\(https?:\/\/[^)]+\)$/gim, '')
     // Remove "Recipe from: URL" lines
     .replace(
-      /^(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s\)]+\)?$/gim,
+      /^(?:recipe\s+)?(?:from|via|adapted from|original):?\s*\[?[^\]]*\]?\(?https?:\/\/[^\s)]+\)?$/gim,
       ''
     )
     // Clean up multiple blank lines
@@ -581,8 +581,8 @@ function extractInlineMetadata(content: string): {
   // Patterns for inline metadata - match "Key: Value" or "Key - Value" at start of line
   // Prep time patterns
   const prepPatterns = [
-    /^(?:prep(?:aration)?(?:\s*time)?)\s*[:：\-]\s*(.+)$/im,
-    /^(?:prep)\s*[:：\-]\s*(.+)$/im,
+    /^(?:prep(?:aration)?(?:\s*time)?)\s*[:：-]\s*(.+)$/im,
+    /^(?:prep)\s*[:：-]\s*(.+)$/im,
   ];
   for (const pattern of prepPatterns) {
     const match = content.match(pattern);
@@ -594,8 +594,8 @@ function extractInlineMetadata(content: string): {
 
   // Cook time patterns
   const cookPatterns = [
-    /^(?:cook(?:ing)?(?:\s*time)?)\s*[:：\-]\s*(.+)$/im,
-    /^(?:cook)\s*[:：\-]\s*(.+)$/im,
+    /^(?:cook(?:ing)?(?:\s*time)?)\s*[:：-]\s*(.+)$/im,
+    /^(?:cook)\s*[:：-]\s*(.+)$/im,
   ];
   for (const pattern of cookPatterns) {
     const match = content.match(pattern);
@@ -607,8 +607,8 @@ function extractInlineMetadata(content: string): {
 
   // Total time patterns
   const totalPatterns = [
-    /^(?:total(?:\s*time)?)\s*[:：\-]\s*(.+)$/im,
-    /^(?:time)\s*[:：\-]\s*(.+)$/im,
+    /^(?:total(?:\s*time)?)\s*[:：-]\s*(.+)$/im,
+    /^(?:time)\s*[:：-]\s*(.+)$/im,
   ];
   for (const pattern of totalPatterns) {
     const match = content.match(pattern);
@@ -620,8 +620,8 @@ function extractInlineMetadata(content: string): {
 
   // Servings patterns
   const servingsPatterns = [
-    /^(?:servings?|serves?|yield|portions?)\s*[:：\-]\s*(\d+)(?:\s*[-–]\s*\d+)?(?:\s+(.+))?$/im,
-    /^(?:makes)\s*[:：\-]?\s*(\d+)(?:\s*[-–]\s*\d+)?(?:\s+(.+))?$/im,
+    /^(?:servings?|serves?|yield|portions?)\s*[:：-]\s*(\d+)(?:\s*[-–]\s*\d+)?(?:\s+(.+))?$/im,
+    /^(?:makes)\s*[:：-]?\s*(\d+)(?:\s*[-–]\s*\d+)?(?:\s+(.+))?$/im,
   ];
   for (const pattern of servingsPatterns) {
     const match = content.match(pattern);

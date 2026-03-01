@@ -14,6 +14,7 @@ import {
   exportRoutes,
   nutrition,
   user,
+  scrapeRoutes,
 } from './routes';
 import { validateAccessJWT, requireUser } from './middleware';
 
@@ -158,6 +159,7 @@ app.route('/api/recipes', recipes);
 app.route('/api/tags', tags);
 app.route('/api/search', search);
 app.route('/api/import', importRoutes);
+app.route('/api/import', scrapeRoutes);
 app.route('/api/images', images);
 app.route('/api/associations', associations);
 app.route('/api/pantry', pantry);

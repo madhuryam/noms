@@ -117,5 +117,7 @@ export {
 } from './useNutrition';
 export type { NutritionEntry, NutritionEntryWithSource } from './useNutrition';
 export { useWakeLock } from './useWakeLock';
+export { useUrlImport } from './useUrlImport';
+export type { ScrapedRecipe, ScrapedVideo, ScrapeData } from './useUrlImport';
 export { useUser, useUpdateUser } from './useUser';
 export type { User } from './useUser';

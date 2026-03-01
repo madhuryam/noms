@@ -193,14 +193,14 @@ function preprocessPlusNotation(rawText: string): string {
 
     if (hasIngredientWord) {
       // The part before + has an ingredient (e.g., "1 large egg"), use just that
-      let cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
+      const cleaned = beforePlus.replace(/\(\d+\s*g\)/gi, '');
       return cleaned.replace(/\s+/g, ' ').trim();
     }
   }
 
   // Fall back to removing "+ quantity unit" patterns (for cases like "2 cups + 2 tbsp flour")
   const plusPattern =
-    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\.\-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
+    /\+\s*[\d½⅓⅔¼¾⅛⅜⅝⅞/\s.-]*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|grams?|g|kg|ml|l|large|medium|small|whole|pieces?|cloves?)\s*/gi;
   let cleaned = rawText.replace(plusPattern, ' ');
 
   // Also remove standalone parenthetical weight measurements like (265g)
@@ -210,35 +210,6 @@ function preprocessPlusNotation(rawText: string): string {
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   return cleaned;
-}
-
-/**
- * Extract ingredient name from raw text.
- * Uses sharp-recipe-parser for accurate extraction, with fallback to raw text.
- * Handles "+" notation for combined measurements (e.g., "2 cups + 2 tbsp flour").
- */
-function extractIngredientName(rawText: string): string {
-  // Preprocess to handle "+" combined measurements
-  const preprocessed = preprocessPlusNotation(rawText);
-
-  const parsed = parseIngredientLine(preprocessed);
-
-  if (parsed && parsed.ingredient) {
-    return stripExtraSuffixes(parsed.ingredient);
-  }
-
-  // Fallback: basic cleanup if parser fails
-  let text = preprocessed.trim();
-  // Remove leading numbers, fractions, and ranges
-  text = text.replace(/^[\d½⅓⅔¼¾⅛⅜⅝⅞\/\s\-\.]+/, '');
-  // Remove common units
-  text = text.replace(
-    /^(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g|kg|ml|l|quarts?|pints?|gallons?|bunch(?:es)?|heads?|cloves?|stalks?|cans?|jars?|pieces?|slices?|pinch|dash|handful|small|medium|large)\s+/i,
-    ''
-  );
-  text = text.replace(/^of\s+/i, '');
-
-  return stripExtraSuffixes(text.trim());
 }
 
 /**
@@ -361,7 +332,7 @@ function normalizeInstructions(text: string | null): string | null {
     let stepText = trimmed;
     // Remove leading bullet, dash, asterisk, or existing number
     stepText = stepText.replace(/^[-*•]\s*/, '');
-    stepText = stepText.replace(/^\d+[\.)]\s*/, '');
+    stepText = stepText.replace(/^\d+[.)]\s*/, '');
 
     if (stepText) {
       result.push(`${stepNumber}. ${stepText}`);
@@ -392,8 +363,8 @@ recipes.get('/', async (c) => {
 
   try {
     let query = `
-      SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes,
-             r.cook_time_minutes, r.servings, r.created_at, r.updated_at
+      SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.video_url,
+             r.prep_time_minutes, r.cook_time_minutes, r.servings, r.created_at, r.updated_at
       FROM recipes r
     `;
     let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
@@ -488,7 +459,7 @@ recipes.get('/', async (c) => {
 
     // Get tags for each recipe
     const recipeIds = (results.results ?? []).map((r) => (r as { id: number }).id);
-    let recipeTags: Record<
+    const recipeTags: Record<
       number,
       Array<{
         id: number;
@@ -498,7 +469,7 @@ recipes.get('/', async (c) => {
         is_category: number;
       }>
     > = {};
-    let recipeSmartTags: Record<
+    const recipeSmartTags: Record<
       number,
       Array<{
         id: number;
@@ -948,7 +919,7 @@ recipes.get('/suggestions/pantry', async (c) => {
 
     // Get tags for the recipes
     const recipeIds = limitedResults.map((r) => r.recipe.id);
-    let recipeTags: Record<
+    const recipeTags: Record<
       number,
       Array<{
         id: number;
@@ -1304,6 +1275,7 @@ recipes.post('/', async (c) => {
       prep_time_minutes,
       cook_time_minutes,
       notes,
+      video_url,
     } = body;
 
     if (!title) {
@@ -1317,8 +1289,9 @@ recipes.post('/', async (c) => {
       `
       INSERT INTO recipes (
         user_id, title, slug, markdown_content, description, ingredients_raw, instructions_raw,
-        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes,
+        video_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -1334,7 +1307,8 @@ recipes.post('/', async (c) => {
         servings_unit ?? 'servings',
         prep_time_minutes ?? null,
         cook_time_minutes ?? null,
-        notes ?? null
+        notes ?? null,
+        video_url ?? null
       )
       .run();
 
@@ -1426,6 +1400,7 @@ recipes.put('/:id', async (c) => {
       'fat_total',
       'calories_total',
       'macros_manual',
+      'video_url',
     ];
 
     const updates: string[] = [];
