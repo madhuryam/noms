@@ -67,16 +67,15 @@ export function NewRecipePage() {
       ? {
           title: videoData.title,
           description: videoData.description,
-          ingredients_raw: null,
-          instructions_raw: null,
+          ingredients_raw: videoData.ingredients_raw,
+          instructions_raw: videoData.instructions_raw,
           prep_instructions_raw: null,
           servings: null,
           prep_time_minutes: null,
           cook_time_minutes: null,
-          notes: videoData.embed_url
-            ? `Video: ${videoData.embed_url}`
-            : `Video: ${videoData.source_url}`,
+          notes: null,
           source_url: videoData.source_url,
+          video_url: videoData.embed_url || videoData.source_url,
           calories_total: null,
           protein_total: null,
           carbs_total: null,
@@ -251,8 +250,9 @@ export function NewRecipePage() {
                   Video link detected ({videoData.provider})
                 </p>
                 <p className="text-xs text-blue-600 dark:text-onedark-blue/80 mt-0.5">
-                  No structured recipe data available from this video. The link has been added as a
-                  source. You can manually fill in the recipe details below.
+                  {videoData.ingredients_raw || videoData.instructions_raw
+                    ? 'Recipe data found in the video description and pre-filled below. Review and edit as needed.'
+                    : 'No structured recipe data available from this video. The link has been added as a source. You can manually fill in the recipe details below.'}
                 </p>
                 {videoData.embed_url && videoData.provider === 'youtube' && (
                   <div className="mt-3 rounded-lg overflow-hidden aspect-video max-w-md">

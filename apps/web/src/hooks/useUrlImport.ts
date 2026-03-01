@@ -27,6 +27,8 @@ export interface ScrapedVideo {
   embed_url: string | null;
   thumbnail_url: string | null;
   provider: 'youtube' | 'instagram' | 'facebook' | 'tiktok';
+  ingredients_raw: string | null;
+  instructions_raw: string | null;
 }
 
 export type ScrapeData = ScrapedRecipe | ScrapedVideo;

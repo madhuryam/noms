@@ -17,6 +17,7 @@ interface Recipe {
   servings_unit: string | null;
   source_path: string | null;
   source_url: string | null;
+  video_url: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -47,6 +48,7 @@ interface CreateRecipeInput {
   cook_time_minutes?: number | null;
   notes?: string | null;
   source_url?: string | null;
+  video_url?: string | null;
 }
 
 interface UpdateRecipeInput extends Partial<CreateRecipeInput> {

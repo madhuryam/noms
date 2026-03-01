@@ -363,8 +363,8 @@ recipes.get('/', async (c) => {
 
   try {
     let query = `
-      SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.prep_time_minutes,
-             r.cook_time_minutes, r.servings, r.created_at, r.updated_at
+      SELECT DISTINCT r.id, r.slug, r.title, r.description, r.image_path, r.video_url,
+             r.prep_time_minutes, r.cook_time_minutes, r.servings, r.created_at, r.updated_at
       FROM recipes r
     `;
     let countQuery = 'SELECT COUNT(DISTINCT r.id) as total FROM recipes r';
@@ -1275,6 +1275,7 @@ recipes.post('/', async (c) => {
       prep_time_minutes,
       cook_time_minutes,
       notes,
+      video_url,
     } = body;
 
     if (!title) {
@@ -1288,8 +1289,9 @@ recipes.post('/', async (c) => {
       `
       INSERT INTO recipes (
         user_id, title, slug, markdown_content, description, ingredients_raw, instructions_raw,
-        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        prep_instructions_raw, servings, servings_unit, prep_time_minutes, cook_time_minutes, notes,
+        video_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     )
       .bind(
@@ -1305,7 +1307,8 @@ recipes.post('/', async (c) => {
         servings_unit ?? 'servings',
         prep_time_minutes ?? null,
         cook_time_minutes ?? null,
-        notes ?? null
+        notes ?? null,
+        video_url ?? null
       )
       .run();
 
@@ -1397,6 +1400,7 @@ recipes.put('/:id', async (c) => {
       'fat_total',
       'calories_total',
       'macros_manual',
+      'video_url',
     ];
 
     const updates: string[] = [];

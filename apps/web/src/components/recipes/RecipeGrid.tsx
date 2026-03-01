@@ -26,6 +26,7 @@ export function RecipeGrid({ recipes, loading = false }: RecipeGridProps) {
           title={recipe.title}
           description={recipe.description}
           imageUrl={recipe.image_path}
+          videoUrl={recipe.video_url}
           prepTime={recipe.prep_time_minutes}
           cookTime={recipe.cook_time_minutes}
           servings={recipe.servings}

@@ -76,6 +76,9 @@ interface ScrapedVideo {
   embed_url: string | null;
   thumbnail_url: string | null;
   provider: 'youtube' | 'instagram' | 'facebook' | 'tiktok';
+  // Recipe data extracted from video description (if detected)
+  ingredients_raw: string | null;
+  instructions_raw: string | null;
 }
 
 type ScrapeResult =
@@ -380,6 +383,94 @@ function extractTitleFromHtml(html: string): string | null {
   return titleMatch ? titleMatch[1].trim() : null;
 }
 
+// --- YouTube full description extraction ---
+
+function extractYouTubeDescription(html: string): string | null {
+  // YouTube embeds the full description in ytInitialPlayerResponse as "shortDescription"
+  const match = html.match(/"shortDescription"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (match) {
+    // Unescape JSON string escape sequences
+    try {
+      return JSON.parse(`"${match[1]}"`);
+    } catch {
+      return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    }
+  }
+  return null;
+}
+
+// --- Recipe extraction from video description ---
+
+function extractRecipeFromDescription(description: string): {
+  ingredients_raw: string | null;
+  instructions_raw: string | null;
+} {
+  const lines = description.split('\n');
+
+  let ingredientLines: string[] = [];
+  let instructionLines: string[] = [];
+  let currentSection: 'none' | 'ingredients' | 'instructions' = 'none';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const lower = trimmed.toLowerCase();
+
+    // Detect section headers
+    if (/^(ingredients|what you.?ll need)[:\s]*$/i.test(trimmed.replace(/[*#_-]/g, '').trim())) {
+      currentSection = 'ingredients';
+      continue;
+    }
+    if (
+      /^(instructions|directions|method|steps|how to make|preparation)[:\s]*$/i.test(
+        trimmed.replace(/[*#_-]/g, '').trim()
+      )
+    ) {
+      currentSection = 'instructions';
+      continue;
+    }
+
+    // Empty line in a section - keep going (descriptions often have blank lines)
+    if (!trimmed) {
+      // If we hit a blank line after collecting items, and the next content
+      // looks like a different section, we'll catch it with the header detection
+      continue;
+    }
+
+    // Stop collecting if we hit a clearly unrelated section
+    if (
+      currentSection !== 'none' &&
+      /^(follow me|subscribe|social|links|music|credits|tags|equipment|tools|notes)[:\s]*$/i.test(
+        lower.replace(/[*#_-]/g, '').trim()
+      )
+    ) {
+      currentSection = 'none';
+      continue;
+    }
+
+    if (currentSection === 'ingredients') {
+      // Clean up bullet points, dashes, etc.
+      const cleaned = trimmed.replace(/^[-•*▸▹➤►]\s*/, '').trim();
+      if (cleaned && !cleaned.startsWith('http')) {
+        ingredientLines.push(cleaned);
+      }
+    } else if (currentSection === 'instructions') {
+      // Clean up numbering
+      const cleaned = trimmed.replace(/^\d+[.)]\s*/, '').trim();
+      if (cleaned && !cleaned.startsWith('http')) {
+        instructionLines.push(cleaned);
+      }
+    }
+  }
+
+  return {
+    ingredients_raw: ingredientLines.length >= 2 ? ingredientLines.join('\n') : null,
+    instructions_raw:
+      instructionLines.length >= 2
+        ? instructionLines.map((line, i) => `${i + 1}. ${line}`).join('\n')
+        : null,
+  };
+}
+
 // --- Route handlers ---
 
 const scrapeRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -448,8 +539,10 @@ scrapeRoutes.post('/scrape-url', async (c) => {
           author_name?: string;
         };
 
-        // Also try to fetch the actual page to extract description
+        // Fetch the actual page to extract full description and look for recipe content
         let description: string | null = null;
+        let ingredientsRaw: string | null = null;
+        let instructionsRaw: string | null = null;
         try {
           const pageResponse = await fetch(normalizedUrl, {
             headers: {
@@ -459,7 +552,16 @@ scrapeRoutes.post('/scrape-url', async (c) => {
           });
           if (pageResponse.ok) {
             const html = await pageResponse.text();
-            description = extractMetaContent(html, 'og:description');
+            // Try to get the full description from YouTube's embedded data
+            const fullDescription = extractYouTubeDescription(html);
+            description = fullDescription || extractMetaContent(html, 'og:description');
+
+            // Try to extract recipe from the full description
+            if (fullDescription) {
+              const recipeData = extractRecipeFromDescription(fullDescription);
+              ingredientsRaw = recipeData.ingredients_raw;
+              instructionsRaw = recipeData.instructions_raw;
+            }
           }
         } catch {
           // Description extraction is best-effort
@@ -475,6 +577,8 @@ scrapeRoutes.post('/scrape-url', async (c) => {
             embed_url: `https://www.youtube.com/embed/${videoId}`,
             thumbnail_url: oembed.thumbnail_url || null,
             provider: 'youtube',
+            ingredients_raw: ingredientsRaw,
+            instructions_raw: instructionsRaw,
           },
         };
 
@@ -522,6 +626,8 @@ scrapeRoutes.post('/scrape-url', async (c) => {
           embed_url: null,
           thumbnail_url: thumbnailUrl,
           provider: 'instagram',
+          ingredients_raw: null,
+          instructions_raw: null,
         },
       };
 
@@ -559,6 +665,8 @@ scrapeRoutes.post('/scrape-url', async (c) => {
           embed_url: null,
           thumbnail_url: thumbnailUrl,
           provider: 'facebook',
+          ingredients_raw: null,
+          instructions_raw: null,
         },
       };
 
@@ -596,6 +704,8 @@ scrapeRoutes.post('/scrape-url', async (c) => {
           embed_url: null,
           thumbnail_url: thumbnailUrl,
           provider: 'tiktok',
+          ingredients_raw: null,
+          instructions_raw: null,
         },
       };
 

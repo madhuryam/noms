@@ -10,11 +10,24 @@ interface RecipeCardProps {
   title: string;
   description?: string | null;
   imageUrl?: string | null;
+  videoUrl?: string | null;
   prepTime?: number | null;
   cookTime?: number | null;
   servings?: number | null;
   tags?: RecipeTag[];
   showCalendarButton?: boolean;
+}
+
+function getYouTubeThumbnail(url: string): string | null {
+  const patterns = [
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
+  }
+  return null;
 }
 
 export function RecipeCard({
@@ -23,6 +36,7 @@ export function RecipeCard({
   title,
   description,
   imageUrl,
+  videoUrl,
   prepTime,
   cookTime,
   servings,
@@ -32,20 +46,42 @@ export function RecipeCard({
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const totalTime = (prepTime || 0) + (cookTime || 0);
 
+  // Use YouTube thumbnail as fallback when no image is uploaded
+  const videoThumbnail = !imageUrl && videoUrl ? getYouTubeThumbnail(videoUrl) : null;
+
   return (
     <>
       <Link
         to={`/recipes/${slug || id}`}
         className="group block bg-white dark:bg-onedark-bg-lighter rounded-xl border border-gray-200 dark:border-onedark-bg-highlight overflow-hidden hover:border-blue-500 dark:hover:border-onedark-blue hover:shadow-lg transition-all"
       >
-        {/* Image */}
+        {/* Image / Video Thumbnail */}
         <div className="relative overflow-hidden">
-          <RecipeImage
-            imagePath={imageUrl}
-            title={title}
-            recipeId={id}
-            className="group-hover:scale-105 transition-transform duration-300"
-          />
+          {videoThumbnail ? (
+            <div className="relative aspect-video bg-gray-100 dark:bg-onedark-bg group-hover:scale-105 transition-transform duration-300">
+              <img
+                src={videoThumbnail}
+                alt={title}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              {/* Play button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <RecipeImage
+              imagePath={imageUrl}
+              title={title}
+              recipeId={id}
+              className="group-hover:scale-105 transition-transform duration-300"
+            />
+          )}
           {/* Calendar button overlay */}
           {showCalendarButton && (
             <button
